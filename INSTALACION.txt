@@ -1,0 +1,28 @@
+ENIGMAX CINEPLAYER 0.2.7 — PORTÁTIL PARA WINDOWS 11 X64
+
+Descomprime el ZIP completo en una carpeta donde tengas permisos de escritura.
+Ejecuta EnigmaxCinePlayer.exe. Conserva junto a él libmpv-2.dll y las carpetas
+runtime, assets y licencias. No requiere instalar Rust ni FFmpeg.
+
+No hay instalador, servicios ni cambios automáticos en el registro. Para abrir
+MKV, MP4 o ISO por doble clic, usa Abrir con > Elegir otra aplicación de Windows
+y selecciona el EXE. La elección de aplicación predeterminada queda en tus manos.
+No es un EXE autónomo: necesita las bibliotecas incluidas en el ZIP.
+
+Los ajustes se guardan en config/ dentro de esta carpeta y no se incluyen en el
+paquete de distribución. Antes de mover la aplicación, ciérrala por completo.
+Para retirarla, cierra el programa y elimina su carpeta cuando ya no la necesites.
+Conserva config/ si quieres trasladar tus ajustes a otra ubicación.
+
+ACTUALIZACIONES
+Se comprueban al arrancar y desde Acerca de > Buscar actualizaciones. Solo se
+descarga después de aceptar. El auxiliar valida el ZIP antes de cerrar el
+reproductor, sustituye el EXE y sus bibliotecas, conserva config/ y reinicia.
+Cierra las otras instancias antes de actualizar. Consulta ACTUALIZACIONES.md.
+Para actualizar manualmente, cierra todas las instancias y extrae el paquete
+nuevo completo en la carpeta elegida. No sustituyas solamente el EXE.
+
+El ejecutable no está firmado digitalmente. El soporte de HDR, audio HDMI,
+Blu-ray y MVC y los límites de las pruebas se detallan en README.md.
+La distribución pública de las dependencias requiere revisar las obligaciones
+de sus licencias y disponer del código fuente correspondiente: DEPENDENCIAS.md.

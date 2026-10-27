@@ -1,0 +1,26 @@
+[package]
+name = "enigmax-cineplayer"
+version = "0.2.7"
+edition = "2024"
+description = "Reproductor MKV para Windows con presentación estereoscópica en 2D"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+semver = "1"
+serde_json = "1"
+tempfile = "3"
+
+[lib]
+name = "cineplayer_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "EnigmaxCinePlayer"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+

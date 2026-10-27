@@ -1,0 +1,15 @@
+/target/
+/EnigmaxCinePlayer.exe
+/libmpv-2.dll
+/ultimo-error.txt
+/diagnostico-eventos.txt
+/config/
+/runtime/*.dll
+/package.manifest.json
+/SHA256SUMS.txt
+/.enigmax-update-*/
+/.enigmax-update.lock
+
+/verificacion/muestras/*.mkv
+/verificacion/muestras/*.mp4
+/verificacion/muestras/synthetic.srt
