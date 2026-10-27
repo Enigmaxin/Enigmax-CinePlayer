@@ -1,29 +1,21 @@
-# Compilar desde este repositorio
+# Compilar Enigmax CinePlayer 0.2.8
 
-Código de Enigmax CinePlayer 0.2.7, GPL-3.0-or-later. Las DLL de reproducción y los ajustes personales no forman parte del árbol Git. Las licencias de terceros se conservan en licencias/ y en native/vendor/.
+El repositorio contiene el programa y puente MVC/UDF. Los dos ZIP adicionales de FUENTES.md contienen las instantáneas y dependencias del motor, sus recetas y las fuentes Cargo. No contienen películas ni ajustes personales.
 
 ## Windows x64
 
-- Instalar Rust GNU x64 y MinGW-w64 con GCC, make y windres. El código local se verificó con Rust 1.99.1 GNU. No se requiere ese entorno para ejecutar el reproductor.
-- Disponer de libmpv-2.dll en la raíz y las DLL FFmpeg y cine_mvc.dll en runtime/. El paquete portátil completo contiene estos archivos; no basta el EXE. Las procedencias y versiones están documentadas en DEPENDENCIAS.md.
-- Para las pruebas del ejecutable se generan localmente cuadros negros, ondas sinusoidales y subtítulos de prueba. No se publican películas ni vídeos de prueba en Git:
+Rust GNU, GCC/make/windres y Windows 11. build.ps1 verifica formato, Clippy y pruebas antes de copiar el EXE. El conjunto probado usa Rust 1.99.1, w64devkit 2.10.1 y MSYS2 UCRT64/GCC 16.2.0. ToolsPath admite cargo/bin, rustup y w64devkit/bin, o herramientas ya presentes en PATH.
 
-```powershell
-./verificacion/tests/generate-fixtures.ps1 -Ffmpeg 'C:/ruta/ffmpeg.exe'
-./build.ps1 -ToolsPath 'C:/ruta/herramientas'
-./build-portable.ps1
-```
+1. Extraer ambos ZIP de fuentes en una carpeta. fuentes/EnigmaxCinePlayer es el proyecto; fuentes/mpv y fuentes/ffmpeg son exportaciones de las revisiones fijadas. dependency-sources/ contiene las fuentes MSYS2 y los metadatos BUILDINFO/PKGINFO/PKGBUILD/SRCINFO.
+2. Preparar MSYS2 UCRT64. El archivo fuentes/msys2-packages.lock registra el entorno instalado, que incluye herramientas y un superconjunto de bibliotecas. Para reconstruir una dependencia, extraer su .src.tar.zst y usar su PKGBUILD con makepkg-mingw en UCRT64, respetando las versiones/recetas registradas. Algunos paquetes originales de Rust obtienen crates durante prepare(); sus fuentes están también en fuentes/cargo-vendor. No se afirma reproducibilidad bit a bit ni se requiere usar todos los paquetes del entorno para ejecutar.
+3. En bash UCRT64: bash fuentes/EnigmaxCinePlayer/native/build-engine.sh fuentes engine-build 4. El script comprueba revisiones, compila FFmpeg y luego libmpv; no reemplaza el reproductor. Si se usa Git en lugar de las instantáneas, clonar y seleccionar exactamente las revisiones de FUENTES.md.
+4. En PowerShell, compilar el puente: ./build-native.ps1 -ToolsPath C:/herramientas -FfmpegDirectory C:/engine-build/prefix -RuntimeDirectory C:/bridge. native/stage-engine.py resuelve las importaciones PE desde prefix/bin y MSYS2/ucrt64/bin, excluye Windows y recoge avisos/licencias. Ejecutarlo con --help para los parámetros. Colocar libmpv-2.dll en la raíz del proyecto y las otras DLL en runtime/.
+5. Generar las muestras sintéticas con ./verificacion/tests/generate-fixtures.ps1 -Ffmpeg C:/ruta/ffmpeg.exe. Para el paquete de fuentes no se publican vídeos; las muestras se crean localmente. ./build.ps1 -ToolsPath C:/herramientas compila y prueba el programa. ./build-portable.ps1 genera y valida el ZIP portátil.
 
-ToolsPath admite la disposición cargo/bin, rustup y w64devkit/bin usada por los scripts. También pueden usarse Rust y MinGW ya presentes en PATH. La compilación verifica formato, Clippy y pruebas antes de generar el EXE. Las cabeceras, bibliotecas de importación necesarias y fuentes del puente están incluidas; no se incluyen los compiladores ni las DLL del motor en Git.
+Las cabeceras e import libraries de native/vendor/ffmpeg corresponden al FFmpeg compartido fijado. Si se cambia esa revisión, actualizar también el SDK desde prefix/include y prefix/lib antes de compilar el puente. build.ps1 recompila el puente, pero no reconstruye automáticamente el motor.
 
-En Linux y macOS se comprueba solamente el núcleo independiente de la plataforma:
+fuentes/cargo-vendor permite usar Cargo sin descargar crates. Por ejemplo, pasar --offline y las opciones --config 'source.crates-io.replace-with="vendored-sources"' y --config 'source.vendored-sources.directory="C:/fuentes/cargo-vendor"'. Incluye los cuatro proyectos Cargo y sus dependencias, también de otros destinos. fuentes/rust-upstreams conserva las instantáneas/archivos de bloqueo de librsvg, libdovi y rav1e; librsvg incorpora la preparación windows-sys 0.61.2 -> 0.60.2 indicada por su PKGBUILD.
 
-```sh
-cargo test --locked --lib
-```
+## Otros sistemas
 
-Eso no produce todavía aplicaciones de escritorio para esas plataformas.
-
-## Distribución de binarios
-
-La validación funcional local no certifica por sí sola la distribución pública de todas las dependencias. La documentación de esta entrega mantiene pendiente reunir el código fuente correspondiente de todos los componentes incluidos en libmpv/FFmpeg. No se afirma que unos enlaces a ramas main/master sean un paquete de fuentes correspondiente completo. Véase DEPENDENCIAS.md.
+cargo test --locked --lib comprueba únicamente el núcleo independiente de Windows. No genera aplicaciones para macOS/Linux/Google TV. El flujo GitHub Actions no llegó a ejecutar las pruebas porque GitHub bloqueó los trabajos por la facturación/límite de gasto de la cuenta; no se presenta como CI superada.

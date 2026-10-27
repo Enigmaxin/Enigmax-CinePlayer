@@ -8,7 +8,7 @@ $output=[IO.Path]::GetFullPath($OutputDirectory)
 [void][IO.Directory]::CreateDirectory($output)
 $package=Join-Path $output "Enigmax-CinePlayer-Portable-$version-windows-x64.zip"
 if (Test-Path -LiteralPath $package) {throw "El paquete ya existe: $package. Retíralo explícitamente antes de volver a empaquetar."}
-$files=@('EnigmaxCinePlayer.exe','libmpv-2.dll','assets/enigmax_controls.lua','LICENSE.txt','README.md','DEPENDENCIAS.md','INSTALACION.txt','ACTUALIZACIONES.md')
+$files=@('EnigmaxCinePlayer.exe','libmpv-2.dll','assets/enigmax_controls.lua','LICENSE.txt','README.md','DEPENDENCIAS.md','INSTALACION.txt','ACTUALIZACIONES.md','FUENTES.md')
 $files+=Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'runtime') -File -Filter '*.dll' | ForEach-Object {'runtime/'+$_.Name}
 $files+=Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'licencias') -File | ForEach-Object {'licencias/'+$_.Name}
 $hashes=@(foreach ($f in ($files | Sort-Object -Unique)) {

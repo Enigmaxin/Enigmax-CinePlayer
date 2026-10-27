@@ -1,31 +1,25 @@
-# Dependencias de 0.2.7
+# Dependencias de 0.2.8
 
-Código propio GPL-3.0-or-later; Rust 1.99.1 GNU x64 y w64devkit 2.10.1/GCC 16.2.0. Perfil release LTO. No se necesitan para ejecutar.
+Código propio GPL-3.0-or-later. Rust 1.99.1 GNU x64 y w64devkit 2.10.1/GCC 16.2.0 para el ejecutable y puente; MSYS2 UCRT64/GCC 16.2.0, Meson 1.12.1 y Ninja 1.13.2 para el motor. No se requieren para ejecutar.
 
-- libmpv estándar x64: v0.41.0-1227-ge471496c5, API 2.6, shinchiro 20261021. DLL conservada de 0.1.1; SHA-256 04E4D27DC385DC18DDD93FBE69C75E635B864F3C6EC53A9122DF54C2F7842F4A.
-- FFmpeg compartido BtbN n9.0/latest GPL, descarga local del 26/10/2026. avformat-63, avcodec-63, avutil-61 y swresample-7; se carga al catalogar ISO o decodificar MVC. No se lanza un proceso FFmpeg para reproducir. El motor libmpv incorpora su propio FFmpeg estático.
-- edge264-mvc API 2, fuentes BSD descargadas de main el 26/10/2026 y conservadas en native/vendor. Compilado base x86-64 con variantes x86-64-v2/v3 seleccionadas en ejecución. Cuatro hilos para el puente. No se modificaron las fuentes del decodificador.
-- libudfread, fuentes master descargadas el 26/10/2026, LGPL 2.1+, conservadas en native/vendor. El bloque de entrada propio abre el archivo en lectura mediante AVIO y serializa la lectura de sectores de la ISO.
-- Pruebas: FFmpeg estático git 9a861e968; conformance_check del decodificador. Python/Pillow/numpy se utilizan fuera del reproductor para QA.
+- mpv e471496c56f0f49c133bd88b50aed62b845f1909: compilación propia compartida con Lua 5.1, D3D11, WASAPI, libass, libplacebo, Blu-ray y gestión de color. JavaScript, VapourSynth y SMTC no se habilitan.
+- FFmpeg 6882969ce9fd2aa6aa1d0008b2bfe1c838aac11d: compilación propia GPL v3 compartida. Motor y puente utilizan el mismo conjunto FFmpeg, sin otro FFmpeg estático dentro de libmpv. D3D11VA/D3D12VA/DXVA2 y selección de CPU en ejecución. Argumentos completos en native/build-engine.sh. Whisper y libmysofa no se habilitan.
+- Otras DLL: paquetes UCRT64 de MSYS2, con versiones fijadas y binarios validados mediante PGP por pacman. Se distribuye la clausura de importaciones PE de 125 DLL, excluyendo las DLL del sistema Windows. Versiones, paquetes propietarios y hashes en licencias/engine-manifest.txt; avisos y textos en licencias/third-party-runtime.txt y las licencias individuales.
+- edge264-mvc API 2, fuentes BSD conservadas en native/vendor. Base x86-64 y variantes x86-64-v2/v3 seleccionadas en ejecución. Cuatro hilos para el puente. libudfread LGPL 2.1+, fuentes conservadas en native/vendor. La ISO se abre en lectura.
+- Actualizador: semver, serde_json y tempfile, con dependencias fijadas en Cargo.lock. PowerShell 5.1, .NET y Windows Forms del sistema realizan la consulta HTTPS y el auxiliar. No hay servicio ni runtime asíncrono residente.
 
-Los hashes de los archivos entregados están en SHA256SUMS.txt. Son hashes locales de identificación, no firmas independientes del proveedor. Las instantáneas de fuentes incluidas fijan el contenido usado; main/master no son números de publicación estables.
+Las revisiones de mpv y FFmpeg se comprobaron contra Git antes de compilar. Se verificó la diferencia CRLF/LF del checkout Windows sin cambios de contenido. El identificador mpv puede contener «dirty» por esos finales de línea; no corresponde a un parche del motor.
 
-Orígenes y documentación:
+Los archivos fuente MSYS2 proceden del repositorio oficial. El SHA de cada PKGBUILD se contrastó con BUILDINFO del paquete binario validado con PGP. Los archivos fuente no se presentan como firmados individualmente: el inventario registra URL y SHA-256. Las recetas, parches, instantáneas y fuentes Cargo se incluyen en los paquetes adicionales de la misma release: FUENTES.md. No se afirma una reconstrucción bit a bit ni una auditoría jurídica independiente.
 
-- https://mpv.io/installation/
-- https://mpv.io/manual/master/
-- https://github.com/shinchiro/mpv-winbuild-cmake/releases/tag/20261021
-- https://github.com/BtbN/FFmpeg-Builds/releases
+Orígenes:
+
+- https://github.com/mpv-player/mpv
+- https://github.com/FFmpeg/FFmpeg
+- https://repo.msys2.org/mingw/sources/
+- https://github.com/msys2/MINGW-packages
 - https://github.com/jens-duttke/edge264-mvc
 - https://code.videolan.org/videolan/libudfread
-- https://github.com/skeeto/w64devkit/releases/tag/v2.10.1
+- https://github.com/skeeto/w64devkit
 
-Los coeficientes Dubois y el filtro alternativo siguen la referencia stereo3d de FFmpeg. Se adjuntan licencias de mpv, FFmpeg, edge264-mvc y libudfread. Esta entrega local no contiene el código fuente completo correspondiente a todos los componentes del binario libmpv/FFmpeg; antes de una redistribución pública hay que preparar ese conjunto y revisar sus obligaciones. No se presenta como paquete público auditado.
-
-La ampliación ASS 3D utiliza el libass integrado en libmpv y la API de propiedades observadas. No añade crates ni DLL nuevas. Se consultaron el manual y el código de la versión mpv e471496c56 para comprobar la fusión antes de MAIN y la corrección de píxel ASS:
-
-- https://mpv.io/manual/master/#options-blend-subtitles
-- https://github.com/mpv-player/mpv/blob/e471496c56/sub/sd_ass.c
-- https://github.com/mpv-player/mpv/blob/e471496c56/video/out/gpu/video.c
-
-Actualizador: crates semver (MIT/Apache-2.0), serde_json (MIT/Apache-2.0) y tempfile (MIT/Apache-2.0), con versiones transitivas fijadas en Cargo.lock. Windows PowerShell 5.1, .NET y Windows Forms del sistema realizan la consulta HTTPS y el auxiliar; no se añaden DLL distribuidas. El código de consulta no utiliza Rust async ni un runtime residente.
+Los coeficientes Dubois siguen la referencia stereo3d de FFmpeg. ASS 3D utiliza libass y la fusión antes del shader. Las pruebas y límites se documentan en VERIFICACION_0.2.8.md; no se certifica cualquier archivo, CPU, TV HDR o receptor HDMI.

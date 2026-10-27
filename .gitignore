@@ -9,7 +9,7 @@
 /SHA256SUMS.txt
 /.enigmax-update-*/
 /.enigmax-update.lock
-
 /verificacion/muestras/*.mkv
 /verificacion/muestras/*.mp4
 /verificacion/muestras/synthetic.srt
+/licencias/third-party-runtime.txt

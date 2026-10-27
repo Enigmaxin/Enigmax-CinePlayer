@@ -22,6 +22,12 @@ try {
     foreach ($name in @('../EnigmaxCinePlayer.exe','runtime/../libmpv-2.dll','C:/evil.dll','config/default.ini','runtime/a.dll:stream','runtime\a.dll','assets/evil.lua','movie.mkv','runtime/.dll')) {
         Assert (!(Test-PayloadPath $name)) "Ruta aceptada: $name"; $passed++
     }
+    foreach ($name in @('runtime/libstdc++-6.dll','runtime/libgobject-2.0-0.dll')) {
+        Assert (Test-PayloadPath $name) "Dependencia DLL rechazada: $name"; $passed++
+    }
+    foreach ($name in @('runtime/CON.dll','runtime/com1.dll','runtime/NUL.dll')) {
+        Assert (!(Test-PayloadPath $name)) "Nombre de dispositivo aceptado: $name"; $passed++
+    }
     foreach ($names in @(@('../EnigmaxCinePlayer.exe'),@('libmpv-2.dll','LIBMPV-2.DLL'),@('config/default.ini'))) {
         $path=Join-Path $base ([Guid]::NewGuid().ToString('N')+'.zip'); Write-Zip $path $names
         $stage=Join-Path $base ('.enigmax-update-'+[Guid]::NewGuid().ToString('N'))
@@ -36,6 +42,12 @@ try {
         $p=Join-Path $source $f; [pscustomobject]@{path=$f;bytes=(Get-Item -LiteralPath $p).Length;sha256=Get-Sha256 $p}
     })
     $payload=[pscustomobject]@{format=1;version=$version;files=$files}
+    $many=@($files)+@(1..252 | ForEach-Object {[pscustomobject]@{path="runtime/test-$_.dll";bytes=1;sha256=('0'*64)}})
+    $limit=Join-Path $base 'limit.json'
+    [IO.File]::WriteAllText($limit,([pscustomobject]@{format=1;version=$version;files=$many} | ConvertTo-Json -Depth 5))
+    Assert (@((Read-PayloadManifest $limit $version).files).Count -eq 256) 'No se acepta el límite de 256 archivos'; $passed++
+    [IO.File]::WriteAllText($limit,([pscustomobject]@{format=1;version=$version;files=@($many)+@([pscustomobject]@{path='runtime/overflow.dll';bytes=1;sha256=('0'*64)})} | ConvertTo-Json -Depth 5))
+    Reject {Read-PayloadManifest $limit $version} 'más de 256 archivos'
     [IO.File]::WriteAllText((Join-Path $source 'package.manifest.json'),($payload | ConvertTo-Json -Depth 5))
     $zipPath=Join-Path $base 'valid.zip'
     $zip=[IO.Compression.ZipFile]::Open($zipPath,[IO.Compression.ZipArchiveMode]::Create)

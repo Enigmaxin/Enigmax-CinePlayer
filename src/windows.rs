@@ -19,6 +19,8 @@ unsafe extern "system" {
     fn SetLastError(error: u32);
     fn GetModuleHandleW(name: *const u16) -> Handle;
     fn MoveFileExW(source: *const u16, destination: *const u16, flags: u32) -> i32;
+    fn AddDllDirectory(path: *const u16) -> Handle;
+    fn RemoveDllDirectory(cookie: Handle) -> i32;
 }
 #[link(name = "user32")]
 unsafe extern "system" {
@@ -182,7 +184,18 @@ impl Drop for MenuHost {
 }
 thread_local! {static MENU_HOST: RefCell<Option<MenuHost>> = const {RefCell::new(None)};}
 
-pub struct Library(Handle);
+struct DependencyDirectory(Handle);
+impl Drop for DependencyDirectory {
+    fn drop(&mut self) {
+        unsafe { RemoveDllDirectory(self.0) };
+    }
+}
+pub struct Library {
+    handle: Handle,
+    // Keep the registered, application-owned runtime directory alive while
+    // the module and its delayed dependencies may need it. Never add PATH/CWD.
+    _runtime: Option<DependencyDirectory>,
+}
 pub fn replace_file(source: &Path, destination: &Path) -> Result<(), String> {
     let a = source
         .as_os_str()
@@ -204,12 +217,32 @@ impl Library {
     pub fn load(path: &Path) -> Result<Self, String> {
         let resolved =
             std::fs::canonicalize(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let runtime = resolved.parent().map(|p| p.join("runtime"));
+        let runtime = if let Some(path) = runtime.filter(|p| p.is_dir()) {
+            let path = std::fs::canonicalize(&path).map_err(|e| e.to_string())?;
+            let wide = path
+                .as_os_str()
+                .encode_wide()
+                .chain(Some(0))
+                .collect::<Vec<_>>();
+            let cookie = unsafe { AddDllDirectory(wide.as_ptr()) };
+            if cookie.is_null() {
+                return Err(format!(
+                    "No se pudo registrar runtime: {}",
+                    std::io::Error::last_os_error()
+                ));
+            }
+            Some(DependencyDirectory(cookie))
+        } else {
+            None
+        };
         let path = resolved
             .as_os_str()
             .encode_wide()
             .chain(Some(0))
             .collect::<Vec<_>>();
-        // Only the DLL folder and Windows system locations are searched for dependencies.
+        // DLL folder, application directory, explicitly registered runtime and
+        // system locations. LOAD_LIBRARY_SEARCH_DEFAULT_DIRS excludes PATH/CWD.
         let handle = unsafe { LoadLibraryExW(path.as_ptr(), ptr::null_mut(), 0x100 | 0x1000) };
         if handle.is_null() {
             Err(format!(
@@ -218,11 +251,14 @@ impl Library {
                 std::io::Error::last_os_error()
             ))
         } else {
-            Ok(Self(handle))
+            Ok(Self {
+                handle,
+                _runtime: runtime,
+            })
         }
     }
     pub fn symbol(&self, name: &CStr) -> Result<*mut c_void, String> {
-        let p = unsafe { GetProcAddress(self.0, name.as_ptr()) };
+        let p = unsafe { GetProcAddress(self.handle, name.as_ptr()) };
         if p.is_null() {
             Err(format!("libmpv no exporta {}", name.to_string_lossy()))
         } else {
@@ -232,7 +268,7 @@ impl Library {
 }
 impl Drop for Library {
     fn drop(&mut self) {
-        unsafe { FreeLibrary(self.0) };
+        unsafe { FreeLibrary(self.handle) };
     }
 }
 

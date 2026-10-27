@@ -8,9 +8,12 @@ function Get-Sha256([string]$Path) {
 }
 
 function Test-PayloadPath([string]$Path) {
+    $leaf = ($Path -split '/')[-1]
+    if ($leaf -imatch '^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)') { return $false }
     if ($Path -ceq 'EnigmaxCinePlayer.exe' -or $Path -ceq 'libmpv-2.dll' -or
-        $Path -ceq 'assets/enigmax_controls.lua' -or $Path -ceq 'package.manifest.json') { return $true }
-    if ($Path -cmatch '^runtime/[a-zA-Z0-9_-]+\.dll$' -or
+        $Path -ceq 'assets/enigmax_controls.lua' -or $Path -ceq 'package.manifest.json' -or
+        $Path -ceq 'FUENTES.md') { return $true }
+    if ($Path -cmatch '^runtime/[a-zA-Z0-9_.+-]+\.dll$' -or
         $Path -cmatch '^licencias/[a-zA-Z0-9_.-]+\.(txt|md)$' -or
         $Path -cin @('LICENSE.txt','README.md','DEPENDENCIAS.md','INSTALACION.txt','ACTUALIZACIONES.md')) { return $true }
     return $false
@@ -43,7 +46,7 @@ function Read-PayloadManifest([string]$Path, [string]$ExpectedVersion) {
     $m = [IO.File]::ReadAllText($Path,[Text.Encoding]::UTF8) | ConvertFrom-Json
     if ($m.format -ne 1 -or $m.version -cnotmatch '^\d+\.\d+\.\d+$' -or
         ($ExpectedVersion -and $m.version -cne $ExpectedVersion) -or
-        @($m.files).Count -lt 4 -or @($m.files).Count -gt 128) { throw 'Manifiesto de paquete no válido' }
+        @($m.files).Count -lt 4 -or @($m.files).Count -gt 256) { throw 'Manifiesto de paquete no válido' }
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     [long]$total = 0
     foreach ($f in $m.files) {
@@ -86,7 +89,7 @@ function Expand-ValidatedPayload([string]$Zip, [string]$Stage, [string]$Version)
     [void][IO.Directory]::CreateDirectory($Stage)
     $archive = [IO.Compression.ZipFile]::OpenRead($Zip)
     try {
-        if ($archive.Entries.Count -gt 129) { throw 'Demasiadas entradas ZIP' }
+        if ($archive.Entries.Count -gt 257) { throw 'Demasiadas entradas ZIP' }
         $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         [long]$total = 0
         # Validate ALL names and bounds before extracting anything. No directory,

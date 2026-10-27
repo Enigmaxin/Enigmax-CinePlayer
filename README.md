@@ -1,4 +1,4 @@
-# Enigmax CinePlayer 0.2.7 — Windows 11 x64
+# Enigmax CinePlayer 0.2.8 — Windows 11 x64
 
 Versión de desarrollo funcional. Se mantiene únicamente la última versión del programa; las versiones obsoletas se eliminan por indicación del usuario. Logo A elegido: cinta dorada y símbolo de reproducción azul.
 
@@ -76,7 +76,7 @@ En una prueba MVC de 0.2.0 de 20 segundos sobre i9-9900K se observaron 745,7 MiB
 
 `src/lib.rs` y `src/stereo.rs` no dependen de Windows. `player.rs` contiene las políticas de reproducción; `mpv.rs` y `mvc.rs`, enlaces ABI; `windows.rs`, interfaz nativa. El puente C actual depende de Windows. GOOGLETV.md describe el trabajo pendiente para Android: no se entrega APK.
 
-VERIFICACION_ASS3D.md documenta esta ampliación; VERIFICACION.md conserva las pruebas de 0.2.0. No se ha certificado compatibilidad universal ni distribución pública de todas las dependencias del motor. Se distribuye como ZIP portátil y se actualiza mediante GitHub Releases; los ejecutables no están firmados digitalmente.
+VERIFICACION_ASS3D.md documenta esta ampliación; VERIFICACION.md conserva las pruebas de 0.2.0. No se ha certificado compatibilidad universal. Las fuentes correspondientes del motor y sus dependencias se ofrecen en la misma release: FUENTES.md. Se distribuye como ZIP portátil y se actualiza mediante GitHub Releases; los ejecutables no están firmados digitalmente.
 
 ## Actualizaciones desde GitHub
 
@@ -91,3 +91,7 @@ Distribución y actualización del conjunto portátil, recuperación ante archiv
 ## Cambios de 0.2.5
 
 En el menú Acerca de se puede buscar actualizaciones manualmente; la consulta sigue ejecutándose en segundo plano e informa del resultado. La barra inferior incluye Audio y Subs (A/S en ventanas pequeñas), con las pistas disponibles y desactivación de subtítulos. Las búsquedas, cambios de pista y controles de reproducción se envían de forma asíncrona. Las búsquedas rápidas se agrupan con una solicitud activa y una pendiente; se descartan al cambiar de archivo o cerrar. Los errores de controles se muestran sin diálogo modal y se conserva un diagnóstico acotado en config/ultimo-error-reproduccion.log. Consulta VERIFICACION_0.2.5.md para el alcance de las pruebas.
+
+## Cambios de 0.2.8
+
+Motor reconstruido desde revisiones fijadas de mpv y FFmpeg; ambos comparten las bibliotecas FFmpeg. Carga de dependencias desde runtime/ mediante directorios DLL explícitos, sin buscar en PATH o el directorio de trabajo. Inventario, licencias y paquetes de fuentes correspondientes incluidos. Verificación: VERIFICACION_0.2.8.md.

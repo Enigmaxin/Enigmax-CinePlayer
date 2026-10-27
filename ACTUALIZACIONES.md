@@ -1,4 +1,4 @@
-# Actualizaciones portátiles de Enigmax CinePlayer 0.2.7
+# Actualizaciones portátiles de Enigmax CinePlayer 0.2.8
 
 Al arrancar y desde Acerca de > Buscar actualizaciones, un hilo secundario consulta la API pública de GitHub Releases. La reproducción no espera a la red. APP_VERSION procede de Cargo.toml. Los modos --probe no consultan actualizaciones. Una exclusión entre procesos evita consultas simultáneas.
 
@@ -21,8 +21,10 @@ Los errores de consulta se registran en config/updater-status.log sin diálogos 
 
 1. Ejecutar build.ps1 y revisar las pruebas.
 2. Ejecutar build-portable.ps1. Comprueba que Cargo.toml y el EXE coinciden, prepara el manifiesto, genera el ZIP y verifica de nuevo su contenido extraído. Emite también un archivo .sha256.
-3. Cuando el usuario autorice publicar, subir el código al repositorio y adjuntar el ZIP a una release pública estable, por ejemplo v0.2.7. El nombre exacto del asset será Enigmax-CinePlayer-Portable-0.2.7-windows-x64.zip. Los archivos automáticos Source code de GitHub no sustituyen este paquete.
+3. Cuando el usuario autorice publicar, subir el código al repositorio y adjuntar el ZIP a una release pública estable, por ejemplo v0.2.8. El nombre exacto del asset será Enigmax-CinePlayer-Portable-0.2.8-windows-x64.zip. Los archivos automáticos Source code de GitHub no sustituyen este paquete.
 4. Comprobar que la API de GitHub proporciona el digest SHA-256 y que una versión anterior detecta la nueva. Esta prueba real de distribución queda pendiente hasta publicar un ZIP compatible. No se publican releases automáticamente.
 
 build-installer.ps1 e installer/ permanecen únicamente como fuentes históricas; no intervienen en la compilación portátil ni se han generado instaladores nuevos.
 Las versiones antiguas cuyo actualizador solo admite Setup necesitan descargar y extraer manualmente el primer ZIP portátil. Después podrán usar el nuevo mecanismo.
+
+La primera migración desde 0.2.7 a este nuevo motor debe hacerse descargando el ZIP completo: su validador anterior no admite todos los nombres de DLL nuevos. Las versiones 0.2.8 en adelante admiten el conjunto compartido.

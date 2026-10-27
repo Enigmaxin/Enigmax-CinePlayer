@@ -1,0 +1,3434 @@
+{
+  "format": 1,
+  "modules": [
+    {
+      "path": "libmpv-2.dll",
+      "bytes": 3745303,
+      "sha256": "98174dcb985c2095080f91ac1058db265e9f65c148d28d2caae42681d93dbd80",
+      "imports": [
+        "avcodec-63.dll",
+        "avdevice-63.dll",
+        "avfilter-12.dll",
+        "avformat-63.dll",
+        "avutil-61.dll",
+        "swresample-7.dll",
+        "swscale-10.dll",
+        "ADVAPI32.dll",
+        "AVRT.dll",
+        "dwmapi.dll",
+        "GDI32.dll",
+        "libiconv-2.dll",
+        "IMM32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ntdll.dll",
+        "ole32.dll",
+        "OPENGL32.dll",
+        "api-ms-win-core-path-l1-1-0.dll",
+        "SHCORE.dll",
+        "SHELL32.dll",
+        "USER32.dll",
+        "UxTheme.dll",
+        "VERSION.dll",
+        "libarchive-13.dll",
+        "libass-9.dll",
+        "libbluray-4.dll",
+        "libcaca-0.dll",
+        "libcurl-4.dll",
+        "libjpeg-8.dll",
+        "liblcms2-2.dll",
+        "lua51.dll",
+        "libplacebo-387.dll",
+        "libshaderc_shared.dll",
+        "libspirv-cross-c-shared.dll",
+        "libuchardet.dll",
+        "libva.dll",
+        "libva_win32.dll",
+        "vulkan-1.dll",
+        "zlib1.dll",
+        "libzimg-2.dll"
+      ],
+      "provider": "own-source-build"
+    },
+    {
+      "path": "runtime/cine_mvc.dll",
+      "bytes": 1384712,
+      "sha256": "706e69b89ae676e43c7743175290c3f4fbf77bc8d6507ca8cc2b5e70ad25f793",
+      "imports": [
+        "avcodec-63.dll",
+        "avformat-63.dll",
+        "avutil-61.dll",
+        "KERNEL32.dll",
+        "msvcrt.dll"
+      ],
+      "provider": "own-mvc-udf-source-build"
+    },
+    {
+      "path": "runtime/avcodec-63.dll",
+      "bytes": 20447232,
+      "sha256": "c64f3bc9da3d257579a445e43a0cfee4acc3882e68b65a213dbdc7cd872f1ee8",
+      "imports": [
+        "libaom.dll",
+        "libcairo-2.dll",
+        "libdav1d-7.dll",
+        "libglib-2.0-0.dll",
+        "libgobject-2.0-0.dll",
+        "libgsm.dll",
+        "libiconv-2.dll",
+        "libjxl.dll",
+        "libjxl_threads.dll",
+        "KERNEL32.dll",
+        "liblc3-1.dll",
+        "liblzma-5.dll",
+        "libmp3lame-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ole32.dll",
+        "libopencore-amrnb-0.dll",
+        "libopencore-amrwb-0.dll",
+        "libopenjp2-7.dll",
+        "libopus-0.dll",
+        "librav1e.dll",
+        "librsvg-2-2.dll",
+        "libspeex-1.dll",
+        "libSvtAv1Enc-4.dll",
+        "libtheoradec-2.dll",
+        "libtheoraenc-2.dll",
+        "libva.dll",
+        "libvorbis-0.dll",
+        "libvorbisenc-2.dll",
+        "libvpl-2.dll",
+        "libvpx-1.dll",
+        "libwebp-7.dll",
+        "libwebpmux-3.dll",
+        "libx264-165.dll",
+        "libx265-217.dll",
+        "xvidcore.dll",
+        "zlib1.dll",
+        "libzvbi-0.dll",
+        "avutil-61.dll",
+        "swresample-7.dll"
+      ],
+      "provider": "own-source-build"
+    },
+    {
+      "path": "runtime/avdevice-63.dll",
+      "bytes": 151552,
+      "sha256": "eceda6c5cccb2cd7748b763464ea8e3e6346bcd25762ff496d6b360f2dbd166d",
+      "imports": [
+        "GDI32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "ole32.dll",
+        "OLEAUT32.dll",
+        "SHLWAPI.dll",
+        "USER32.dll",
+        "AVICAP32.dll",
+        "avcodec-63.dll",
+        "avfilter-12.dll",
+        "avformat-63.dll",
+        "avutil-61.dll"
+      ],
+      "provider": "own-source-build"
+    },
+    {
+      "path": "runtime/avfilter-12.dll",
+      "bytes": 6696960,
+      "sha256": "83bfee32473b69101b6e683f4878dc30347b5f9a46e88923df0d6bf97332695d",
+      "imports": [
+        "libass-9.dll",
+        "libfontconfig-1.dll",
+        "libfreetype-6.dll",
+        "libfribidi-0.dll",
+        "libgcc_s_seh-1.dll",
+        "libharfbuzz-0.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ole32.dll",
+        "libplacebo-387.dll",
+        "libwinpthread-1.dll",
+        "libstdc++-6.dll",
+        "USER32.dll",
+        "libva.dll",
+        "libvidstab.dll",
+        "libvpl-2.dll",
+        "zlib1.dll",
+        "libzimg-2.dll",
+        "avcodec-63.dll",
+        "avformat-63.dll",
+        "avutil-61.dll",
+        "swresample-7.dll",
+        "swscale-10.dll"
+      ],
+      "provider": "own-source-build"
+    },
+    {
+      "path": "runtime/avformat-63.dll",
+      "bytes": 2925056,
+      "sha256": "0a0fca43cc97351a96f9e3f16a8fb687ad83dec66996bc8faffb2b74abc93ee0",
+      "imports": [
+        "libbluray-4.dll",
+        "libbz2-1.dll",
+        "libgme.dll",
+        "libgnutls-30.dll",
+        "libiconv-2.dll",
+        "KERNEL32.dll",
+        "libmodplug-1.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "librtmp-1.dll",
+        "libsrt.dll",
+        "libssh.dll",
+        "WS2_32.dll",
+        "libxml2-16.dll",
+        "zlib1.dll",
+        "avcodec-63.dll",
+        "avutil-61.dll"
+      ],
+      "provider": "own-source-build"
+    },
+    {
+      "path": "runtime/avutil-61.dll",
+      "bytes": 1263104,
+      "sha256": "72305ff9e668c69c559c0a53248ac2f493272dc70a3f23d6010021e2920a2fc4",
+      "imports": [
+        "bcrypt.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libwinpthread-1.dll",
+        "USER32.dll",
+        "libva.dll",
+        "libva_win32.dll",
+        "libvpl-2.dll",
+        "zlib1.dll"
+      ],
+      "provider": "own-source-build"
+    },
+    {
+      "path": "runtime/swresample-7.dll",
+      "bytes": 178176,
+      "sha256": "4c4ce060cf62b2461b1427c22c609d8aaadfffb9b07f45b664efba86944bbc6b",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "libsoxr.dll",
+        "avutil-61.dll"
+      ],
+      "provider": "own-source-build"
+    },
+    {
+      "path": "runtime/swscale-10.dll",
+      "bytes": 2187776,
+      "sha256": "37817c6bf60ae73a05d093bd02122cb14b033fdb1adc0e7a469b1de5ef49fe8f",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "zlib1.dll",
+        "avutil-61.dll"
+      ],
+      "provider": "own-source-build"
+    },
+    {
+      "path": "runtime/libiconv-2.dll",
+      "bytes": 1141951,
+      "sha256": "94ec68fb8d342b6c91b6b48a8d95092819cdcd006a7166e0b68062f946afd08a",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libiconv",
+      "version": "1.19-1",
+      "base": "mingw-w64-libiconv",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later",
+        "documentation:spdx:GPL-3.0-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libarchive-13.dll",
+      "bytes": 1001421,
+      "sha256": "607330aaac68f8977dc52eeb8f630c29a583f5edce36c8aae1e991a369520cab",
+      "imports": [
+        "bcrypt.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ole32.dll",
+        "XmlLite.dll",
+        "libb2-1.dll",
+        "libbz2-1.dll",
+        "libiconv-2.dll",
+        "liblz4.dll",
+        "liblzma-5.dll",
+        "zlib1.dll",
+        "libzstd.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libarchive",
+      "version": "3.8.10-1",
+      "base": "mingw-w64-libarchive",
+      "licenses": [
+        "spdx:BSD-2-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libass-9.dll",
+      "bytes": 345174,
+      "sha256": "cb2b46133b3bd9630384148bd7229e987af9703208d4329fc2215f4170b8dc6b",
+      "imports": [
+        "GDI32.dll",
+        "libiconv-2.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "USER32.dll",
+        "libfontconfig-1.dll",
+        "libfreetype-6.dll",
+        "libfribidi-0.dll",
+        "libharfbuzz-0.dll",
+        "libunibreak-7.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libass",
+      "version": "0.17.5-1",
+      "base": "mingw-w64-libass",
+      "licenses": [
+        "spdx:ISC"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libbluray-4.dll",
+      "bytes": 373421,
+      "sha256": "24870a1b32ff8b36cfa94479d802dfabc55a12e7bbde8584606f7e2d44d3c6dd",
+      "imports": [
+        "ADVAPI32.dll",
+        "GDI32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "SHELL32.dll",
+        "USER32.dll",
+        "libfreetype-6.dll",
+        "libxml2-16.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libbluray",
+      "version": "1.5.0-1",
+      "base": "mingw-w64-libbluray",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libcaca-0.dll",
+      "bytes": 859225,
+      "sha256": "4ab7b69e156b77a76776237ad37054dc9558f18dc2cd4a9c2a4287a8811002b2",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "zlib1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libcaca",
+      "version": "0.99.beta20-8",
+      "base": "mingw-w64-libcaca",
+      "licenses": [
+        "LGPL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libcurl-4.dll",
+      "bytes": 1417088,
+      "sha256": "529af2acc6ce7507dbc96fd96e196555bb9a38d9cbb47dee441ea2cce325428d",
+      "imports": [
+        "bcrypt.dll",
+        "libbrotlidec.dll",
+        "CRYPT32.dll",
+        "libidn2-0.dll",
+        "IPHLPAPI.DLL",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libnghttp2-14.dll",
+        "libnghttp3-9.dll",
+        "libngtcp2-16.dll",
+        "libngtcp2_crypto_ossl-0.dll",
+        "libpsl-5.dll",
+        "Secur32.dll",
+        "libssh2-1.dll",
+        "WLDAP32.dll",
+        "WS2_32.dll",
+        "libzstd.dll",
+        "libcrypto-3-x64.dll",
+        "libssl-3-x64.dll",
+        "zlib1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-curl",
+      "version": "8.23.0-1",
+      "base": "mingw-w64-curl",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libjpeg-8.dll",
+      "bytes": 967184,
+      "sha256": "c63acd5a3231725aa96aa35444b74cd8d607a6fbdab1dd18b0e0ada7e39476d4",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libjpeg-turbo",
+      "version": "3.2.0-1",
+      "base": "mingw-w64-libjpeg-turbo",
+      "licenses": [
+        "custom:BSD-like"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/liblcms2-2.dll",
+      "bytes": 448202,
+      "sha256": "03314471fadd04cdd63c108472ff85d058903d236a0356c14eda363f0e1ccb65",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-lcms2",
+      "version": "2.19.1-1",
+      "base": "mingw-w64-lcms2",
+      "licenses": [
+        "spdx:MIT AND GPL-3.0-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/lua51.dll",
+      "bytes": 237118,
+      "sha256": "a8e7e60a412a5815ff38a9f5a116a452bff5b89e3d7019ed3ff45123b2aa8464",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-lua51",
+      "version": "5.1.5-6",
+      "base": "mingw-w64-lua51",
+      "licenses": [
+        "MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libplacebo-387.dll",
+      "bytes": 1328772,
+      "sha256": "ebdc2d898ee396db8f342427f77a0af59b0823f853001eedefc801f05bd791b3",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "SHLWAPI.dll",
+        "libstdc++-6.dll",
+        "USER32.dll",
+        "VERSION.dll",
+        "libdovi.dll",
+        "liblcms2-2.dll",
+        "libshaderc_shared.dll",
+        "libspirv-cross-c-shared.dll",
+        "vulkan-1.dll",
+        "api-ms-win-crt-math-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libplacebo",
+      "version": "7.387.0-1",
+      "base": "mingw-w64-libplacebo",
+      "licenses": [
+        "LGPL2.1"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libshaderc_shared.dll",
+      "bytes": 10657197,
+      "sha256": "331df8a45983735b823c893a9b872c3414af6eadca9fa189d0b6dfe97960b3cf",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-shaderc",
+      "version": "2026.4-1",
+      "base": "mingw-w64-shaderc",
+      "licenses": [
+        "spdx:Apache-2.0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libspirv-cross-c-shared.dll",
+      "bytes": 3433687,
+      "sha256": "bc4bdcf63b9bbf60777bc10340050ae6edfbb3be3faf3fa636af53ecf7d2bbc8",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-spirv-cross",
+      "version": "1~1.4.363.0-1",
+      "base": "mingw-w64-spirv-cross",
+      "licenses": [
+        "spdx:Apache-2.0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libuchardet.dll",
+      "bytes": 202040,
+      "sha256": "75f34913b3c3fe264c4471a47f4f3e3a14fed397824122936f1ba40a7712a7a4",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-uchardet",
+      "version": "0.0.8-2",
+      "base": "mingw-w64-uchardet",
+      "licenses": [
+        "spdx:MPL-1.1"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libva.dll",
+      "bytes": 285777,
+      "sha256": "20591e45edfcbf7f4b5735f9096b19be9796b0f61d1ab041f39d2732357593ae",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libva",
+      "version": "2.24.1-1",
+      "base": "mingw-w64-libva",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libva_win32.dll",
+      "bytes": 17779,
+      "sha256": "2721e9c28099699b6d723d3d56671ca46db21a5bdb9e2c41df516da17d6539b7",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libva.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libva",
+      "version": "2.24.1-1",
+      "base": "mingw-w64-libva",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/vulkan-1.dll",
+      "bytes": 724189,
+      "sha256": "31862137c4179dcdbba782760f3e401f9fb526477947079d7f63987864f9b0eb",
+      "imports": [
+        "ADVAPI32.dll",
+        "CFGMGR32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-vulkan-loader",
+      "version": "1~1.4.363.0-1",
+      "base": "mingw-w64-vulkan-loader",
+      "licenses": [
+        "spdx:Apache-2.0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/zlib1.dll",
+      "bytes": 121530,
+      "sha256": "8ae7aeb0467763a1e271cd831ca8e2f7fd101602adb9923100ea26c6be2a559b",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-zlib",
+      "version": "1.3.2-3",
+      "base": "mingw-w64-zlib",
+      "licenses": [
+        "spdx:Zlib"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libzimg-2.dll",
+      "bytes": 631148,
+      "sha256": "99625f39de8de654a90077362aafaa4e565c97908b39c0e9614562f9dfb57200",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-zimg",
+      "version": "3.0.6-3",
+      "base": "mingw-w64-zimg",
+      "licenses": [
+        "spdx:WTFPL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libaom.dll",
+      "bytes": 9682038,
+      "sha256": "61c2c12b0fd9fb42b4cdb5eca107eded4abe6ba8d59941e33737260da6f5355e",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libwinpthread-1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-aom",
+      "version": "3.15.2-1",
+      "base": "mingw-w64-aom",
+      "licenses": [
+        "spdx:BSD-2-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libcairo-2.dll",
+      "bytes": 1244446,
+      "sha256": "be391428fd305983f888becae10ebab9d8009637e7805383e822740043e95849",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "GDI32.dll",
+        "KERNEL32.dll",
+        "MSIMG32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ole32.dll",
+        "libstdc++-6.dll",
+        "USER32.dll",
+        "libfontconfig-1.dll",
+        "libfreetype-6.dll",
+        "libpixman-1-0.dll",
+        "libpng16-16.dll",
+        "zlib1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-cairo",
+      "version": "1.18.6-2",
+      "base": "mingw-w64-cairo",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later OR MPL-1.1"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libdav1d-7.dll",
+      "bytes": 1929830,
+      "sha256": "bbe67862f77c22f6f509684207b5363542e5b52c1a1faa354e12a11d072ad766",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-dav1d",
+      "version": "1.5.4-1",
+      "base": "mingw-w64-dav1d",
+      "licenses": [
+        "spdx:BSD-2-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libglib-2.0-0.dll",
+      "bytes": 1568604,
+      "sha256": "3a1abec0184b238db54399cb9243393d9436d96b8fdb9bd9f2875da207c5b458",
+      "imports": [
+        "ADVAPI32.dll",
+        "libintl-8.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-process-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ole32.dll",
+        "SHELL32.dll",
+        "USER32.dll",
+        "WS2_32.dll",
+        "libpcre2-8-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-glib2",
+      "version": "2.90.1-1",
+      "base": "mingw-w64-glib2",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgobject-2.0-0.dll",
+      "bytes": 358171,
+      "sha256": "d12b1c34335cf605809af3b9bbed80a05c3334a9dbd02c0d398c1618d47f1d21",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libffi-8.dll",
+        "libglib-2.0-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-glib2",
+      "version": "2.90.1-1",
+      "base": "mingw-w64-glib2",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgsm.dll",
+      "bytes": 56666,
+      "sha256": "b3446b547f8894bcabf0aa98a78146c60b1cf6dba7ab55e6a726fb3739276bf4",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-gsm",
+      "version": "1.0.24-1",
+      "base": "mingw-w64-gsm",
+      "licenses": [
+        "custom"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libjxl.dll",
+      "bytes": 6201782,
+      "sha256": "f0db8ef57af445a5b807a5b6d27f9a3c4c7441af61cebfee5542fb7529fb35a5",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll",
+        "libbrotlidec.dll",
+        "libbrotlienc.dll",
+        "libhwy.dll",
+        "libjxl_cms.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libjxl",
+      "version": "0.12.0-2",
+      "base": "mingw-w64-libjxl",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libjxl_threads.dll",
+      "bytes": 23033,
+      "sha256": "b065e2464cf13626d2ad95f82091b4bd988dcc8aeb7fd65b364b59d4bdf4199e",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libwinpthread-1.dll",
+        "libstdc++-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libjxl",
+      "version": "0.12.0-2",
+      "base": "mingw-w64-libjxl",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/liblc3-1.dll",
+      "bytes": 165946,
+      "sha256": "970f6d805e215cc17df962c64e21449af3da97e09cb4a14a5f943bbd0e9c0329",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-liblc3",
+      "version": "1.1.3-1",
+      "base": "mingw-w64-liblc3",
+      "licenses": [
+        "spdx:Apache-2.0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/liblzma-5.dll",
+      "bytes": 190872,
+      "sha256": "d97a260b8bb4f6affc34ec47249429240068b94bb6f7dc30c4d64daaafb3ac69",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-xz",
+      "version": "5.8.4-1",
+      "base": "mingw-w64-xz",
+      "licenses": [
+        "spdx:0BSD AND LGPL-2.1-or-later AND GPL-2.0-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libmp3lame-0.dll",
+      "bytes": 280370,
+      "sha256": "d28ee2c6d87346e3a4d96b03731362273c6ee24ee14d7b861be57c5b366aab79",
+      "imports": [
+        "KERNEL32.dll",
+        "libmpg123-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-lame",
+      "version": "4.0-1",
+      "base": "mingw-w64-lame",
+      "licenses": [
+        "LGPL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libopencore-amrnb-0.dll",
+      "bytes": 178308,
+      "sha256": "9d36d5661fd002f8889d90e0a53f2c5d693c641c075ef55c26ade85d958d1369",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-opencore-amr",
+      "version": "0.1.6-1",
+      "base": "mingw-w64-opencore-amr",
+      "licenses": [
+        "Apache"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libopencore-amrwb-0.dll",
+      "bytes": 95876,
+      "sha256": "54341e49eab692d77e0ff8534a40a3cce6d0d58b9cd157ed69c817c4b852bbdb",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-opencore-amr",
+      "version": "0.1.6-1",
+      "base": "mingw-w64-opencore-amr",
+      "licenses": [
+        "Apache"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libopenjp2-7.dll",
+      "bytes": 517286,
+      "sha256": "94f9507828d391cf96d700d34918114f1c1e03f91dd1243a19275e0435690925",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-openjpeg2",
+      "version": "2.5.4-2",
+      "base": "mingw-w64-openjpeg2",
+      "licenses": [
+        "spdx:BSD-2-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libopus-0.dll",
+      "bytes": 491630,
+      "sha256": "e747edad6bf02cf5cdcce417b95be3b7ba108f93df1b024778be5d73fa6dae39",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-opus",
+      "version": "1.6.1-2",
+      "base": "mingw-w64-opus",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/librav1e.dll",
+      "bytes": 3522560,
+      "sha256": "bc549e2178589f371469d1bd23544859ff118e48218eae2bfca7126654988779",
+      "imports": [
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "ntdll.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-rav1e",
+      "version": "0.8.1-1",
+      "base": "mingw-w64-rav1e",
+      "licenses": [
+        "spdx:BSD-2-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/librsvg-2-2.dll",
+      "bytes": 11712009,
+      "sha256": "4fe1479c791a604fc184edc5b2e0c9d8dcd790bccfa326d3fa85fa2ec838a1ed",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "ntdll.dll",
+        "USERENV.dll",
+        "WS2_32.dll",
+        "libcairo-gobject-2.dll",
+        "libcairo-2.dll",
+        "libgdk_pixbuf-2.0-0.dll",
+        "libgio-2.0-0.dll",
+        "libglib-2.0-0.dll",
+        "libgobject-2.0-0.dll",
+        "libpango-1.0-0.dll",
+        "libpangocairo-1.0-0.dll",
+        "libxml2-16.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "bcryptprimitives.dll",
+        "kernel32.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-librsvg",
+      "version": "2.63.4-1",
+      "base": "mingw-w64-librsvg",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libspeex-1.dll",
+      "bytes": 139325,
+      "sha256": "70517dd82e962c0956f0e8d3bb700cd7ecc62b8c08741b35d71f2e95d601621d",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-speex",
+      "version": "1.2.1-1",
+      "base": "mingw-w64-speex",
+      "licenses": [
+        "BSD"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libSvtAv1Enc-4.dll",
+      "bytes": 7566075,
+      "sha256": "34f015c70ac283ba90bf5bbe0fec6e6af0fcbd50762566826405c8ccfade6e75",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-svt-av1",
+      "version": "4.2.0-1",
+      "base": "mingw-w64-svt-av1",
+      "licenses": [
+        "spdx:BSD-3-Clause-Clear"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libtheoradec-2.dll",
+      "bytes": 97913,
+      "sha256": "0b9877e581421abe4090abacf2cd8c04df6de00520d7a34b9f41b46a11a02a80",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libtheora",
+      "version": "1.2.0-1",
+      "base": "mingw-w64-libtheora",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libtheoraenc-2.dll",
+      "bytes": 247882,
+      "sha256": "ed0fb82d04220070d2f53832a9cb653546ddce2c704a53bfacae7597666db4d7",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libogg-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libtheora",
+      "version": "1.2.0-1",
+      "base": "mingw-w64-libtheora",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libvorbis-0.dll",
+      "bytes": 179630,
+      "sha256": "d1b40d7f33171ccb8cd2a238bea36c01176c54de5bf22afae332fb33f26a008f",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libogg-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libvorbis",
+      "version": "1.3.7-3",
+      "base": "mingw-w64-libvorbis",
+      "licenses": [
+        "custom"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libvorbisenc-2.dll",
+      "bytes": 577914,
+      "sha256": "971cfa7c8866653aae9760a317dc3838e821f3911d9c6a8a8ef90f4a13de798f",
+      "imports": [
+        "libvorbis-0.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libvorbis",
+      "version": "1.3.7-3",
+      "base": "mingw-w64-libvorbis",
+      "licenses": [
+        "custom"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libvpl-2.dll",
+      "bytes": 480527,
+      "sha256": "88bd6fece68ebad05d3e78581455bb902cc1d3930018931d0830616097e74d73",
+      "imports": [
+        "ADVAPI32.dll",
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ole32.dll",
+        "libstdc++-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libvpl",
+      "version": "2.17.0-1",
+      "base": "mingw-w64-libvpl",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libvpx-1.dll",
+      "bytes": 4405542,
+      "sha256": "759bb95b0cd6c75bfce910f003b26a2d95ed3c94ef1a20dcfd4c89a0569f2016",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libwinpthread-1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libvpx",
+      "version": "1.17.0-1",
+      "base": "mingw-w64-libvpx",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libwebp-7.dll",
+      "bytes": 746378,
+      "sha256": "8dfe40c4e0abc90ddf18f080898987e01253d099b2b2d6daf7db521e55c00446",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libsharpyuv-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libwebp",
+      "version": "1.6.0-1",
+      "base": "mingw-w64-libwebp",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libwebpmux-3.dll",
+      "bytes": 78875,
+      "sha256": "9bd85116a22923d648d6b0ad09f21d08df7bd3d8860b24a5b4a6d4ac788b7340",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libwebp-7.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libwebp",
+      "version": "1.6.0-1",
+      "base": "mingw-w64-libwebp",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libx264-165.dll",
+      "bytes": 2017572,
+      "sha256": "a58995b5af6d0fcf5d17f354bfa54bb05d99056ed167eec9c8e86a3a63478ec1",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libx264",
+      "version": "0.165.r3222.b35605a-3",
+      "base": "mingw-w64-x264",
+      "licenses": [
+        "custom"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libx265-217.dll",
+      "bytes": 22658774,
+      "sha256": "48a6c942cab3196d740d7af3cfc8359dc7bd833c87c1ca24b8d231b70daa9e18",
+      "imports": [
+        "ADVAPI32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-x265",
+      "version": "4.3-1",
+      "base": "mingw-w64-x265",
+      "licenses": [
+        "GPL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/xvidcore.dll",
+      "bytes": 779670,
+      "sha256": "5107ab029f4f06a5a360ac769c20a150d4bd1a1922575517b9054768ff219611",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-xvidcore",
+      "version": "1.3.7-5",
+      "base": "mingw-w64-xvidcore",
+      "licenses": [
+        "GPL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libzvbi-0.dll",
+      "bytes": 443711,
+      "sha256": "8389bdf0a8b482cb6b80e4fe131d49c75779659db3f4afb259f5d6fff0b80e08",
+      "imports": [
+        "libiconv-2.dll",
+        "libintl-8.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libpng16-16.dll",
+        "libwinpthread-1.dll",
+        "WS2_32.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-zvbi",
+      "version": "0.2.46-1",
+      "base": "mingw-w64-zvbi",
+      "licenses": [
+        "spdx:GPL-2.0-or-later AND BSD-2-Clause AND LGPL-2.1-or-later AND MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libfontconfig-1.dll",
+      "bytes": 505833,
+      "sha256": "be30a200fa4000d0a7a1d3911391969627440148f01d0028a319bcb9fa112202",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "libintl-8.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-multibyte-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libexpat-1.dll",
+        "libfreetype-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-fontconfig",
+      "version": "2.18.3-1",
+      "base": "mingw-w64-fontconfig",
+      "licenses": [
+        "custom"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libfreetype-6.dll",
+      "bytes": 808305,
+      "sha256": "19604dde573cbb8a13053fc231eee99b91cd972e0e9a3e1465f44ad6985e83ee",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libbrotlidec.dll",
+        "libbz2-1.dll",
+        "libharfbuzz-0.dll",
+        "libpng16-16.dll",
+        "zlib1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-freetype",
+      "version": "2.15.0-1",
+      "base": "mingw-w64-freetype",
+      "licenses": [
+        "spdx:GPL-2.0-or-later OR FTL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libfribidi-0.dll",
+      "bytes": 152541,
+      "sha256": "14bd0ed4c24d0068434bc23cd4f39e8dc0edcf56f2c9996b6fe39b39ffc54673",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-fribidi",
+      "version": "1.0.17-1",
+      "base": "mingw-w64-fribidi",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgcc_s_seh-1.dll",
+      "bytes": 150537,
+      "sha256": "791ebf66e99c7c1b4ed3666468cec45a0172b4c8942ac6c84c3e9cab3e1b5270",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "libwinpthread-1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libgcc",
+      "version": "16.2.0-6",
+      "base": "mingw-w64-gcc",
+      "licenses": [
+        "spdx:GPL-3.0-or-later WITH GCC-exception-3.1 AND GFDL-1.3-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libharfbuzz-0.dll",
+      "bytes": 1829497,
+      "sha256": "574ef797d2480d73283ecc993e272092bdb1dda45c4db5d36bf72a5a91baeec8",
+      "imports": [
+        "DWrite.dll",
+        "libgcc_s_seh-1.dll",
+        "GDI32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "RPCRT4.dll",
+        "USER32.dll",
+        "USP10.dll",
+        "libfreetype-6.dll",
+        "libglib-2.0-0.dll",
+        "libgraphite2.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-harfbuzz",
+      "version": "15.0.0-1",
+      "base": "mingw-w64-harfbuzz",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libwinpthread-1.dll",
+      "bytes": 73820,
+      "sha256": "ee4f503512b09d7e2668518c41d6c176755a354523ae15aa4d36220c9cb31791",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libwinpthread",
+      "version": "14.0.0.r569.g34eeafb7d-1",
+      "base": "mingw-w64-winpthreads",
+      "licenses": [
+        "spdx:MIT AND BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libstdc++-6.dll",
+      "bytes": 2659194,
+      "sha256": "4e4822dc4aaa99383f581dae7ab9464ae89346c5ca742f7efbcdebe20b0fe7b5",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libwinpthread-1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libstdc++",
+      "version": "16.2.0-6",
+      "base": "mingw-w64-gcc",
+      "licenses": [
+        "spdx:GPL-3.0-or-later WITH GCC-exception-3.1 AND GFDL-1.3-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libvidstab.dll",
+      "bytes": 150415,
+      "sha256": "6980084b957f32cf13248d8b0160a698d75e1148f6b35af85f57f559242fb623",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libgomp-1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-vid.stab",
+      "version": "1.1.2-1",
+      "base": "mingw-w64-vid.stab",
+      "licenses": [
+        "spdx:GPL-2.0-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libbz2-1.dll",
+      "bytes": 107741,
+      "sha256": "1790bf6473c9d48db14c1f0ee8124142327556d281299ea2a72ee361118ee01a",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-bzip2",
+      "version": "1.0.8-4",
+      "base": "mingw-w64-bzip2",
+      "licenses": [
+        "custom"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgme.dll",
+      "bytes": 372192,
+      "sha256": "98e306bc1443f4f5a0744baf0477d2f856594bb3f8036440ad7cb1f30a1f5a72",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll",
+        "zlib1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libgme",
+      "version": "0.6.5-2",
+      "base": "mingw-w64-libgme",
+      "licenses": [
+        "LGPL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgnutls-30.dll",
+      "bytes": 2315149,
+      "sha256": "f7f05c96572506c81f2ffa89b518234afa4af2603aad8903db257a4f1e97e9e6",
+      "imports": [
+        "ADVAPI32.dll",
+        "libbrotlidec.dll",
+        "libbrotlienc.dll",
+        "CRYPT32.dll",
+        "libgmp-10.dll",
+        "libhogweed-7.dll",
+        "libidn2-0.dll",
+        "libintl-8.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ncrypt.dll",
+        "libnettle-9.dll",
+        "libp11-kit-0.dll",
+        "libwinpthread-1.dll",
+        "libtasn1-6.dll",
+        "libunistring-5.dll",
+        "WS2_32.dll",
+        "zlib1.dll",
+        "libzstd.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-gnutls",
+      "version": "3.8.13-3",
+      "base": "mingw-w64-gnutls",
+      "licenses": [
+        "spdx:GPL-3.0-or-later",
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libmodplug-1.dll",
+      "bytes": 397610,
+      "sha256": "d1425827ff8c5cc81dfc66d7d5660e9ea9bfda8ada71255a0c4847d0889ea62b",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll",
+        "USER32.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libmodplug",
+      "version": "0.8.9.0-5",
+      "base": "mingw-w64-libmodplug",
+      "licenses": [
+        "PublicDomain"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/librtmp-1.dll",
+      "bytes": 117122,
+      "sha256": "f9fecc5ce88e647cdc5960f125a91d9ed2e66f1ff812ee4160da69b0d416e5e2",
+      "imports": [
+        "libgmp-10.dll",
+        "libgnutls-30.dll",
+        "libhogweed-7.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libnettle-9.dll",
+        "WINMM.dll",
+        "WS2_32.dll",
+        "zlib1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-rtmpdump",
+      "version": "2.6-2",
+      "base": "mingw-w64-rtmpdump",
+      "licenses": [
+        "spdx:GPL-2.0-or-later",
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libsrt.dll",
+      "bytes": 852770,
+      "sha256": "6ad77ab5b1a9dc3d2d0bb929bfe9c6a46eb119c5f81d32014176ab873abeebdc",
+      "imports": [
+        "libcrypto-3-x64.dll",
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libwinpthread-1.dll",
+        "libstdc++-6.dll",
+        "WS2_32.dll",
+        "WSOCK32.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-srt",
+      "version": "1.5.7-1",
+      "base": "mingw-w64-srt",
+      "licenses": [
+        "spdx:MPL-2.0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libssh.dll",
+      "bytes": 622845,
+      "sha256": "dbaf4b60ccbcef6aa5d6385d8d1965d4f483999b9ced1d5a2afbf719028b3d1e",
+      "imports": [
+        "ADVAPI32.dll",
+        "IPHLPAPI.DLL",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libwinpthread-1.dll",
+        "SHELL32.dll",
+        "WS2_32.dll",
+        "libcrypto-3-x64.dll",
+        "zlib1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libssh",
+      "version": "0.12.2-1",
+      "base": "mingw-w64-libssh",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libxml2-16.dll",
+      "bytes": 1246528,
+      "sha256": "2c971559c9bedb5459b35043de25886c9b36fc07536b6d84dfb84d938c46d5a4",
+      "imports": [
+        "bcrypt.dll",
+        "libiconv-2.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "zlib1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libxml2",
+      "version": "2.15.4-3",
+      "base": "mingw-w64-libxml2",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libsoxr.dll",
+      "bytes": 344576,
+      "sha256": "47f6a0fbaa08f7ba38b051de741ebc7a2613bfb3ed276ebbe6fbafb6ee47b445",
+      "imports": [
+        "libgomp-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libsoxr",
+      "version": "0.1.3-6",
+      "base": "mingw-w64-libsoxr",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libb2-1.dll",
+      "bytes": 35323,
+      "sha256": "01bbf64090367d511f41d9fc8f34c557f61d4a227b7c9e47ce04052cbfdc3e7d",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libb2",
+      "version": "0.98.1-3",
+      "base": "mingw-w64-libb2",
+      "licenses": [
+        "custom:CC0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/liblz4.dll",
+      "bytes": 161286,
+      "sha256": "5e83fd34144fa033c12e22718317ec2123f8a3460903932b0bfddb8aad379cfd",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-lz4",
+      "version": "1.10.0-1",
+      "base": "mingw-w64-lz4",
+      "licenses": [
+        "BSD",
+        "GPL2"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libzstd.dll",
+      "bytes": 1217412,
+      "sha256": "48368ab0ca622d0ec12f41ce85d91f22866bf5da92c77a69a06483564c93816c",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-zstd",
+      "version": "1.5.7-2",
+      "base": "mingw-w64-zstd",
+      "licenses": [
+        "spdx:BSD-3-Clause OR GPL-2.0-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libunibreak-7.dll",
+      "bytes": 141442,
+      "sha256": "f1f4bb5b5bb3dbf8d142df3012f13e4b5b0246565496d43718a6f33321e96283",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libunibreak",
+      "version": "7.0-1",
+      "base": "mingw-w64-libunibreak",
+      "licenses": [
+        "spdx:Zlib"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libbrotlidec.dll",
+      "bytes": 60224,
+      "sha256": "c4c987a01597ddf969d93023f933f999a20f285588b0decb4deeb780c9e9cdf8",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libbrotlicommon.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-brotli",
+      "version": "1.2.1-1",
+      "base": "mingw-w64-brotli",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libidn2-0.dll",
+      "bytes": 246525,
+      "sha256": "a054a6bb69aaf4666157f968740412e9697085cbc1e48a78f8dd9622169c5aaf",
+      "imports": [
+        "libiconv-2.dll",
+        "libintl-8.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libunistring-5.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libidn2",
+      "version": "2.3.8-4",
+      "base": "mingw-w64-libidn2",
+      "licenses": [
+        "spdx:GPL-2.0-or-later",
+        "spdx:LGPL-3.0-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libnghttp2-14.dll",
+      "bytes": 214379,
+      "sha256": "550b9933ce54833ebb2c0e24b43e1463006c6c62305c471570c6bf18095581bd",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-nghttp2",
+      "version": "1.70.0-1",
+      "base": "mingw-w64-nghttp2",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libnghttp3-9.dll",
+      "bytes": 206693,
+      "sha256": "eed257dd6092a2f67a760f3f75103ec27cec929281bb2d7b51afabf21a2cad70",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-nghttp3",
+      "version": "1.18.0-1",
+      "base": "mingw-w64-nghttp3",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libngtcp2-16.dll",
+      "bytes": 392518,
+      "sha256": "e77294cc542bfa35a932217ab0130b19cb45f232fb257d8869d967e750e40b31",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-ngtcp2",
+      "version": "1.25.0-1",
+      "base": "mingw-w64-ngtcp2",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libngtcp2_crypto_ossl-0.dll",
+      "bytes": 54925,
+      "sha256": "e63698046730c9dfcaee49d52298c489ae4c0b28770bcc3ba7f612d35d031dd8",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libcrypto-3-x64.dll",
+        "libssl-3-x64.dll",
+        "libngtcp2-16.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-ngtcp2",
+      "version": "1.25.0-1",
+      "base": "mingw-w64-ngtcp2",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libpsl-5.dll",
+      "bytes": 105846,
+      "sha256": "a531e72de3c64d43fb83cbfb6fa63e5ee982a970292ec51314e29d0acabf1dd5",
+      "imports": [
+        "libiconv-2.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libunistring-5.dll",
+        "WS2_32.dll",
+        "libidn2-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libpsl",
+      "version": "0.21.5-3",
+      "base": "mingw-w64-libpsl",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libssh2-1.dll",
+      "bytes": 311537,
+      "sha256": "7c9b4edb678b738b919950492c4a390482fdd644d1276d4728990fdd3c3ea989",
+      "imports": [
+        "libcrypto-3-x64.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "USER32.dll",
+        "WS2_32.dll",
+        "zlib1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libssh2",
+      "version": "1.11.1-2",
+      "base": "mingw-w64-libssh2",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libcrypto-3-x64.dll",
+      "bytes": 5501287,
+      "sha256": "97308feea369b305e562c0098638a1b02a06f52ee9fcc4b8cf3da362ff563cf4",
+      "imports": [
+        "ADVAPI32.dll",
+        "CRYPT32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "USER32.dll",
+        "WS2_32.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-openssl",
+      "version": "3.6.5-1",
+      "base": "mingw-w64-openssl",
+      "licenses": [
+        "spdx:Apache-2.0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libssl-3-x64.dll",
+      "bytes": 998449,
+      "sha256": "8b71cd694f8edfbddc76674111278db6bcdcde0dcd63b99238420193848e6dbf",
+      "imports": [
+        "libcrypto-3-x64.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "WS2_32.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-openssl",
+      "version": "3.6.5-1",
+      "base": "mingw-w64-openssl",
+      "licenses": [
+        "spdx:Apache-2.0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libdovi.dll",
+      "bytes": 1370861,
+      "sha256": "75988509f0d2166e2060ed548913bd7b34556bc16b3f9a02469de1dd2347a7fb",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "ntdll.dll",
+        "USERENV.dll",
+        "WS2_32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "bcryptprimitives.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libdovi",
+      "version": "3.4.0-1",
+      "base": "mingw-w64-libdovi",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libpixman-1-0.dll",
+      "bytes": 737775,
+      "sha256": "12e693d94829f013e0bd7c042b30998b20e91ece7b6f4d5f075ddbb58b373c92",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-pixman",
+      "version": "0.46.4-3",
+      "base": "mingw-w64-pixman",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libpng16-16.dll",
+      "bytes": 254777,
+      "sha256": "28db7a8c6fcc579ce621729d27f1952324cd3a2b4e24da121611bb586346e732",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "zlib1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libpng",
+      "version": "1.6.59-2",
+      "base": "mingw-w64-libpng",
+      "licenses": [
+        "custom"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libintl-8.dll",
+      "bytes": 298164,
+      "sha256": "0e5a178731e6be6d115442a6ade3df7f03265cd1fc4338f8b6f86a8001cbf582",
+      "imports": [
+        "ADVAPI32.dll",
+        "libiconv-2.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-gettext-runtime",
+      "version": "1.0-1",
+      "base": "mingw-w64-gettext",
+      "licenses": [
+        "spdx:GPL-3.0-or-later AND LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libpcre2-8-0.dll",
+      "bytes": 706022,
+      "sha256": "1f609cde2ce432efb7d2b0c7b84a14a6dbfc9622d1ac1a3cbadf51c5b0b4dada",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-pcre2",
+      "version": "10.49-1",
+      "base": "mingw-w64-pcre2",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libffi-8.dll",
+      "bytes": 39826,
+      "sha256": "f96cf79b75f33a10023d001673b564538023395c94b3c58e1db53114976a7c25",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libffi",
+      "version": "3.8.0-1",
+      "base": "mingw-w64-libffi",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libbrotlienc.dll",
+      "bytes": 786797,
+      "sha256": "03f9a82d293caf5b4065a9641dd5309e27aefc5c8111eeec25f906e47ec6c934",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libbrotlicommon.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-brotli",
+      "version": "1.2.1-1",
+      "base": "mingw-w64-brotli",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libhwy.dll",
+      "bytes": 87628,
+      "sha256": "9ba0ac7bad82c4c88e9bb8d6ca8c6a83877adc1f71cc48590c65b8d26108a41c",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-highway",
+      "version": "1.4.0-3",
+      "base": "mingw-w64-highway",
+      "licenses": [
+        "spdx:Apache-2.0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libjxl_cms.dll",
+      "bytes": 137640,
+      "sha256": "da3bf1847c40b66ffc036212d83f5e9acb0770de737d0383c8f1efbef65388c9",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll",
+        "libhwy.dll",
+        "liblcms2-2.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libjxl",
+      "version": "0.12.0-2",
+      "base": "mingw-w64-libjxl",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libmpg123-0.dll",
+      "bytes": 450706,
+      "sha256": "bd63359e95781ce1a9f4e1d0d7c98be32583731e34d09df0c6a020d215048ff5",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "SHLWAPI.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-mpg123",
+      "version": "1.33.7-1",
+      "base": "mingw-w64-mpg123",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libcairo-gobject-2.dll",
+      "bytes": 31536,
+      "sha256": "060e586a23bc07d81cf9c9c2a3927dc2d61168fcc89b13601e98afdffffbfeb6",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "libglib-2.0-0.dll",
+        "libgobject-2.0-0.dll",
+        "libcairo-2.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-cairo",
+      "version": "1.18.6-2",
+      "base": "mingw-w64-cairo",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later OR MPL-1.1"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgdk_pixbuf-2.0-0.dll",
+      "bytes": 355572,
+      "sha256": "0f51ba434b2080ab14ce5d6b0b890620be3716fa15460d519bf641ca8441dcd0",
+      "imports": [
+        "gdiplus.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ole32.dll",
+        "libgio-2.0-0.dll",
+        "libglib-2.0-0.dll",
+        "libgmodule-2.0-0.dll",
+        "libgobject-2.0-0.dll",
+        "libintl-8.dll",
+        "libjpeg-8.dll",
+        "libpng16-16.dll",
+        "libtiff-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-gdk-pixbuf2",
+      "version": "2.44.8-1",
+      "base": "mingw-w64-gdk-pixbuf2",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgio-2.0-0.dll",
+      "bytes": 1919044,
+      "sha256": "1256cbd7cb48df5ecea1646343d617c8e41a434216fdbb88ccfd78fe498442c8",
+      "imports": [
+        "ADVAPI32.dll",
+        "DNSAPI.dll",
+        "libintl-8.dll",
+        "IPHLPAPI.DLL",
+        "KERNEL32.dll",
+        "api-ms-win-crt-conio-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ole32.dll",
+        "SHELL32.dll",
+        "SHLWAPI.dll",
+        "USER32.dll",
+        "WS2_32.dll",
+        "zlib1.dll",
+        "libglib-2.0-0.dll",
+        "libgmodule-2.0-0.dll",
+        "libgobject-2.0-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-glib2",
+      "version": "2.90.1-1",
+      "base": "mingw-w64-glib2",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libpango-1.0-0.dll",
+      "bytes": 435180,
+      "sha256": "fd92503a3fcab12fcf555cf8a47610f23b203cf888b48b5628629987d68215b8",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libfribidi-0.dll",
+        "libgio-2.0-0.dll",
+        "libglib-2.0-0.dll",
+        "libgobject-2.0-0.dll",
+        "libharfbuzz-0.dll",
+        "libthai-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-pango",
+      "version": "1.58.2-1",
+      "base": "mingw-w64-pango",
+      "licenses": [
+        "spdx:LGPL-2.1"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libpangocairo-1.0-0.dll",
+      "bytes": 82317,
+      "sha256": "0af768e57c0aaf8f1dbafdff21b95a21d9cff7ae5be2e3e5ffa366c9dbf4f5c8",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libcairo-2.dll",
+        "libfontconfig-1.dll",
+        "libglib-2.0-0.dll",
+        "libgobject-2.0-0.dll",
+        "libharfbuzz-0.dll",
+        "libpango-1.0-0.dll",
+        "libpangoft2-1.0-0.dll",
+        "libpangowin32-1.0-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-pango",
+      "version": "1.58.2-1",
+      "base": "mingw-w64-pango",
+      "licenses": [
+        "spdx:LGPL-2.1"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libogg-0.dll",
+      "bytes": 41748,
+      "sha256": "2f102fba6f2a49516be85cb2643f6a9ba394dc5657aedb3ea235b6603c12d3d2",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libogg",
+      "version": "1.3.6-1",
+      "base": "mingw-w64-libogg",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libsharpyuv-0.dll",
+      "bytes": 48938,
+      "sha256": "d29380c7056383f3e7a80bf9e150f0b8c425c1cf2568d1336e88979ddc2307af",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libwebp",
+      "version": "1.6.0-1",
+      "base": "mingw-w64-libwebp",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libexpat-1.dll",
+      "bytes": 239251,
+      "sha256": "8a10cf7e89524b621d5f74bd4aedc659c47c7ce397d489f323a1065ba695027a",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-expat",
+      "version": "2.9.0-1",
+      "base": "mingw-w64-expat",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgraphite2.dll",
+      "bytes": 167857,
+      "sha256": "93953e4744bcfce9a7bc439b956544bc213095cb1349c3602a58370f32b25c18",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-graphite2",
+      "version": "1.3.15-1",
+      "base": "mingw-w64-graphite2",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgomp-1.dll",
+      "bytes": 327456,
+      "sha256": "ccaf59dc8cff15ace88ab47acd68a5b014167cad8f960e7683466a4c821e41c4",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libwinpthread-1.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libgomp",
+      "version": "16.2.0-6",
+      "base": "mingw-w64-gcc",
+      "licenses": [
+        "spdx:GPL-3.0-or-later WITH GCC-exception-3.1 AND GFDL-1.3-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgmp-10.dll",
+      "bytes": 681231,
+      "sha256": "c2567ccf3f410c3411ba7cd4b7ba14f393a0e70a1d0c0593297df6706b5fba96",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-gmp",
+      "version": "6.3.0-2",
+      "base": "mingw-w64-gmp",
+      "licenses": [
+        "LGPL3",
+        "GPL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libhogweed-7.dll",
+      "bytes": 276571,
+      "sha256": "b48e33181b78d715ba310581f4c72376c959854638bf635e1703e5fc1b783498",
+      "imports": [
+        "libgmp-10.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libnettle-9.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-nettle",
+      "version": "4.0-1",
+      "base": "mingw-w64-nettle",
+      "licenses": [
+        "spdx:GPL-2.0-or-later",
+        "spdx:LGPL-3.0-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libnettle-9.dll",
+      "bytes": 359138,
+      "sha256": "9b9f8bffca94d3cca7d1afb77d9deb0fa34427eaa05f1832037f46bc9e3dc134",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-nettle",
+      "version": "4.0-1",
+      "base": "mingw-w64-nettle",
+      "licenses": [
+        "spdx:GPL-2.0-or-later",
+        "spdx:LGPL-3.0-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libp11-kit-0.dll",
+      "bytes": 1590616,
+      "sha256": "c24fcbd4d67f6f837a1cc29bd37a2980670febfa64b1a424720e5768ff91cfa8",
+      "imports": [
+        "libffi-8.dll",
+        "libintl-8.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-process-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "SHELL32.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-p11-kit",
+      "version": "0.26.5-1",
+      "base": "mingw-w64-p11-kit",
+      "licenses": [
+        "spdx:BSD-3-Clause"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libtasn1-6.dll",
+      "bytes": 111487,
+      "sha256": "9793128fa5028fe8d8b49407a6ed900a2315444f9f7444a146f0b62f08c1c5bb",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libtasn1",
+      "version": "4.21.0-1",
+      "base": "mingw-w64-libtasn1",
+      "licenses": [
+        "GPL3, LGPL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libunistring-5.dll",
+      "bytes": 2256134,
+      "sha256": "ee39258fa1086269674a8179d3cfaf7c4e380ada14441b5dd9ed53d82d15c4e3",
+      "imports": [
+        "libiconv-2.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libunistring",
+      "version": "1.4.2-1",
+      "base": "mingw-w64-libunistring",
+      "licenses": [
+        "spdx:LGPL-3.0-or-later OR GPL-3.0-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libbrotlicommon.dll",
+      "bytes": 140697,
+      "sha256": "7b0047dc16dd92a7932124dfd5a6e698d342f533a15d37d61f710def66091436",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-brotli",
+      "version": "1.2.1-1",
+      "base": "mingw-w64-brotli",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libgmodule-2.0-0.dll",
+      "bytes": 23440,
+      "sha256": "5833f90d3c7a627d4d1b541e873bf0b10bca2204be89666213b3c48f6a57422d",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libglib-2.0-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-glib2",
+      "version": "2.90.1-1",
+      "base": "mingw-w64-glib2",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libtiff-6.dll",
+      "bytes": 614318,
+      "sha256": "d047260c3d456f84a2f9cd801d3b57bee0357cade32724caf16006c64c5fe8ff",
+      "imports": [
+        "libdeflate.dll",
+        "libjbig-0.dll",
+        "libjpeg-8.dll",
+        "KERNEL32.dll",
+        "libLerc.dll",
+        "liblzma-5.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libwebp-7.dll",
+        "zlib1.dll",
+        "libzstd.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libtiff",
+      "version": "4.7.2-2",
+      "base": "mingw-w64-libtiff",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libthai-0.dll",
+      "bytes": 71780,
+      "sha256": "d8d8b87e9089a811e088f6a01da57c19ed54d2b6613bb85697f1958473f63666",
+      "imports": [
+        "libdatrie-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "SHLWAPI.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libthai",
+      "version": "0.1.30-1",
+      "base": "mingw-w64-libthai",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libpangoft2-1.0-0.dll",
+      "bytes": 111100,
+      "sha256": "27620f9c842109690616393b3616c29d5dfda8f8a0a980c0a5e869d4f75be925",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libfontconfig-1.dll",
+        "libfreetype-6.dll",
+        "libgio-2.0-0.dll",
+        "libglib-2.0-0.dll",
+        "libgobject-2.0-0.dll",
+        "libharfbuzz-0.dll",
+        "libpango-1.0-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-pango",
+      "version": "1.58.2-1",
+      "base": "mingw-w64-pango",
+      "licenses": [
+        "spdx:LGPL-2.1"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libpangowin32-1.0-0.dll",
+      "bytes": 109864,
+      "sha256": "152832e8add3031293fca8152ac8450db9122ee5b20561160e025a078954162d",
+      "imports": [
+        "ADVAPI32.dll",
+        "DWrite.dll",
+        "GDI32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "USER32.dll",
+        "libgio-2.0-0.dll",
+        "libglib-2.0-0.dll",
+        "libgobject-2.0-0.dll",
+        "libharfbuzz-0.dll",
+        "libpango-1.0-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-pango",
+      "version": "1.58.2-1",
+      "base": "mingw-w64-pango",
+      "licenses": [
+        "spdx:LGPL-2.1"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libdeflate.dll",
+      "bytes": 97053,
+      "sha256": "61a60665da9fd15a0e8668c47424f325e1d74479c3f896fa7ae48ffcee4ca300",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libdeflate",
+      "version": "1.26-1",
+      "base": "mingw-w64-libdeflate",
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libjbig-0.dll",
+      "bytes": 61598,
+      "sha256": "36b6155be36d24a19154a48177a09978ff6c26f48665d8c7bb5057aaace6b91c",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-jbigkit",
+      "version": "2.1-6",
+      "base": "mingw-w64-jbigkit",
+      "licenses": [
+        "spdx:GPL-2.0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libLerc.dll",
+      "bytes": 803103,
+      "sha256": "1ffee78579c25b073267bcac8d0a6045d9bd446e010c7953b569b2629ca8a58a",
+      "imports": [
+        "libgcc_s_seh-1.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libstdc++-6.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-lerc",
+      "version": "4.1.1-1",
+      "base": "mingw-w64-lerc",
+      "licenses": [
+        "spdx:Apache-2.0"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libdatrie-1.dll",
+      "bytes": 35223,
+      "sha256": "40aee3ae9a62a77454dfe8419fe21b54c54d969e0471c9e817b65d4502a9949f",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libdatrie",
+      "version": "0.2.14-1",
+      "base": "mingw-w64-libdatrie",
+      "licenses": [
+        "LGPL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    }
+  ],
+  "systemImports": [
+    "advapi32.dll",
+    "api-ms-win-core-path-l1-1-0.dll",
+    "api-ms-win-core-synch-l1-2-0.dll",
+    "api-ms-win-crt-conio-l1-1-0.dll",
+    "api-ms-win-crt-convert-l1-1-0.dll",
+    "api-ms-win-crt-environment-l1-1-0.dll",
+    "api-ms-win-crt-filesystem-l1-1-0.dll",
+    "api-ms-win-crt-heap-l1-1-0.dll",
+    "api-ms-win-crt-locale-l1-1-0.dll",
+    "api-ms-win-crt-math-l1-1-0.dll",
+    "api-ms-win-crt-multibyte-l1-1-0.dll",
+    "api-ms-win-crt-private-l1-1-0.dll",
+    "api-ms-win-crt-process-l1-1-0.dll",
+    "api-ms-win-crt-runtime-l1-1-0.dll",
+    "api-ms-win-crt-stdio-l1-1-0.dll",
+    "api-ms-win-crt-string-l1-1-0.dll",
+    "api-ms-win-crt-time-l1-1-0.dll",
+    "api-ms-win-crt-utility-l1-1-0.dll",
+    "avicap32.dll",
+    "avrt.dll",
+    "bcrypt.dll",
+    "bcryptprimitives.dll",
+    "cfgmgr32.dll",
+    "crypt32.dll",
+    "dnsapi.dll",
+    "dwmapi.dll",
+    "dwrite.dll",
+    "gdi32.dll",
+    "gdiplus.dll",
+    "imm32.dll",
+    "iphlpapi.dll",
+    "kernel32.dll",
+    "msimg32.dll",
+    "msvcrt.dll",
+    "ncrypt.dll",
+    "ntdll.dll",
+    "ole32.dll",
+    "oleaut32.dll",
+    "opengl32.dll",
+    "rpcrt4.dll",
+    "secur32.dll",
+    "shcore.dll",
+    "shell32.dll",
+    "shlwapi.dll",
+    "user32.dll",
+    "userenv.dll",
+    "usp10.dll",
+    "uxtheme.dll",
+    "version.dll",
+    "winmm.dll",
+    "wldap32.dll",
+    "ws2_32.dll",
+    "wsock32.dll",
+    "xmllite.dll"
+  ],
+  "mpvCommit": "e471496c56f0f49c133bd88b50aed62b845f1909",
+  "ffmpegCommit": "6882969ce9fd2aa6aa1d0008b2bfe1c838aac11d"
+}
