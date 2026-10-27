@@ -18,4 +18,4 @@ fuentes/cargo-vendor permite usar Cargo sin descargar crates. Por ejemplo, pasar
 
 ## Otros sistemas
 
-cargo test --locked --lib comprueba únicamente el núcleo independiente de Windows. No genera aplicaciones para macOS/Linux/Google TV. El flujo GitHub Actions no llegó a ejecutar las pruebas porque GitHub bloqueó los trabajos por la facturación/límite de gasto de la cuenta; no se presenta como CI superada.
+cargo test --locked --lib comprueba únicamente el núcleo independiente de Windows. No genera aplicaciones para macOS/Linux/Google TV. La ejecución previa de 0.2.7 quedó bloqueada por facturación/límite de gasto. La ejecución 40526609437 de 0.2.8 terminó correctamente: 23 pruebas del núcleo en macos-latest y 23 en ubuntu-latest. No valida las interfaces o reproducción de Windows en esos sistemas. El ZIP de fuentes se preparó antes de esta comprobación y conserva la referencia histórica al bloqueo; esta nota actualiza ese resultado.

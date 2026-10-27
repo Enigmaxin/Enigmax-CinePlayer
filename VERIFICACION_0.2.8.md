@@ -36,4 +36,11 @@ Se verificaron revisiones Git y ausencia de cambios de contenido, teniendo en cu
 
 El compilador upstream mpv emitió una advertencia sobre el tamaño de memcpy en filters/f_hwtransfer.c; no se demostró un defecto ni se ocultó con un parche. Los análisis y ensayos no prueban ausencia de cualquier bug. No se ejecutaron sanitizadores ni una auditoría jurídica independiente.
 
-GitHub Actions no inició sus trabajos por una restricción de facturación/límite de gasto de la cuenta; no hay resultado de CI de Linux/macOS. No se certifican otros equipos, todos los procesadores Intel, HDR/HDMI físico, passthrough a receptor, Blu-ray cifrado, menús completos ni cualquier archivo. Las limitaciones funcionales de README.md siguen vigentes. No se creó instalador ni se cambiaron asociaciones o el registro.
+La ejecución anterior de GitHub Actions de 0.2.7 quedó bloqueada por facturación/límite de gasto. En 0.2.8, el run 40526609437 del commit e62a071e10f9587165272369ba548b9a619fff8a completó correctamente las 23 pruebas del núcleo en macos-latest y otras 23 en ubuntu-latest; se comprobaron los pasos y logs. Esto no valida interfaces, reproducción o binarios completos para esas plataformas. El ZIP de fuentes conserva el texto de COMPILAR.md escrito antes de esa CI; este informe y las notas de la release actualizan el resultado. No se certifican otros equipos, todos los procesadores Intel, HDR/HDMI físico, passthrough a receptor, Blu-ray cifrado, menús completos ni cualquier archivo. Las limitaciones funcionales de README.md siguen vigentes. No se creó instalador ni se cambiaron asociaciones o el registro.
+
+## Comprobación después de publicar
+
+Release v0.2.8 pública y marcada Latest; etiqueta apuntando al commit e62a071e10f9587165272369ba548b9a619fff8a. Los cinco assets conservan tamaño y digest SHA-256 coincidentes con los locales. La consulta directa con el auxiliar real y User-Agent devolvió HTTP 403; cabeceras GitHub x-ratelimit-limit=60 y x-ratelimit-remaining=0. La cuota anónima de esta conexión impide validar ahora el flujo completo de actualización. No se atribuye el 403 a ausencia de User-Agent ni se afirma actualización integral superada.
+
+Tras verificar el paquete nuevo, se retiraron el ZIP 0.2.7 y las copias de prueba del reproductor/compilación: 592,7 MiB liberados. Se conservaron fuentes, herramientas, dependencias vigentes, ajustes y medios originales. Los 141 archivos del paquete vigente se volvieron a verificar después de la limpieza.
+
