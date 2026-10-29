@@ -2,8 +2,7 @@
 use semver::Version;
 use serde_json::Value;
 
-pub const UPDATE_ENDPOINT: &str =
-    "https://api.github.com/repos/Enigmaxin/Enigmax-CinePlayer/releases/latest";
+pub const UPDATE_ENDPOINT: &str = "https://github.com/Enigmaxin/Enigmax-CinePlayer/releases/latest/download/Enigmax-CinePlayer-update.json";
 pub const MAX_PACKAGE_BYTES: u64 = 512 * 1024 * 1024;
 const DOWNLOAD_PREFIX: &str = "https://github.com/Enigmaxin/Enigmax-CinePlayer/releases/download/";
 
@@ -33,6 +32,22 @@ fn escape_segment(s: &str) -> String {
         }
     }
     out
+}
+pub fn manifest(json: &[u8], current: &str) -> Result<Option<Release>, String> {
+    let root: Value = serde_json::from_slice(json).map_err(|_| "Manifiesto JSON no válido")?;
+    if root["format"] != 1
+        || !root["draft"].is_boolean()
+        || !root["prerelease"].is_boolean()
+        || !root["assets"].is_array()
+    {
+        return Err("Formato de manifiesto no compatible o incompleto".into());
+    }
+    version(
+        root["tag_name"]
+            .as_str()
+            .ok_or("Falta la versión del manifiesto")?,
+    )?;
+    latest(json, current)
 }
 pub fn latest(json: &[u8], current: &str) -> Result<Option<Release>, String> {
     let root: Value = serde_json::from_slice(json).map_err(|_| "GitHub devolvió JSON no válido")?;
@@ -107,6 +122,21 @@ mod tests {
         let v = version(tag).unwrap();
         let name = format!("Enigmax-CinePlayer-Portable-{v}-windows-x64.zip");
         serde_json::json!({"draft":false,"prerelease":false,"tag_name":tag,"assets":[{"name":name,"size":74000000,"digest":format!("sha256:{}","a".repeat(64)),"browser_download_url":format!("{DOWNLOAD_PREFIX}{tag}/{name}")}]})
+    }
+    #[test]
+    fn static_manifest_preserves_release_validation() {
+        let mut root = fixture("v0.2.18");
+        root["format"] = 1.into();
+        let bytes = serde_json::to_vec(&root).unwrap();
+        assert_eq!(
+            manifest(&bytes, "0.2.17").unwrap(),
+            latest(&bytes, "0.2.17").unwrap()
+        );
+        root["format"] = 2.into();
+        assert!(manifest(&serde_json::to_vec(&root).unwrap(), "0.2.17").is_err());
+        root["format"] = 1.into();
+        root["draft"] = Value::Null;
+        assert!(manifest(&serde_json::to_vec(&root).unwrap(), "0.2.17").is_err());
     }
     #[test]
     fn semantic_order_and_no_downgrades() {

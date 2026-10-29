@@ -13,6 +13,11 @@ $annexbTest=Join-Path $nativeTests 'test_annexb.exe'
 if($LASTEXITCODE -ne 0){throw 'Error al compilar la prueba Annex B'}
 & $annexbTest
 if($LASTEXITCODE -ne 0){throw 'Error de reconstrucción Annex B'}
+$probeTest=Join-Path $nativeTests 'test_probe_nal.exe'
+& gcc -std=c11 -O2 -Wall -Wextra -Werror (Join-Path $PSScriptRoot 'native/test_probe_nal.c') -o $probeTest
+if($LASTEXITCODE -ne 0){throw 'Error al compilar la prueba de detección MVC'}
+& $probeTest
+if($LASTEXITCODE -ne 0){throw 'Error en la detección estructural MVC'}
 $ff=[IO.Path]::GetFullPath($FfmpegDirectory)
 $edge=Join-Path $PSScriptRoot 'native\vendor\edge264-mvc'
 & make -C $edge OS=windows STATIC=yes BUILDTEST=no VARIANTS=x86-64-v2,x86-64-v3 'CFLAGS=-march=x86-64 -mtune=generic' -j4

@@ -1,0 +1,244 @@
+diff --git a/options/options.c b/options/options.c
+index 37d3e1b..8fd5a98 100644
+--- a/options/options.c
++++ b/options/options.c
+@@ -422,6 +422,10 @@ const struct m_sub_options mp_subtitle_shared_sub_opts = {
+ 
+ const struct m_sub_options mp_osd_render_sub_opts = {
+     .opts = (const struct m_option[]){
++        {"cine-sub-layout", OPT_INT(cine_sub_layout), M_RANGE(0, 2)},
++        {"cine-sub-packed", OPT_BOOL(cine_sub_packed)},
++        {"cine-sub-depth", OPT_FLOAT(cine_sub_depth), M_RANGE(-0.1, 0.1)},
++        {"cine-sub-par", OPT_FLOAT(cine_sub_par), M_RANGE(0.01, 100)},
+         {"osd", OPT_SUBSTRUCT(osd_style, osd_style_conf)},
+         {"osd-bar", OPT_SUBSTRUCT(osd_bar_style, osd_bar_style_conf)},
+         {"osd-scale", OPT_FLOAT(osd_scale), M_RANGE(0, 100)},
+@@ -438,6 +442,7 @@ const struct m_sub_options mp_osd_render_sub_opts = {
+     .size = sizeof(OPT_BASE_STRUCT),
+     .defaults = &(OPT_BASE_STRUCT){
+         .osd_scale = 1,
++        .cine_sub_par = 1,
+         .osd_scale_by_window = true,
+         .osd_selected_color = {250, 189, 47, 255},
+         .osd_selected_outline_color = {0, 0, 0, 255},
+diff --git a/options/options.h b/options/options.h
+index 1f8e7cb..3d74bb4 100644
+--- a/options/options.h
++++ b/options/options.h
+@@ -146,6 +146,11 @@ struct mp_subtitle_shared_opts {
+ };
+ 
+ struct mp_osd_render_opts {
++    // CinePlayer: subtitle geometry only, before stereo video projection.
++    int cine_sub_layout;
++    bool cine_sub_packed;
++    float cine_sub_depth;
++    float cine_sub_par;
+     float osd_scale;
+     bool osd_scale_by_window;
+     struct m_color osd_selected_color;
+diff --git a/sub/osd.c b/sub/osd.c
+index 0a073bd..bed108e 100644
+--- a/sub/osd.c
++++ b/sub/osd.c
+@@ -18,6 +18,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <assert.h>
++#include <math.h>
+ 
+ #include <libavutil/common.h>
+ 
+@@ -358,6 +359,68 @@ static struct sub_bitmaps *render_object(struct osd_state *osd,
+     return res;
+ }
+ 
++// Crop geometry and texture coordinates together. No bitmap/video readback.
++static bool cine_clip(struct sub_bitmap *b, int x0, int y0, int x1, int y1,
++                      enum sub_bitmap_format format)
++{
++    if (b->dw <= 0 || b->dh <= 0 || b->w <= 0 || b->h <= 0)
++        return false;
++    int l = MPMAX(b->x, x0), t = MPMAX(b->y, y0);
++    int r = MPMIN(b->x + b->dw, x1), d = MPMIN(b->y + b->dh, y1);
++    if (r <= l || d <= t)
++        return false;
++    int sx = (int)((int64_t)(l - b->x) * b->w / b->dw);
++    int sy = (int)((int64_t)(t - b->y) * b->h / b->dh);
++    int ex = (int)((int64_t)(r - b->x) * b->w / b->dw);
++    int ey = (int)((int64_t)(d - b->y) * b->h / b->dh);
++    b->src_x += sx;
++    b->src_y += sy;
++    if (b->bitmap)
++        b->bitmap = (char *)b->bitmap + sy * b->stride +
++                    sx * (format == SUBBITMAP_BGRA ? 4 : 1);
++    b->w = ex - sx;
++    b->h = ey - sy;
++    b->x = l; b->y = t; b->dw = r - l; b->dh = d - t;
++    return b->w > 0 && b->h > 0;
++}
++
++static void cine_project_subs(struct sub_bitmaps *imgs,
++                              struct mp_osd_res full,
++                              const struct mp_osd_render_opts *opts)
++{
++    if (!imgs || !opts->cine_sub_layout || imgs->num_parts <= 0 ||
++        imgs->num_parts > 100000 ||
++        (imgs->format != SUBBITMAP_LIBASS && imgs->format != SUBBITMAP_BGRA))
++        return;
++    bool horizontal = opts->cine_sub_layout == 1;
++    int ew = full.w / (horizontal ? 2 : 1);
++    int eh = full.h / (horizontal ? 1 : 2);
++    int count = 0;
++    struct sub_bitmap *parts = talloc_array(imgs, struct sub_bitmap,
++                                           imgs->num_parts * 2);
++    for (int eye = 0; eye < 2; eye++) {
++        int ox = horizontal ? eye * ew : 0;
++        int oy = horizontal ? 0 : eye * eh;
++        int shift = lrintf(opts->cine_sub_depth * ew) * (eye ? -1 : 1);
++        for (int i = 0; i < imgs->num_parts; i++) {
++            struct sub_bitmap b = imgs->parts[i];
++            if (!opts->cine_sub_packed) {
++                b.x += ox;
++                b.y += oy;
++            }
++            if (!cine_clip(&b, ox, oy, ox + ew, oy + eh, imgs->format))
++                continue;
++            b.x += shift;
++            if (cine_clip(&b, ox, oy, ox + ew, oy + eh, imgs->format))
++                parts[count++] = b;
++        }
++    }
++    // The decoder-owned pixel storage is shared; only destination rectangles
++    // and a small array of texture coordinates are duplicated.
++    imgs->parts = parts;
++    imgs->num_parts = count;
++}
++
+ // Render OSD to a list of bitmap and return it. The returned object is
+ // refcounted. Typically you should hold it only for a short time, and then
+ // release it.
+@@ -370,6 +433,18 @@ struct sub_bitmap_list *osd_render(struct osd_state *osd, struct mp_osd_res res,
+ 
+     int64_t start_time = mp_time_ns();
+ 
++    if (osd->cine_sub_layout != osd->opts->cine_sub_layout ||
++        osd->cine_sub_packed != osd->opts->cine_sub_packed ||
++        osd->cine_sub_depth != osd->opts->cine_sub_depth ||
++        osd->cine_sub_par != osd->opts->cine_sub_par) {
++        osd->cine_sub_layout = osd->opts->cine_sub_layout;
++        osd->cine_sub_packed = osd->opts->cine_sub_packed;
++        osd->cine_sub_depth = osd->opts->cine_sub_depth;
++        osd->cine_sub_par = osd->opts->cine_sub_par;
++        for (int n = 0; n < MAX_OSD_PARTS; n++)
++            osd->objs[n]->vo_change_id++;
++    }
++
+     struct sub_bitmap_list *list = talloc_zero(NULL, struct sub_bitmap_list);
+     list->change_id = 1;
+     list->w = res.w;
+@@ -397,8 +472,20 @@ struct sub_bitmap_list *osd_render(struct osd_state *osd, struct mp_osd_res res,
+         char *stat_type_render = obj->is_sub ? "sub-render" : "osd-render";
+         stats_time_start(osd->stats, stat_type_render);
+ 
++        struct mp_osd_res subres = res;
++        if (obj->is_sub && osd->opts->cine_sub_layout &&
++            !osd->opts->cine_sub_packed) {
++            int dx = osd->opts->cine_sub_layout == 1 ? 2 : 1;
++            int dy = osd->opts->cine_sub_layout == 2 ? 2 : 1;
++            subres.w /= dx; subres.h /= dy;
++            subres.ml /= dx; subres.mr /= dx;
++            subres.mt /= dy; subres.mb /= dy;
++            subres.display_par = osd->opts->cine_sub_par;
++        }
+         struct sub_bitmaps *imgs =
+-            render_object(osd, obj, res, video_pts, formats);
++            render_object(osd, obj, subres, video_pts, formats);
++        if (obj->is_sub)
++            cine_project_subs(imgs, res, osd->opts);
+ 
+         stats_time_end(osd->stats, stat_type_render);
+ 
+@@ -604,3 +691,8 @@ struct sub_bitmaps *sub_bitmaps_copy(struct sub_bitmap_copy_cache **p_cache,
+ 
+     return res;
+ }
++
++bool osd_is_external_bitmap(int render_index)
++{
++    return render_index == OSDTYPE_EXTERNAL2;
++}
+diff --git a/sub/osd.h b/sub/osd.h
+index b62836e..d4e59bd 100644
+--- a/sub/osd.h
++++ b/sub/osd.h
+@@ -274,4 +274,7 @@ void osd_get_text_size(struct osd_state *osd, int *out_screen_h, int *out_font_h
+ void osd_get_function_sym(char *buffer, size_t buffer_size, int osd_function);
+ void osd_mangle_ass(bstr *dst, const char *in, bool replace_newlines);
+ 
++// Application overlay-add surfaces already use output coordinates.
++bool osd_is_external_bitmap(int render_index);
++
+ #endif /* MPLAYER_SUB_H */
+diff --git a/sub/osd_state.h b/sub/osd_state.h
+index 57bd565..395b0e4 100644
+--- a/sub/osd_state.h
++++ b/sub/osd_state.h
+@@ -68,6 +68,10 @@ struct osd_external {
+ };
+ 
+ struct osd_state {
++    int cine_sub_layout;
++    bool cine_sub_packed;
++    float cine_sub_depth;
++    float cine_sub_par;
+     mp_mutex lock;
+ 
+     struct osd_object *objs[MAX_OSD_PARTS];
+diff --git a/video/out/gpu/osd.c b/video/out/gpu/osd.c
+index 883dccd..76946c9 100644
+--- a/video/out/gpu/osd.c
++++ b/video/out/gpu/osd.c
+@@ -277,6 +277,9 @@ void mpgl_osd_draw_finish(struct mpgl_osd *ctx, int index,
+ 
+     int div[2];
+     mp_get_3d_side_by_side(ctx->stereo_mode, div);
++    // CinePlayer overlay-add surfaces are already projected in output pixels.
++    if (osd_is_external_bitmap(index))
++        div[0] = div[1] = 1;
+ 
+     part->num_vertices = 0;
+ 
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index b6d6930..9a9fd84 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -536,6 +536,10 @@ static void update_overlays(struct vo *vo, struct mp_osd_res res,
+         const struct sub_bitmaps *item = subs->items[n];
+         if (!item->num_parts || !item->packed)
+             continue;
++        int item_div[2] = {div[0], div[1]};
++        // Application bitmap overlays already contain both output-eye planes.
++        if (osd_is_external_bitmap(item->render_index))
++            item_div[0] = item_div[1] = 1;
+         struct osd_entry *entry = &state->entries[item->render_index];
+         if (!upload_overlay_tex(vo, entry, item))
+             break;
+@@ -553,7 +557,7 @@ static void update_overlays(struct vo *vo, struct mp_osd_res res,
+                                     : libass_overlay_color(p, item, src, ref_luma);
+             // Emit pl_overlay per each distinct colorspace run
+             if (start >= 0 && !pl_color_space_equal(&color, &part_color)) {
+-                dup_stereo_parts(p, entry, start, res, div);
++                dup_stereo_parts(p, entry, start, res, item_div);
+                 add_run_overlay(p, state, entry, item, &color, start, coords);
+                 start = -1;
+             }
+@@ -575,7 +579,7 @@ static void update_overlays(struct vo *vo, struct mp_osd_res res,
+             MP_TARRAY_APPEND(p, entry->parts, entry->num_parts, part);
+         }
+         if (start >= 0) {
+-            dup_stereo_parts(p, entry, start, res, div);
++            dup_stereo_parts(p, entry, start, res, item_div);
+             add_run_overlay(p, state, entry, item, &color, start, coords);
+         }
+     }

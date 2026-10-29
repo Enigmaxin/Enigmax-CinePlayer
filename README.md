@@ -1,4 +1,8 @@
-# Enigmax CinePlayer 0.2.8 — Windows 11 x64
+# Enigmax CinePlayer 0.2.18 — Windows 11 x64
+
+Cambios y límites de la versión vigente: **[VERIFICACION_0.2.18.md](VERIFICACION_0.2.18.md)**. Historial protegido entre instancias, recuperación de pistas por archivo y actualizaciones con caché y manifiesto público.
+
+HDR 2D utiliza libplacebo y ST2094-40, con metadatos dinámicos disponibles y alternativa sin ellos. El renderizador compatible usa BT.2390. SDR conserva su tratamiento de origen; no se activa conversión inversa a HDR. La salida real depende de Windows y de la pantalla: no existe una calibración universal para TV, monitores, proyectores y Quest. Véanse las pruebas y excepciones en el informe.
 
 Versión de desarrollo funcional. Se mantiene únicamente la última versión del programa; las versiones obsoletas se eliminan por indicación del usuario. Logo A elegido: cinta dorada y símbolo de reproducción azul.
 
@@ -16,15 +20,17 @@ La versión aparece en el título, en **Ayuda / F1** y en **Acerca de** dentro d
 
 Al abrir cada vídeo reconocido como 3D se pausa temporalmente y se pregunta cómo verlo: **2D sin gafas**, **anaglifo** con las gafas elegidas o **dos vistas originales** para una pantalla 3D. Se pregunta de nuevo al abrir otro archivo o reabrir el mismo; un cambio interno de transporte MVC conserva la elección. Al cerrar la pregunta sin elegir se utiliza 2D izquierdo.
 
-**Vídeo 3D / Ctrl+3** reúne las opciones habituales: **Ver en 2D**, **Ver con gafas de colores**, **Mostrar las dos vistas originales** e **Invertir profundidad**. Elegir las gafas activa directamente el anaglifo. Hay cinco parejas: rojo/cian, verde/magenta, ámbar/azul, rojo/azul y rojo/verde; estas dos últimas son monocromas. **Formato del archivo** corrige la detección. **Avanzado** agrupa el ojo 2D, método de color, calidad, calibración y ASS 3D.
+**Vídeo 3D / Ctrl+3** reúne las opciones habituales: **Ver en 2D**, **Ver con gafas de colores**, **Mostrar las dos vistas originales** e **Invertir profundidad**. Elegir las gafas activa directamente el anaglifo. Hay cinco parejas: rojo/cian, verde/magenta, ámbar/azul, rojo/azul y rojo/verde; estas dos últimas son monocromas. **Formato 3D** corrige la detección. **Avanzado** agrupa el ojo 2D, método de color, calidad, calibración y ASS 3D.
 
 El modo automático reconoce etiquetas explícitas del nombre como Full-SBS, HSBS, Full-OU, HOU y MVC, metadatos inequívocos y títulos Blu-ray con vista dependiente. Un nombre genérico «SBS», «3D» o unos metadatos sin información suficiente sobre Full/Half abren primero la confirmación del formato. No se deduce Full/Half por la resolución ni se analiza toda la imagen; un archivo sin etiquetas ni metadatos puede requerir selección manual. Las preferencias de formato y presentación de la película anterior se reinician para evitar aplicarlas al siguiente vídeo 2D. El menú permite corregir el aspecto final de fuentes anamórficas o recortadas.
 
-Los controles inferiores se muestran planos en 2D. En anaglifo se compone una sola barra con las gafas seleccionadas y una disparidad cruzada suave de 2–8 píxeles según el tamaño de ventana. En original SBS/OU se envía una copia por ojo, con zonas de clic equivalentes. Se corrige el indicador estereoscópico de salida para evitar otra duplicación de la interfaz. La barra aparece al mover el ratón, se oculta tras la inactividad y actualiza como máximo unas diez veces por segundo mientras está visible. Una búsqueda con el deslizador se ejecuta al soltarlo.
+Los controles inferiores y los menús propios permanecen en el plano de la pantalla, sin desplazamiento de profundidad. En SBS/OU y Frame Packing se proyectan en las mismas coordenadas de cada ojo; en anaglifo no hay separación horizontal entre los canales de color. La misma transformación se aplica a las pulsaciones, al progreso y al volumen. La barra aparece al mover el ratón y se oculta tras la inactividad. Un clic fuera de la barra pausa o reanuda, con una espera breve para distinguir el doble clic, que mantiene pantalla completa. Los botones y el deslizador conservan sus propias acciones. La barra se actualiza como máximo unas diez veces por segundo mientras está visible; la búsqueda con el deslizador se ejecuta al soltarlo.
 
-La composición GPU separa los ojos antes del escalado, trabaja en RGB lineal y no recodifica el archivo. La calibración permite ajustar convergencia ±3 %, ganancias de cada ojo y compensación de fugas hasta 15 %. La convergencia desplaza las vistas: no reconstruye profundidad ni elimina defectos de las gafas/pantalla.
+La composición GPU separa los ojos antes del escalado, trabaja en RGB lineal y no recodifica el archivo. La calibración permite ajustar las ganancias de cada ojo y compensación de fugas hasta 15 %. Los antiguos ajustes de convergencia del vídeo y profundidad añadida a los subtítulos se han retirado; los perfiles anteriores se admiten, pero esos valores se ignoran.
 
 **Equilibrado:** GPU y escalado spline36. **Máxima calidad:** GPU y EWA Lanczos. **Compatibilidad:** filtro FFmpeg stereo3d por CPU en RGB de 8 bits; no aplica la calibración GPU y no ofrece equivalencia de color exacta con ella. El modo anaglifo utiliza salida SDR. Para fuentes HDR se realiza primero conversión tonal a SDR mediante CPU; aumenta el consumo y puede limitar la fluidez en equipos modestos.
+
+La opción **Continuar último vídeo** guarda la ruta original de la ISO y recupera la playlist y la posición del historial. Si se recarga el transporte para mostrar MVC, la posición pendiente se conserva hasta confirmar la búsqueda.
 
 ## Blu-ray e ISO
 
@@ -38,11 +44,11 @@ El soporte MVC está en desarrollo: las pruebas reales se han realizado con la I
 
 SDR y HDR10 usan gpu-next/D3D11. El modo automático depende del estado HDR de Windows y de la pantalla. También puedes forzar SDR. La ISO UHD facilitada se ha abierto como HEVC 3840×2160 PQ/BT.2020 con D3D11VA y audio TrueHD. Eso no certifica la señal enviada al televisor.
 
-No se garantiza passthrough de metadatos HDR10+ ni salida nativa Dolby Vision, tampoco reconstrucción FEL. La interpretación de RPU/reshaping y la reproducción de una capa HDR compatible no equivalen a activar Dolby Vision en la TV. No se ha verificado físicamente una cadena HDR/HDMI.
+No se garantiza passthrough de metadatos HDR10+ ni salida nativa Dolby Vision, ni reconstrucción FEL verificada físicamente. La interpretación de RPU/reshaping y la reproducción de una capa HDR compatible no equivalen a activar Dolby Vision en la TV. No se ha verificado físicamente una cadena HDR/HDMI.
 
 WASAPI/PCM para altavoces o TV; selección de dispositivo y pistas en el menú. Passthrough opcional AC3/DTS o HDMI ampliado AC3/EAC3/DTS-HD/TrueHD, según receptor y controlador. No se ha comprobado con un receptor físico ni mediante escucha.
 
-SRT y ASS/SSA conservan el renderizado nativo, incluidos estilos y fuentes adjuntas. **Nuevo: los ASS con eventos estereoscópicos duplicados se detectan y se procesan junto con el vídeo.** Consulta el apartado siguiente. Los subtítulos 2D siguen superpuestos en el plano de pantalla. Las pistas PGS del Blu-ray se enumeran y seleccionan con su decodificador nativo; la validación visual de PGS sigue pendiente y no se detectan ni transforman PGS estereoscópicos duplicados. Los controles de posición no sustituyen las posiciones explícitas de un ASS.
+SRT y ASS/SSA conservan el renderizado nativo, incluidos estilos y fuentes adjuntas. **Nuevo: los ASS con eventos estereoscópicos duplicados se detectan y se procesan junto con el vídeo.** Consulta el apartado siguiente. Los subtítulos convencionales se duplican por ojo en las salidas estereoscópicas, sin profundidad añadida. Las pistas PGS del Blu-ray se enumeran y seleccionan con su decodificador nativo; la validación visual de PGS sigue pendiente y no se detectan ni transforman PGS estereoscópicos duplicados. Los controles de posición no sustituyen las posiciones explícitas de un ASS.
 
 ## Subtítulos ASS 3D
 
@@ -50,7 +56,7 @@ Activado por defecto: **M → Vídeo 3D → Avanzado → Subtítulos 3D → Auto
 
 Cuando se confirma una pareja SBS u OU compatible con el formato de vídeo seleccionado:
 
-- Anaglifo: texto y vídeo pasan por la misma matriz de gafas, intercambio de ojos, convergencia y calibración.
+- Anaglifo: texto y vídeo pasan por la misma matriz de gafas, intercambio de ojos y calibración.
 - 2D izquierdo o derecho: se selecciona el mismo ojo para imagen y texto.
 - Original: se conservan ambas vistas y su disposición.
 
@@ -95,3 +101,65 @@ En el menú Acerca de se puede buscar actualizaciones manualmente; la consulta s
 ## Cambios de 0.2.8
 
 Motor reconstruido desde revisiones fijadas de mpv y FFmpeg; ambos comparten las bibliotecas FFmpeg. Carga de dependencias desde runtime/ mediante directorios DLL explícitos, sin buscar en PATH o el directorio de trabajo. Inventario, licencias y paquetes de fuentes correspondientes incluidos. Verificación: VERIFICACION_0.2.8.md.
+
+## Cambios de 0.2.9
+
+El selector inicial de vídeo 3D usa botones grandes accesibles de Windows. Ofrece 2D izquierdo, anaglifo con cinco gafas, Full SBS 3840×1080 y Full SBS anamórfico 3840×2160. Los dos últimos componen dos vistas de 1920×1080 o 1920×2160 en la GPU: expanden HSBS y convierten OU/MVC a SBS. El modo anamórfico estira la altura y se verá deformado antes de activar SBS en la pantalla 3D. No crea ni convierte archivos en disco ni cambia la resolución HDMI de Windows. En un monitor de otra resolución, la composición se adapta al área de reproducción.
+
+Cada shader tiene una ruta inmutable por contenido durante la sesión. Así se evita que la caché de mpv mantenga las gafas, la inversión o el shader anaglifo anterior al elegir 2D. Las variantes iguales reutilizan el mismo archivo y la carpeta de sesión se limpia al cerrar.
+
+La aplicación recuerda la posición en config/resume.json y pregunta al reabrir el mismo medio si se quiere reanudar o empezar desde cero. Incluye el título MPLS de las ISO. Solo conserva posiciones a partir de 10 segundos y a más de 10 segundos del final; un vídeo terminado deja de ofrecer reanudación. La identidad combina ruta, tamaño y fecha de modificación para evitar aplicar posiciones a otro archivo sustituido. Máximo 500 registros y un límite de tamaño; escritura atómica. Se actualiza en memoria cada 5 segundos y en disco cada 30 segundos, además del cierre y cambio de archivo. Un cierre forzado puede perder hasta el último intervalo de guardado; el cierre nativo puede recuperar la última muestra de 5 segundos si mpv ya ha finalizado.
+
+Verificación y límites: VERIFICACION_0.2.9.md.
+
+## Cambios de 0.2.10
+
+El EXE declara PerMonitorV2 desde su manifiesto, antes de crear ventanas. La pantalla completa utiliza el área completa del monitor que gestiona mpv, sin modo exclusivo ni cambios de resolución de Windows. Se comprobó a 3840×2160 con escalado del 150 %, tanto con gpu-next como con gpu. Las barras que correspondan a la relación de aspecto de la película se conservan.
+
+La barra inferior añade «⋯», con el resto de opciones del menú contextual. Usa el mismo constructor y las mismas acciones, omitiendo las secciones de pistas y 3D, que tienen botones propios. Conserva salida de audio, dispositivo, aspecto, HDR, ayuda, información y actualizaciones.
+
+Se explicita el fallback de mpv: métodos acelerados seguros, variantes con copia y, si no funcionan, decodificación software; tres errores de decodificación consecutivos disparan el siguiente método. El renderizador intenta gpu-next y después gpu, y Direct3D puede recurrir a WARP si no logra crear el dispositivo físico. Los hilos software se ajustan a los procesadores lógicos, con máximo 8 para FFmpeg y 4 para MVC. No se reducen la resolución ni la precisión del vídeo para ocultar una falta de rendimiento. Estos límites contienen la memoria por fotogramas y evitan cuatro trabajadores MVC en equipos con uno o dos procesadores lógicos; no garantizan menor consumo o más velocidad en cualquier equipo.
+
+MVC conserva el decodificador software de ambas vistas. Los filtros CPU de compatibilidad y la conversión HDR para anaglifo conservan auto-copy: pueden decodificar por hardware, pero el procesamiento de esos filtros sigue en CPU. La composición normal y las salidas Full SBS usan GPU. Información de reproducción incluye el modo activo y el diagnóstico de ventana/monitor. Ver VERIFICACION_0.2.10.md para resultados y límites.
+
+## Cambios de 0.2.11
+
+El selector inicial prioriza el formato original HSBS/HOU, identificado por su nombre y con instrucciones para activar SBS o arriba/abajo en una pantalla compatible. Esta salida conserva el empaquetado y no crea las texturas intermedias de resolución fija. El escalado final del monitor sigue siendo necesario cuando su resolución difiere. 2D izquierdo y anaglifo permanecen disponibles; Full SBS 3840×1080 y SBS anamórfico 3840×2160 se presentan como alternativas de compatibilidad, con advertencias sobre interpolación y posible reducción de detalle de fuentes mayores. Para Full SBS/OU completos, la pantalla y su configuración de salida deben admitir ese empaquetado.
+
+Las barras de volumen y progreso utilizan la misma proyección que el resto de controles. Se desactiva la barra 2D de mpv; rueda, teclas de volumen y búsquedas por teclado muestran el panel proyectado. El volumen también aparece en ventanas más pequeñas cuando queda espacio. El arrastre SBS conserva el ojo donde comenzó, no salta al cruzar la división y utiliza la coordenada final al soltar, incluso fuera del panel o cuando no llegó el último evento de movimiento. Shift+flechas izquierda/derecha permite búsquedas exactas de un segundo.
+
+Una ISO puede conservar archivos AACS aunque su vídeo ya esté legible. Si libbluray rechaza abrirla, se intenta una única lectura UDF alternativa del mismo título, limitada a títulos 2D de un clip. Antes de admitirla se exige decodificar una imagen válida por software; después mpv usa su decodificación habitual, incluida la aceleración compatible. No se descifra contenido, no se modifica ni extrae la película y no se sustituye silenciosamente el título seleccionado. Esta vía conserva los flujos de audio y subtítulos del M2TS, admite búsquedas y limita el final al intervalo del título. No reconstruye capítulos MPLS ni menús; los títulos de varios clips siguen necesitando la vía Blu-ray habitual.
+
+Ver resultados y límites en VERIFICACION_0.2.11.md. La versión no está publicada en GitHub y no se crea instalador.
+
+## Cambios de 0.2.12
+
+Vídeo 3D y la pregunta inicial incluyen Frame Packing 1920×2205 (composición). Produce en GPU dos vistas 1920×1080, una encima de otra, separadas por 45 líneas negras. Conserva la proporción de cada ojo mediante bandas cuando sea necesario, permite intercambiarlos y transforma también el ASS 3D fusionado. Es una composición de imagen, no una activación de Frame Packing HDMI: no cambia la resolución/frecuencia de Windows ni negocia el modo 3D del televisor. Si la ventana tiene otra proporción, el lienzo completo se ajusta a ella sin recortarse. HSBS/HOU originales siguen siendo las opciones recomendadas para pantallas compatibles con esos formatos.
+
+Los controles se proyectan dentro de cada vista Frame Packing y excluyen el hueco y los márgenes laterales de las zonas de pulsación. También funciona el arrastre de progreso y volumen en cada ojo. El perfil conserva esta salida como delivery=3, sin cambiar los valores anteriores.
+
+Al cambiar el volumen aparece durante aproximadamente 1,8 segundos un aviso con porcentaje y flecha de subida/bajada; silencio y reactivación tienen su propio mensaje. El aviso sigue el modo 2D, anaglifo, SBS, OU o Frame Packing. Reutiliza el panel y su temporizador, manteniendo el límite de unas diez actualizaciones por segundo y sin sondeo cuando está oculto. Se incorporan más datos de diagnóstico a petición en Información de reproducción: decodificador activo, renderizador, FPS y retrasos de presentación.
+
+No se incorporan miniaturas, inferencia IA, decodificadores adicionales ni colas nuevas. Frame Packing utiliza un paso de composición GPU solo al seleccionarlo; puede requerir más memoria gráfica que el original sin composición. No se afirma consumo idéntico o mínimo universal. Pruebas y límites en VERIFICACION_0.2.12.md.
+
+## Cambios de 0.2.16
+
+Selector J con cinco tarjetas e iconos de acción directa, fotografías fijas embebidas y aspecto de cristal sobre una ilustración suavizada. Original y 2D no tienen descripción. Las gafas tienen selector visual y Volver. No se captura el escritorio ni la película, ni se añade un motor web o animaciones. Los recursos gráficos se liberan al cerrar la ventana.
+
+Se retira Full SBS 3840×1080 y se migra su perfil a Original. Los modos conservan las muestras de origen; el anamórfico se ajusta a 16:9 al presentar, sin lienzo fijo 4K, y OU se reorganiza en SBS sin cambiar la cantidad de píxeles. Frame Packing conserva 1920×2205 por excepción expresa del usuario. La pantalla completa usa el visualizador, sin modificar sus temporizaciones.
+
+Capítulo anterior, lista y capítulo siguiente están en la barra. En ventanas muy estrechas se mantiene la lista. Los títulos MVC importan capítulos de su fuente original. Ver VERIFICACION_0.2.17.md para pruebas, límites y coste de los modos.
+
+## Interfaz M y auditoría de 0.2.16
+
+Barra flotante con progreso verde suave, controles de capítulos/volumen y menús oscuros. Audio y Subtítulos muestran los datos de cada pista en dos líneas; Subtítulos incluye añadir y sincronizar. Cerrar y Volver tienen mayor contraste. Se conserva el procesamiento del vídeo y la política de aceleración automática. Resultados y límites de audio, HDR, MVC y recursos: **VERIFICACION_0.2.17.md**.
+
+Durante la reproducción, los menús de Audio, Subtítulos, 3D, Opciones, capítulos y sus submenús se componen dentro del vídeo en cada ojo. Una segunda pulsación de 3D cierra su desplegable; también admiten Escape, teclado y rueda. Se recuperan −10 y +10. La selección inicial mantiene las tarjetas visuales; durante la salida estéreo se emplean desplegables sobre la imagen para que ambas vistas reciban la interfaz. Los selectores de archivos de Windows y los diálogos del actualizador siguen siendo ventanas del sistema en 2D.
+
+## Cambios de 0.2.17
+
+Se eliminan los menús, el botón y los ajustes de convergencia del vídeo y profundidad añadida de subtítulos. Los perfiles antiguos ignoran esos dos valores, conservando el resto de preferencias y la disparidad escrita en los ASS 3D. El botón de formato se llama «Formato 3D». Controles y menús permanecen en el plano de pantalla. «Continuar último vídeo» recupera la ruta, playlist y posición de las ISO, conservando la búsqueda pendiente durante las recargas MVC. Pruebas y límites: VERIFICACION_0.2.17.md.
+
+## Cambios de 0.2.18
+
+Se recuerda el último vídeo al confirmar sus pistas, sin esperar necesariamente a la primera imagen. Las escrituras tardías de otras instancias no sustituyen una apertura más reciente y el historial se combina bajo bloqueo. Se guardan las pistas de audio y subtítulos por archivo, incluidos subtítulos desactivados y SRT/ASS externos. Las elecciones se restauran también al recargar el transporte. El actualizador usa un manifiesto público con SHA-256, conserva una caché de 12 horas para consultas automáticas y respeta las esperas del servidor también al consultar manualmente. Ver VERIFICACION_0.2.18.md.

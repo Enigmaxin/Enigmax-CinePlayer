@@ -1,4 +1,4 @@
-# Package validation and recoverable replacement. No network or UI in this module.
+﻿# Package validation and recoverable replacement. No network or UI in this module.
 # Paths in a release are data: never pass them to a shell or overwrite config/media.
 function Get-Sha256([string]$Path) {
     $stream = [IO.File]::OpenRead($Path)

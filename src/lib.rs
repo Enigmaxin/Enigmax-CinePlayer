@@ -1,8 +1,14 @@
 //! Geometry shared with a future Android frontend. No OS or decoder dependencies.
 pub mod ass3d;
 pub mod control_layout;
+pub mod history;
+pub mod media;
+pub mod performance;
+pub mod playback;
 pub mod seek;
+pub mod shader_store;
 pub mod stereo;
+pub mod update_cache;
 pub mod update_policy;
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -147,3 +153,4 @@ mod tests {
         }
     }
 }
+pub mod popup_geometry;

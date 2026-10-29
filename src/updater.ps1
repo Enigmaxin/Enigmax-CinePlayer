@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][ValidateSet('Query','Apply')][string]$Mode,
     [string]$Endpoint,
     [string]$AppVersion,
@@ -53,6 +53,27 @@ function Open-Https([string]$Url, [string]$Agent) {
     throw 'Demasiadas redirecciones'
 }
 
+function Get-QueryFailure([int]$Code, $Headers, [long]$Now) {
+                $code=[int]$Code
+                $status='http-error'
+                $retry=[long]0
+                if ($code -eq 404) {$status='no-release'}
+                elseif ($code -eq 429 -or ($code -eq 403 -and
+                    ($Headers['X-RateLimit-Remaining'] -eq '0' -or $Headers['Retry-After']))) {
+                    $status='limited'
+                    $retry=$now+900
+                    $seconds=[long]0
+                    if ([long]::TryParse($Headers['Retry-After'],[ref]$seconds) -and $seconds -gt 0) {$retry=[Math]::Max($retry,$now+[Math]::Min($seconds,604800))}
+                    else {
+                        $date=[DateTimeOffset]::MinValue
+                        if ([DateTimeOffset]::TryParse($Headers['Retry-After'],[ref]$date)) {$retry=[Math]::Max($retry,[Math]::Min($date.ToUnixTimeSeconds(),$now+604800))}
+                    }
+                    $reset=[long]0
+                    if ([long]::TryParse($Headers['X-RateLimit-Reset'],[ref]$reset)) {$retry=[Math]::Max($retry,[Math]::Min($reset,$now+604800))}
+                }
+                return @{status=$status;http=$code;retry=$retry}
+}
+
 if ($Mode -eq 'Query') {
     $response = $null
     $stream = $null
@@ -68,10 +89,22 @@ if ($Mode -eq 'Query') {
             $memory.Write($buffer,0,$count)
         }
         $release = [Text.Encoding]::UTF8.GetString($memory.ToArray()) | ConvertFrom-Json
-        @{release=$release} |
+        @{status='ok';release=$release} |
             ConvertTo-Json -Depth 32 -Compress
         exit 0
-    } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
+    } catch {
+        $failure=$_.Exception
+        while ($failure.InnerException -and !($failure -is [Net.WebException])) {$failure=$failure.InnerException}
+        $http=$null
+        if ($failure -is [Net.WebException]) {$http=$failure.Response}
+        if ($http) {
+            try {
+                Get-QueryFailure ([int]$http.StatusCode) $http.Headers ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) | ConvertTo-Json -Compress
+                exit 0
+            } finally {$http.Dispose()}
+        }
+        [Console]::Error.WriteLine($_.Exception.Message); exit 1
+    }
     finally { if ($stream) {$stream.Dispose()}; if ($response) {$response.Dispose()}; if ($memory) {$memory.Dispose()} }
 }
 

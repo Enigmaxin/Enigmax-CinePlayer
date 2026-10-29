@@ -1,4 +1,4 @@
-# Compilar Enigmax CinePlayer 0.2.8
+# Compilar Enigmax CinePlayer 0.2.13
 
 El repositorio contiene el programa y puente MVC/UDF. Los dos ZIP adicionales de FUENTES.md contienen las instantáneas y dependencias del motor, sus recetas y las fuentes Cargo. No contienen películas ni ajustes personales.
 
@@ -19,3 +19,19 @@ fuentes/cargo-vendor permite usar Cargo sin descargar crates. Por ejemplo, pasar
 ## Otros sistemas
 
 cargo test --locked --lib comprueba únicamente el núcleo independiente de Windows. No genera aplicaciones para macOS/Linux/Google TV. La ejecución previa de 0.2.7 quedó bloqueada por facturación/límite de gasto. La ejecución 40526609437 de 0.2.8 terminó correctamente: 23 pruebas del núcleo en macos-latest y 23 en ubuntu-latest. No valida las interfaces o reproducción de Windows en esos sistemas. El ZIP de fuentes se preparó antes de esta comprobación y conserva la referencia histórica al bloqueo; esta nota actualiza ese resultado.
+
+El recurso assets/windows.manifest activa los diálogos nativos con botones grandes. build.rs comprueba sus cambios. Las pruebas actuales incluyen comparación de píxeles durante cambios de gafas, inversión, 2D y salida Full SBS.
+
+El generador prepara las muestras necesarias para cargo test, con patrones de color distintos por ojo para detectar shaders obsoletos. Las dos plantillas ASS están incluidas en las fuentes. La batería ampliada de verificacion/ requiere además sus muestras específicas y los medios de usuario autorizados; no se incluyen películas ni ISO. ENIGMAX_TEST_FIXTURES permite verificar la integración con una carpeta de muestras recién generadas.
+
+### Pruebas de audio de 0.2.14
+
+Antes de ejecutar las pruebas, genera la matriz sintética con `python verificacion/tests/generate-audio.py RUTA_A_FFMPEG.exe`. No utiliza archivos originales. `build.ps1` ejecuta la prueba de recursos GDI por separado para evitar interferencias con los tests GPU concurrentes.
+
+### Subtítulos estereoscópicos de 0.2.16
+
+La instantánea mpv incluida contiene el parche nativo documentado en native/mpv-subtitle-stereo.patch sobre la revisión base fijada. Al partir de Git limpio, aplícalo con git apply antes de compilar; build-engine.sh admite exclusivamente ese diff local. No se sustituye un controlador gráfico.
+
+Después de generate-fixtures.ps1, ejecutar python verificacion/tests/generate-stereo-subs.py --ffmpeg RUTA_A_FFMPEG.exe para generar las muestras originales PGS/SRT/ASS y el título MKV de prueba. Las mediciones de profundidad se ejecutan con cargo test; no requieren películas del usuario.
+
+package-sources.py admite --reuse-dependencies y --reuse-sha256 para reutilizar por renombrado un paquete de dependencias sin cambios, tras verificar hash, manifiesto y CRC; evita duplicar temporalmente más de un GiB.

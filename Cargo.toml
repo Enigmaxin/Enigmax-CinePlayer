@@ -1,6 +1,6 @@
 [package]
 name = "enigmax-cineplayer"
-version = "0.2.8"
+version = "0.2.18"
 edition = "2024"
 description = "Reproductor MKV para Windows con presentación estereoscópica en 2D"
 license = "GPL-3.0-or-later"

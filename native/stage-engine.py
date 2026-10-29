@@ -109,7 +109,7 @@ def main() -> None:
     (destination / "engine-manifest.json").write_text(json.dumps({
         "format": 1, "modules": [entry for _, entry in modules],
         "systemImports": sorted(system_imports),
-        "mpvCommit": "e471496c56f0f49c133bd88b50aed62b845f1909",
+        "mpvCommit": "dc4b285c93043d99492c3664a24f4ae08cdfdf0d",
         "ffmpegCommit": "6882969ce9fd2aa6aa1d0008b2bfe1c838aac11d",
     }, indent=2), encoding="utf-8")
     notices = []

@@ -1,4 +1,4 @@
-param([string]$OutputDirectory=(Split-Path $PSScriptRoot -Parent))
+﻿param([string]$OutputDirectory=(Split-Path $PSScriptRoot -Parent))
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 . (Join-Path $PSScriptRoot 'src/update_package.ps1')
@@ -36,3 +36,7 @@ try {
 $sum=Get-Sha256 $package
 [IO.File]::WriteAllText($package+'.sha256',"$sum  $([IO.Path]::GetFileName($package))`n",[Text.UTF8Encoding]::new($false))
 Write-Output "ZIP portátil verificado: $package"
+
+# Public static release asset: clients do not consume the GitHub REST quota.
+$update=[ordered]@{format=1;tag_name="v$version";draft=$false;prerelease=$false;assets=@(@{name=[IO.Path]::GetFileName($package);size=(Get-Item -LiteralPath $package).Length;digest="sha256:$sum";browser_download_url="https://github.com/Enigmaxin/Enigmax-CinePlayer/releases/download/v$version/$([IO.Path]::GetFileName($package))"})}
+[IO.File]::WriteAllText((Join-Path $output 'Enigmax-CinePlayer-update.json'),($update | ConvertTo-Json -Depth 5),[Text.UTF8Encoding]::new($false))

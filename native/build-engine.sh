@@ -3,6 +3,7 @@
 # Dependencies are supplied by a separately recorded, signature-verified MSYS2 set.
 set -euo pipefail
 source_root=$(realpath "${1:?source directory required}")
+player_native=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 build_root=$(realpath -m "${2:?build directory required}")
 jobs=${3:-4}
 stage=${4:-all}
@@ -14,13 +15,17 @@ verify_source() {
   if [[ -d "$path/.git" ]]; then
     [[ $(git -C "$path" rev-parse HEAD) == "$expected" ]]
     # Windows checkouts may use CRLF without changing the pinned source content.
-    git -C "$path" -c core.autocrlf=true diff --quiet HEAD --
+    if ! git -C "$path" -c core.autocrlf=true diff --quiet HEAD --; then
+      [[ $(basename "$path") == mpv ]]
+      git -C "$path" -c core.autocrlf=true diff --no-ext-diff --binary HEAD -- |
+        cmp - "$player_native/mpv-subtitle-stereo.patch"
+    fi
   else
     # These snapshots are exported with git archive; verify their release ZIP SHA-256 first.
     [[ $(cat "$path/.source-revision") == "$expected" ]]
   fi
 }
-verify_source "$source_root/mpv" e471496c56f0f49c133bd88b50aed62b845f1909
+verify_source "$source_root/mpv" dc4b285c93043d99492c3664a24f4ae08cdfdf0d
 verify_source "$source_root/ffmpeg" 6882969ce9fd2aa6aa1d0008b2bfe1c838aac11d
 mkdir -p "$build_root/ffmpeg" "$build_root/prefix"
 prefix="$build_root/prefix"

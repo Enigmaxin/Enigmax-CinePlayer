@@ -41,6 +41,8 @@ type Error = unsafe extern "C" fn(*mut c_void) -> *const c_char;
 struct Api {
     _library: Library,
     open: Open,
+    disc_open: Open,
+    disc_io: Io,
     titles: Titles,
     read: Read,
     seek: Seek,
@@ -60,6 +62,29 @@ impl Api {
         unsafe {
             Ok(Arc::new(Self {
                 open: std::mem::transmute::<*mut c_void, Open>(l.symbol(c"ec_mvc_open")?),
+                disc_open: std::mem::transmute::<*mut c_void, Open>(
+                    l.symbol(c"ec_disc_stream_open")?,
+                ),
+                disc_io: Io {
+                    read: std::mem::transmute::<*mut c_void, Read>(
+                        l.symbol(c"ec_disc_stream_read")?,
+                    ),
+                    seek: std::mem::transmute::<*mut c_void, Seek>(
+                        l.symbol(c"ec_disc_stream_seek")?,
+                    ),
+                    size: std::mem::transmute::<*mut c_void, Size>(
+                        l.symbol(c"ec_disc_stream_size")?,
+                    ),
+                    close: std::mem::transmute::<*mut c_void, Close>(
+                        l.symbol(c"ec_disc_stream_close")?,
+                    ),
+                    cancel: std::mem::transmute::<*mut c_void, Close>(
+                        l.symbol(c"ec_disc_stream_cancel")?,
+                    ),
+                    error: std::mem::transmute::<*mut c_void, Error>(
+                        l.symbol(c"ec_disc_stream_error")?,
+                    ),
+                },
                 titles: std::mem::transmute::<*mut c_void, Titles>(l.symbol(c"ec_disc_titles")?),
                 read: std::mem::transmute::<*mut c_void, Read>(l.symbol(c"ec_mvc_read")?),
                 seek: std::mem::transmute::<*mut c_void, Seek>(l.symbol(c"ec_mvc_seek")?),
@@ -72,9 +97,19 @@ impl Api {
         }
     }
 }
+#[derive(Clone, Copy)]
+struct Io {
+    read: Read,
+    seek: Seek,
+    size: Size,
+    close: Close,
+    cancel: Close,
+    error: Error,
+}
 struct Engine {
-    api: Arc<Api>,
+    _api: Arc<Api>,
     context: *mut c_void,
+    io: Io,
     error: Arc<Mutex<String>>,
 }
 // Ownership moves to mpv's demux thread. Only cancel runs concurrently; its C
@@ -82,7 +117,7 @@ struct Engine {
 unsafe impl Send for Engine {}
 impl Engine {
     fn failure(&self) {
-        let p = unsafe { (self.api.error)(self.context) };
+        let p = unsafe { (self.io.error)(self.context) };
         if !p.is_null() {
             let s = unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned();
             if let Ok(mut e) = self.error.lock() {
@@ -93,7 +128,7 @@ impl Engine {
 }
 impl Drop for Engine {
     fn drop(&mut self) {
-        unsafe { (self.api.close)(self.context) }
+        unsafe { (self.io.close)(self.context) }
     }
 }
 pub struct Registry {
@@ -156,7 +191,9 @@ impl Registry {
             (api.open)(
                 path.as_ptr(),
                 title,
-                4,
+                cineplayer_core::performance::mvc_threads(
+                    std::thread::available_parallelism().map_or(1, usize::from),
+                ) as i32,
                 &mut info,
                 err.as_mut_ptr(),
                 err.len() as i32,
@@ -168,7 +205,15 @@ impl Registry {
                 .into_owned());
         }
         let engine = Engine {
-            api,
+            io: Io {
+                read: api.read,
+                seek: api.seek,
+                size: api.size,
+                close: api.close,
+                cancel: api.cancel,
+                error: api.error,
+            },
+            _api: api,
             context,
             error: self.error.clone(),
         };
@@ -182,6 +227,36 @@ impl Registry {
         }
         *self.error.lock().map_err(|_| "MVC: error bloqueado")? = String::new();
         *self.pending.lock().map_err(|_| "MVC: estado bloqueado")? = Some((uri.into(), engine));
+        Ok(info)
+    }
+    pub fn prepare_disc(&self, path: &str, title: i32, uri: &str) -> Result<Info, String> {
+        let api = self.api()?;
+        let path = CString::new(path).map_err(|_| "Ruta con NUL")?;
+        let mut info = Info::default();
+        let mut error = [0i8; 1024];
+        let context = unsafe {
+            (api.disc_open)(
+                path.as_ptr(),
+                title,
+                0,
+                &mut info,
+                error.as_mut_ptr(),
+                error.len() as i32,
+            )
+        };
+        if context.is_null() {
+            return Err(unsafe { CStr::from_ptr(error.as_ptr()) }
+                .to_string_lossy()
+                .into_owned());
+        }
+        let engine = Engine {
+            io: api.disc_io,
+            _api: api,
+            context,
+            error: self.error.clone(),
+        };
+        *self.error.lock().map_err(|_| "Disco: error bloqueado")? = String::new();
+        *self.pending.lock().map_err(|_| "Disco: estado bloqueado")? = Some((uri.into(), engine));
         Ok(info)
     }
     pub fn error(&self) -> String {
@@ -233,7 +308,7 @@ pub unsafe extern "C" fn open(user: *mut c_void, uri: *mut c_char, out: *mut Str
 }
 unsafe extern "C" fn read(cookie: *mut c_void, buf: *mut c_char, n: u64) -> i64 {
     let e = unsafe { &*cookie.cast::<Engine>() };
-    let r = unsafe { (e.api.read)(e.context, buf.cast(), n) };
+    let r = unsafe { (e.io.read)(e.context, buf.cast(), n) };
     if r < 0 {
         e.failure();
     }
@@ -241,7 +316,7 @@ unsafe extern "C" fn read(cookie: *mut c_void, buf: *mut c_char, n: u64) -> i64 
 }
 unsafe extern "C" fn seek(cookie: *mut c_void, pos: i64) -> i64 {
     let e = unsafe { &*cookie.cast::<Engine>() };
-    let r = unsafe { (e.api.seek)(e.context, pos) };
+    let r = unsafe { (e.io.seek)(e.context, pos) };
     if r < 0 {
         e.failure();
     }
@@ -249,12 +324,12 @@ unsafe extern "C" fn seek(cookie: *mut c_void, pos: i64) -> i64 {
 }
 unsafe extern "C" fn size(cookie: *mut c_void) -> i64 {
     let e = unsafe { &*cookie.cast::<Engine>() };
-    unsafe { (e.api.size)(e.context) }
+    unsafe { (e.io.size)(e.context) }
 }
 unsafe extern "C" fn close(cookie: *mut c_void) {
     drop(unsafe { Box::from_raw(cookie.cast::<Engine>()) });
 }
 unsafe extern "C" fn cancel(cookie: *mut c_void) {
     let e = unsafe { &*cookie.cast::<Engine>() };
-    unsafe { (e.api.cancel)(e.context) }
+    unsafe { (e.io.cancel)(e.context) }
 }

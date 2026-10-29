@@ -26,6 +26,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Formato Rust incorrecto' }
 if ($LASTEXITCODE -ne 0) { throw 'Ha fallado el análisis estático' }
 & cargo test --locked --manifest-path $manifest
 if ($LASTEXITCODE -ne 0) { throw 'Han fallado las pruebas' }
+# Process-wide GDI accounting must run outside the parallel GPU test suite.
+& cargo test --locked --manifest-path $manifest native_popup_theme_preserves_text_and_releases_gdi_resources -- --ignored --nocapture
+if ($LASTEXITCODE -ne 0) { throw 'Ha fallado la prueba aislada de recursos de menús' }
 & cargo build --release --locked --manifest-path $manifest
 if ($LASTEXITCODE -ne 0) { throw 'Ha fallado la compilación' }
 Copy-Item -LiteralPath (Join-Path $build 'release\EnigmaxCinePlayer.exe') -Destination (Join-Path $PSScriptRoot 'EnigmaxCinePlayer.exe')

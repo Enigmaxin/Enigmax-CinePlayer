@@ -1,4 +1,4 @@
-param([string]$Root=([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))))
+﻿param([string]$Root=([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))))
 $ErrorActionPreference='Stop'
 . (Join-Path $Root 'src/update_package.ps1')
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem

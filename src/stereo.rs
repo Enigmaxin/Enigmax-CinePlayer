@@ -178,12 +178,12 @@ pub struct Settings {
     pub quality: Quality,
     pub swap: bool,
     pub aspect: Option<f64>,
-    pub convergence: f32,
     pub left_gain: f32,
     pub right_gain: f32,
     pub crosstalk: f32,
     pub sub_pos: i32,
     pub ass_mode: crate::ass3d::Mode,
+    pub delivery: Delivery,
 }
 impl Default for Settings {
     fn default() -> Self {
@@ -195,19 +195,18 @@ impl Default for Settings {
             quality: Quality::Balanced,
             swap: false,
             aspect: None,
-            convergence: 0.0,
             left_gain: 1.0,
             right_gain: 1.0,
             crosstalk: 0.0,
             sub_pos: 100,
             ass_mode: crate::ass3d::Mode::Auto,
+            delivery: Delivery::Native,
         }
     }
 }
 impl Settings {
     pub fn validate(&self) -> Result<(), String> {
         for (v, min, max) in [
-            (self.convergence, -0.03, 0.03),
             (self.left_gain, 0.5, 1.5),
             (self.right_gain, 0.5, 1.5),
             (self.crosstalk, 0.0, 0.15),
@@ -227,7 +226,7 @@ impl Settings {
     }
     pub fn encode(&self) -> String {
         format!(
-            "version=1\nlayout={}\noutput={}\nglasses={}\nalgorithm={}\nquality={}\nswap={}\naspect={}\nconvergence={}\nleft_gain={}\nright_gain={}\ncrosstalk={}\nsub_pos={}\nass_mode={}\n",
+            "version=1\nlayout={}\noutput={}\nglasses={}\nalgorithm={}\nquality={}\nswap={}\naspect={}\nleft_gain={}\nright_gain={}\ncrosstalk={}\nsub_pos={}\nass_mode={}\ndelivery={}\n",
             self.layout.code(),
             self.output as u8,
             self.glasses as u8,
@@ -235,12 +234,12 @@ impl Settings {
             self.quality as u8,
             self.swap,
             self.aspect.unwrap_or(0.0),
-            self.convergence,
             self.left_gain,
             self.right_gain,
             self.crosstalk,
             self.sub_pos,
             self.ass_mode as u8,
+            self.delivery as u8,
         )
     }
     pub fn decode(text: &str) -> Result<Self, String> {
@@ -282,12 +281,20 @@ impl Settings {
                         .get(v.parse::<usize>().map_err(|_| bad())?)
                         .ok_or_else(bad)?
                 }
+                "delivery" => {
+                    s.delivery = match v {
+                        "0" => Delivery::Native,
+                        "1" => Delivery::Native,
+                        "2" => Delivery::Anamorphic,
+                        "3" => Delivery::FramePack,
+                        _ => return Err(bad()),
+                    }
+                }
                 "swap" => s.swap = v.parse().map_err(|_| bad())?,
                 "aspect" => {
                     let n = v.parse::<f64>().map_err(|_| bad())?;
                     s.aspect = if n == 0.0 { None } else { Some(n) };
                 }
-                "convergence" => s.convergence = v.parse().map_err(|_| bad())?,
                 "left_gain" => s.left_gain = v.parse().map_err(|_| bad())?,
                 "right_gain" => s.right_gain = v.parse().map_err(|_| bad())?,
                 "crosstalk" => s.crosstalk = v.parse().map_err(|_| bad())?,
@@ -326,19 +333,50 @@ pub fn detect(metadata: &str, name: &str) -> Layout {
         .collect::<Vec<_>>();
     let single = |value: &str| tokens.contains(&value);
     let pair = |a: &str, b: &str| tokens.windows(2).any(|p| p == [a, b]);
-    if single("fullsbs") || pair("full", "sbs") {
-        Layout::FullSbs
-    } else if single("hsbs") || pair("half", "sbs") {
-        Layout::HalfSbs
-    } else if single("fullou") || single("fulltab") || pair("full", "ou") || pair("full", "tab") {
-        Layout::FullOu
-    } else if single("hou") || pair("half", "ou") || pair("half", "tab") {
-        Layout::HalfOu
-    } else if single("mvc") {
-        Layout::Mvc
-    } else {
-        Layout::Mono
+    let candidates = [
+        (single("fullsbs") || pair("full", "sbs"), Layout::FullSbs),
+        (single("hsbs") || pair("half", "sbs"), Layout::HalfSbs),
+        (
+            single("fullou") || single("fulltab") || pair("full", "ou") || pair("full", "tab"),
+            Layout::FullOu,
+        ),
+        (
+            single("hou") || single("htab") || pair("half", "ou") || pair("half", "tab"),
+            Layout::HalfOu,
+        ),
+        (single("mvc"), Layout::Mvc),
+    ];
+    let mut found = candidates.into_iter().filter(|(present, _)| *present);
+    match (found.next(), found.next()) {
+        (Some((_, layout)), None) => layout,
+        _ => Layout::Mono,
     }
+}
+
+/// Codec profiles are structural evidence, never inferred from dimensions or pixels.
+pub fn detect_stream(metadata: &str, name: &str, profile: &str) -> Layout {
+    let profile = profile.to_ascii_lowercase();
+    if matches!(
+        profile.as_str(),
+        "multiview high" | "stereo high" | "h264_mvc" | "mvc"
+    ) {
+        return Layout::Mvc;
+    }
+    let named = detect("", name);
+    let axis = match metadata {
+        "sbsl" | "sbsr" | "sbs2l" | "sbs2r" => Some(true),
+        "abl" | "abr" | "ab2l" | "ab2r" => Some(false),
+        _ => None,
+    };
+    if let Some(horizontal) = axis {
+        // Matroska StereoMode describes packing/order, not Full versus Half.
+        // mpv's historic 'sbs2l' spelling must not turn a tagged Full SBS into Half.
+        if named.packed() && named.horizontal() == horizontal {
+            return named;
+        }
+        return Layout::Mono; // Ask for geometry instead of guessing from resolution.
+    }
+    named
 }
 
 /// A hint alone cannot distinguish full from half packing.
@@ -445,7 +483,7 @@ pub fn shader(s: &Settings, layout: Layout, srgb: bool) -> Result<String, String
         out.push_str("return pow(c,vec3(2.4));}\nvec3 enc(vec3 c){return pow(clamp(c,0.0,1.0),vec3(1.0/2.4));}\n");
     }
     out.push_str("vec4 hook(){vec2 p=HOOKED_pos;vec2 a=p;vec2 b=p;\n");
-    let shift = s.convergence;
+    let shift = 0.0_f32;
     if layout.horizontal() {
         writeln!(out,"a.x=clamp((p.x+{shift:.7})*0.5,0.5*HOOKED_pt.x,0.5-0.5*HOOKED_pt.x);b.x=clamp((p.x-{shift:.7})*0.5+0.5,0.5+0.5*HOOKED_pt.x,1.0-0.5*HOOKED_pt.x);").unwrap();
     } else {
@@ -497,12 +535,14 @@ mod tests {
             layout: Layout::HalfOu,
             output: Output::Anaglyph,
             swap: true,
-            convergence: 0.01,
             ..Settings::default()
         };
         assert_eq!(s, Settings::decode(&s.encode()).unwrap());
+        let legacy = format!("{}convergence=0.03\nsub_depth=-0.02\n", s.encode());
+        assert_eq!(s, Settings::decode(&legacy).unwrap());
+        assert!(!s.encode().contains("convergence="));
+        assert!(!s.encode().contains("sub_depth="));
         for t in [
-            "version=1\nconvergence=NaN",
             "version=1\nglasses=99",
             "version=2",
             "version=1\nsub_pos=500",
@@ -538,6 +578,36 @@ mod tests {
         assert_eq!(ab[2][5], 1.0);
     }
     #[test]
+    fn structural_detection_overrides_conflicting_names_without_visual_guessing() {
+        assert_eq!(
+            detect_stream("sbs2l", "Movie.FullOU.mkv", "High"),
+            Layout::Mono
+        );
+        assert_eq!(
+            detect_stream("sbs2l", "Movie.FullSBS.mkv", "High"),
+            Layout::FullSbs
+        );
+        assert_eq!(
+            detect_stream("sbs2l", "Movie.HSBS.mkv", "High"),
+            Layout::HalfSbs
+        );
+        assert_eq!(detect_stream("sbs2l", "Movie.mkv", "High"), Layout::Mono);
+        assert_eq!(
+            detect_stream("abl", "Movie.FullSBS.mkv", "High"),
+            Layout::Mono
+        );
+        assert_eq!(
+            detect_stream("", "Movie.HSBS.FullSBS.mkv", "High"),
+            Layout::Mono
+        );
+        assert_eq!(
+            detect_stream("", "Movie.mkv", "Multiview High"),
+            Layout::Mvc
+        );
+        assert_eq!(detect_stream("", "Movie.mkv", "Main 10"), Layout::Mono);
+        assert_eq!(detect_stream("", "Movie.HTAB.mp4", "High"), Layout::HalfOu);
+    }
+    #[test]
     fn ambiguous_names_are_not_guessed() {
         assert_eq!(detect("sbsl", "pelicula.mkv"), Layout::Mono);
         assert_eq!(detect("", "pelicula-SBS.mkv"), Layout::Mono);
@@ -550,5 +620,150 @@ mod tests {
         assert!(stereo_hint("sbsl", "Film.mkv"));
         assert!(stereo_hint("", "Film (3D).mkv"));
         assert!(!stereo_hint("", "Somebody.mkv"));
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Delivery {
+    #[default]
+    Native,
+    FullSbs,
+    Anamorphic,
+    FramePack,
+}
+/// Repack both eyes on the GPU, after ASS fusion when required. No CPU readback.
+pub fn packed_shader(layout: Layout, delivery: Delivery, swap: bool, aspect: f64) -> String {
+    if delivery == Delivery::FramePack {
+        return framepack_shader(layout, swap, aspect);
+    }
+    let forced = delivery != Delivery::Native;
+    let (width, height) = match delivery {
+        Delivery::FullSbs | Delivery::Anamorphic if !layout.horizontal() => {
+            ("HOOKED.w 2 *", "HOOKED.h 2 /")
+        }
+        _ => ("HOOKED.w", "HOOKED.h"),
+    };
+    let output_horizontal = forced || layout.horizontal();
+    let axis = if output_horizontal { "x" } else { "y" };
+    let eye = if swap { "1.0 - eye" } else { "eye" };
+    // Repacking retains every stored sample. Aspect/stretch is applied once
+    // at the final viewport, rather than creating an enlarged intermediate.
+    let _ = aspect;
+    let (fit_w, fit_h) = (1.0, 1.0);
+    let input = if layout.horizontal() {
+        "vec2((uv.x + eye) * 0.5, uv.y)"
+    } else {
+        "vec2(uv.x, (uv.y + eye) * 0.5)"
+    };
+    let bounds = if layout.horizontal() {
+        "vec2(eye * 0.5, 0.0)"
+    } else {
+        "vec2(0.0, eye * 0.5)"
+    };
+    let span = if layout.horizontal() {
+        "vec2(0.5, 1.0)"
+    } else {
+        "vec2(1.0, 0.5)"
+    };
+    format!(
+        "//!DESC Enigmax packed stereo output\n//!HOOK MAIN\n//!BIND HOOKED\n//!WIDTH {width}\n//!HEIGHT {height}\nvec4 hook() {{ vec2 uv = HOOKED_pos; float eye = step(0.5, uv.{axis}); uv.{axis} = uv.{axis} * 2.0 - eye; eye = {eye}; uv=(uv-0.5)/vec2({fit_w:.12},{fit_h:.12})+0.5; if(any(lessThan(uv,vec2(0.0))) || any(greaterThan(uv,vec2(1.0)))) return vec4(0.0,0.0,0.0,1.0); vec2 lo = {bounds}; return HOOKED_tex(clamp({input}, lo + HOOKED_pt * 0.5, lo + {span} - HOOKED_pt * 0.5)); }}\n"
+    )
+}
+/// 1080p frame-packing canvas only: never changes HDMI timing or signaling.
+fn framepack_shader(layout: Layout, swap: bool, aspect: f64) -> String {
+    let (fit_w, fit_h) = packed_fit(aspect);
+    let eye = if swap { "1.0-eye" } else { "eye" };
+    let (input, bounds, span) = if layout.horizontal() {
+        (
+            "vec2((uv.x+eye)*0.5,uv.y)",
+            "vec2(eye*0.5,0.0)",
+            "vec2(0.5,1.0)",
+        )
+    } else {
+        (
+            "vec2(uv.x,(uv.y+eye)*0.5)",
+            "vec2(0.0,eye*0.5)",
+            "vec2(1.0,0.5)",
+        )
+    };
+    format!(
+        "//!DESC Enigmax Frame Packing 1920x2205\n//!HOOK MAIN\n//!BIND HOOKED\n//!WIDTH 1920\n//!HEIGHT 2205\nvec4 hook(){{float y=HOOKED_pos.y*2205.0;if(y>=1080.0&&y<1125.0)return vec4(0.0,0.0,0.0,1.0);float eye=step(1125.0,y);vec2 uv=vec2(HOOKED_pos.x,(y-eye*1125.0)/1080.0);eye={eye};uv=(uv-0.5)/vec2({fit_w:.12},{fit_h:.12})+0.5;if(any(lessThan(uv,vec2(0.0)))||any(greaterThan(uv,vec2(1.0))))return vec4(0.0,0.0,0.0,1.0);vec2 lo={bounds};return HOOKED_tex(clamp({input},lo+HOOKED_pt*0.5,lo+{span}-HOOKED_pt*0.5));}}\n"
+    )
+}
+/// Fit the reconstructed eye in a logical 16:9 canvas before anamorphic stretching.
+pub fn packed_fit(aspect: f64) -> (f64, f64) {
+    let target = 16.0 / 9.0;
+    if aspect > target {
+        (1.0, target / aspect)
+    } else {
+        (aspect / target, 1.0)
+    }
+}
+#[cfg(test)]
+mod delivery_tests {
+    use super::*;
+    #[test]
+    fn anamorphic_repacking_preserves_samples_and_old_fixed_profiles_migrate() {
+        assert_eq!(
+            Settings::decode("version=1\ndelivery=1").unwrap().delivery,
+            Delivery::Native
+        );
+        for layout in [
+            Layout::FullSbs,
+            Layout::HalfSbs,
+            Layout::FullOu,
+            Layout::HalfOu,
+            Layout::Mvc,
+        ] {
+            let shader = packed_shader(layout, Delivery::Anamorphic, false, 2.39);
+            assert!(!shader.contains("3840"));
+            assert!(!shader.contains("2160"));
+            if layout.horizontal() {
+                assert!(shader.contains("//!WIDTH HOOKED.w\n//!HEIGHT HOOKED.h"));
+            } else {
+                assert!(shader.contains("//!WIDTH HOOKED.w 2 *\n//!HEIGHT HOOKED.h 2 /"));
+            }
+        }
+    }
+    #[test]
+    fn framepack_profiles_and_all_source_layouts_keep_fixed_transport_and_aspect() {
+        let s = Settings {
+            delivery: Delivery::FramePack,
+            ..Default::default()
+        };
+        assert_eq!(Settings::decode(&s.encode()).unwrap(), s);
+        for layout in [
+            Layout::FullSbs,
+            Layout::HalfSbs,
+            Layout::FullOu,
+            Layout::HalfOu,
+            Layout::Mvc,
+        ] {
+            let shader = packed_shader(layout, Delivery::FramePack, false, 2.39);
+            assert!(shader.contains("//!WIDTH 1920\n//!HEIGHT 2205"));
+            assert!(shader.contains("y>=1080.0&&y<1125.0"));
+            assert_ne!(
+                shader,
+                packed_shader(layout, Delivery::FramePack, true, 2.39)
+            );
+        }
+    }
+    #[test]
+    fn cropped_scope_and_four_three_keep_their_eye_aspect_on_a_fixed_canvas() {
+        for aspect in [16.0 / 9.0, 2.39, 4.0 / 3.0] {
+            let (w, h) = packed_fit(aspect);
+            assert!((w * 1920.0 / (h * 1080.0) - aspect).abs() < 1e-9);
+            assert!(w <= 1.0 && h <= 1.0);
+        }
+        let settings = Settings {
+            delivery: Delivery::Anamorphic,
+            ..Settings::default()
+        };
+        assert_eq!(Settings::decode(&settings.encode()).unwrap(), settings);
+        assert!(Settings::decode("version=1\ndelivery=99").is_err());
+        assert_eq!(
+            Settings::decode("version=1").unwrap().delivery,
+            Delivery::Native
+        );
     }
 }

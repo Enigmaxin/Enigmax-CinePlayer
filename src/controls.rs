@@ -6,6 +6,10 @@ use cineplayer_core::{
 };
 use std::{ffi::c_void, ptr};
 type Handle = *mut c_void;
+#[link(name = "user32")]
+unsafe extern "system" {
+    fn DrawTextW(dc: Handle, text: *const u16, count: i32, rect: *mut [i32; 4], flags: u32) -> i32;
+}
 #[repr(C)]
 struct BitmapHeader {
     size: u32,
@@ -60,7 +64,7 @@ unsafe extern "system" {
     fn TextOutW(dc: Handle, x: i32, y: i32, text: *const u16, count: i32) -> i32;
     fn GdiFlush() -> i32;
 }
-struct Canvas {
+pub(crate) struct Canvas {
     dc: Handle,
     bitmap: Handle,
     old_bitmap: Handle,
@@ -72,6 +76,9 @@ struct Canvas {
 }
 impl Canvas {
     fn new(w: i32, h: i32) -> Result<Self, String> {
+        Self::with_font(w, h, (h * 22 / 100).clamp(14, 36).min((w / 30).max(12)))
+    }
+    pub(crate) fn with_font(w: i32, h: i32, font_size: i32) -> Result<Self, String> {
         let dc = unsafe { CreateCompatibleDC(ptr::null_mut()) };
         if dc.is_null() {
             return Err("No se pudo crear el contexto de controles".into());
@@ -101,7 +108,7 @@ impl Canvas {
         let face = "Segoe UI".encode_utf16().chain(Some(0)).collect::<Vec<_>>();
         let font = unsafe {
             CreateFontW(
-                -(h * 22 / 100).clamp(14, 36).min((w / 18).max(12)),
+                -font_size,
                 0,
                 0,
                 0,
@@ -141,37 +148,92 @@ impl Canvas {
             height: h,
         })
     }
-    fn pixels(&self) -> &[u8] {
+    pub(crate) fn pixels(&mut self) -> &[u8] {
         unsafe {
             GdiFlush();
-            std::slice::from_raw_parts(self.bits, self.width as usize * self.height as usize * 4)
+            let pixels = std::slice::from_raw_parts_mut(
+                self.bits,
+                self.width as usize * self.height as usize * 4,
+            );
+            // GDI text clears alpha. Restore only painted pixels, retaining the
+            // genuinely transparent margin outside the floating shelf.
+            for p in pixels.as_chunks_mut::<4>().0 {
+                if p[3] == 0 && p[..3] != [0, 0, 0] {
+                    p[3] = 255;
+                }
+            }
+            pixels
         }
     }
-    fn clear(&mut self) {
+    fn clear(&mut self, layout: &Layout) {
         let pixels = unsafe {
             std::slice::from_raw_parts_mut(
                 self.bits,
                 self.width as usize * self.height as usize * 4,
             )
         };
-        for p in pixels.as_chunks_mut::<4>().0 {
-            p.copy_from_slice(&[18, 18, 18, 255]);
+        pixels.fill(0);
+        self.rounded(layout.shelf, (layout.panel / 10).max(6), [30, 28, 26, 255]);
+    }
+    pub(crate) fn rounded(&mut self, r: Rect, radius: i32, color: [u8; 4]) {
+        let radius = radius.min(r.h / 2).min(r.w / 2).max(0);
+        for dy in 0..r.h {
+            let edge = if dy < radius {
+                radius - dy - 1
+            } else if dy >= r.h - radius {
+                dy - (r.h - radius)
+            } else {
+                0
+            };
+            let cut = if edge > 0 {
+                radius - ((radius * radius - edge * edge) as f64).sqrt() as i32
+            } else {
+                0
+            };
+            self.color_rect(
+                Rect {
+                    x: r.x + cut,
+                    y: r.y + dy,
+                    w: r.w - 2 * cut,
+                    h: 1,
+                },
+                color,
+            );
         }
     }
-    fn rect(&mut self, r: Rect, value: u8) {
+    pub(crate) fn rect(&mut self, r: Rect, value: u8) {
+        self.color_rect(r, [value, value, value, 255]);
+    }
+    fn color_rect(&mut self, r: Rect, color: [u8; 4]) {
         let w = self.width;
         let h = self.height;
         let p = unsafe { std::slice::from_raw_parts_mut(self.bits, w as usize * h as usize * 4) };
         for y in r.y.max(0)..(r.y + r.h).min(h) {
             for x in r.x.max(0)..(r.x + r.w).min(w) {
                 let i = (y * w + x) as usize * 4;
-                p[i..i + 4].copy_from_slice(&[value, value, value, 255]);
+                p[i..i + 4].copy_from_slice(&color);
             }
         }
     }
-    fn text(&self, x: i32, y: i32, text: &str) {
+    pub(crate) fn text(&self, x: i32, y: i32, text: &str) {
         let s = text.encode_utf16().collect::<Vec<_>>();
         unsafe { TextOutW(self.dc, x, y, s.as_ptr(), s.len() as i32) };
+    }
+    pub(crate) fn text_clipped(&self, x: i32, y: i32, w: i32, h: i32, text: &str) {
+        if w <= 0 || h <= 0 || text.is_empty() {
+            return;
+        }
+        let s = text.encode_utf16().collect::<Vec<_>>();
+        let mut r = [x, y, (x + w).min(self.width), (y + h).min(self.height)];
+        unsafe {
+            DrawTextW(
+                self.dc,
+                s.as_ptr(),
+                s.len() as i32,
+                &mut r,
+                0x20 | 0x800 | 0x8000,
+            );
+        }
     }
 }
 impl Drop for Canvas {
@@ -197,6 +259,7 @@ struct Frame {
     volume: f64,
     paused: bool,
     muted: bool,
+    volume_feedback: i32,
 }
 impl Frame {
     fn parse(s: &str) -> Option<Self> {
@@ -207,7 +270,12 @@ impl Frame {
             .split('|')
             .map(|v| v.parse::<f64>().ok().filter(|v| v.is_finite()))
             .collect::<Option<Vec<_>>>()?;
-        if a.len() != 9 {
+        if a.len() != 9 && a.len() != 10 {
+            return None;
+        }
+        if a.get(9)
+            .is_some_and(|v| ![-1.0, 0.0, 1.0, 2.0, 3.0].contains(v))
+        {
             return None;
         }
         let (w, h) = (a[0] as i32, a[1] as i32);
@@ -230,14 +298,20 @@ impl Frame {
             volume: a[6],
             paused: a[7] != 0.0,
             muted: a[8] != 0.0,
+            volume_feedback: a.get(9).copied().unwrap_or(0.0) as i32,
         })
     }
 }
 pub enum Input {
     None,
     Menu,
+    Options,
     Audio,
     Subtitles,
+    Chapters,
+    ChapterStep(i32),
+    Info,
+    Swap,
 }
 #[derive(Default)]
 pub struct Controls {
@@ -248,10 +322,116 @@ pub struct Controls {
     config: String,
     last: String,
     drag: Option<Button>,
+    drag_second_eye: bool,
     fraction: Option<f64>,
     rendered: bool,
+    title: String,
 }
 impl Controls {
+    fn idle_rects(m: &Mpv) -> Option<[Rect; 2]> {
+        let w = m.get("osd-width")?.parse::<i32>().ok()?;
+        let h = m.get("osd-height")?.parse::<i32>().ok()?;
+        Layout::new(w, h)?;
+        let bw = (w - 32).clamp(100, 360);
+        let bh = (h / 10).clamp(32, 64);
+        Some([
+            Rect {
+                x: (w - bw) / 2,
+                y: (h - 2 * bh - 16) / 2,
+                w: bw,
+                h: bh,
+            },
+            Rect {
+                x: (w - bw) / 2,
+                y: (h - 2 * bh - 16) / 2 + bh + 16,
+                w: bw,
+                h: bh,
+            },
+        ])
+    }
+    pub fn idle_hit(&self, m: &Mpv, x: i32, y: i32) -> Option<bool> {
+        if m.get("idle-active").as_deref() != Some("yes") {
+            return None;
+        }
+        let rects = Self::idle_rects(m)?;
+        if rects[0].contains(x as f64, y as f64) {
+            Some(false)
+        } else if rects[1].contains(x as f64, y as f64) {
+            Some(true)
+        } else {
+            None
+        }
+    }
+    pub fn idle_draw(&mut self, m: &Mpv, last: bool) -> Result<(), String> {
+        if m.get("idle-active").as_deref() != Some("yes") {
+            return Ok(());
+        }
+        let Some(rects) = Self::idle_rects(m) else {
+            return Ok(());
+        };
+        let w = m
+            .get("osd-width")
+            .and_then(|s| s.parse::<i32>().ok())
+            .unwrap_or(640);
+        let mut c = Canvas::with_font(
+            w,
+            rects[1].y + rects[1].h - rects[0].y + 8,
+            (rects[0].h / 3).clamp(14, 22),
+        )?;
+        let pixels =
+            unsafe { std::slice::from_raw_parts_mut(c.bits, (c.width * c.height * 4) as usize) };
+        pixels.fill(0);
+        for (i, r) in rects.iter().enumerate() {
+            let local = Rect {
+                y: r.y - rects[0].y,
+                ..*r
+            };
+            c.rounded(
+                local,
+                10,
+                if i == 0 {
+                    [51, 62, 57, 255]
+                } else {
+                    [33, 33, 33, 255]
+                },
+            );
+            if i == 0 || last {
+                c.text_clipped(
+                    local.x + 16,
+                    local.y + local.h / 4,
+                    local.w - 32,
+                    local.h * 3 / 4,
+                    if i == 0 {
+                        "Abrir vídeo"
+                    } else {
+                        "Continuar último vídeo"
+                    },
+                );
+            } else {
+                c.text_clipped(
+                    local.x + 16,
+                    local.y + local.h / 4,
+                    local.w - 32,
+                    local.h * 3 / 4,
+                    "Sin vídeo anterior disponible",
+                );
+            }
+        }
+        m.command_named(
+            "overlay-add",
+            &[
+                ("id", "63".into()),
+                ("x", "0".into()),
+                ("y", rects[0].y.to_string()),
+                ("file", format!("&{}", c.pixels().as_ptr() as usize)),
+                ("offset", "0".into()),
+                ("fmt", "bgra".into()),
+                ("w", c.width.to_string()),
+                ("h", c.height.to_string()),
+                ("stride", (c.width * 4).to_string()),
+            ],
+        )
+    }
     pub fn rendered(&self) -> bool {
         self.rendered
     }
@@ -260,6 +440,10 @@ impl Controls {
         self.config.clear();
     }
     pub fn sync(&mut self, m: &Mpv, s: &State) -> Result<(), String> {
+        if self.title != s.display_title {
+            self.title = s.display_title.clone();
+            self.last.clear();
+        }
         if !self.ready || s.pending_load {
             return Ok(());
         }
@@ -270,7 +454,11 @@ impl Controls {
             match s.prefs.output {
                 Output::Anaglyph => Projection::Anaglyph,
                 Output::Original => {
-                    if layout.horizontal() {
+                    if s.prefs.delivery == cineplayer_core::stereo::Delivery::FramePack {
+                        Projection::FramePack
+                    } else if s.prefs.delivery != cineplayer_core::stereo::Delivery::Native
+                        || layout.horizontal()
+                    {
                         Projection::Sbs
                     } else {
                         Projection::Ou
@@ -289,6 +477,13 @@ impl Controls {
                 self.mode.code(),
             ])?;
             self.config = config;
+            m.set("user-data/enigmax-projection", self.mode.code())?;
+            m.set(
+                "user-data/enigmax-glasses",
+                &(self.glasses as u8).to_string(),
+            )?;
+            self.drag = None;
+            self.fraction = None;
             self.last.clear();
         }
         Ok(())
@@ -305,23 +500,7 @@ impl Controls {
     }
     pub fn draw(&mut self, m: &Mpv, body: &str) -> Result<(), String> {
         let f = Frame::parse(body).ok_or("Estado de controles no válido")?;
-        let key = format!(
-            "{body}/{:?}/{:?}/{:?}",
-            self.mode, self.glasses, self.fraction
-        );
-        if key == self.last {
-            return Ok(());
-        }
         let l = Layout::new(f.w, f.h).ok_or("Tamaño de controles no válido")?;
-        if self
-            .canvas
-            .as_ref()
-            .is_none_or(|c| c.width != l.width || c.height != l.panel)
-        {
-            self.canvas = Some(Canvas::new(l.width, l.panel)?);
-        }
-        let c = self.canvas.as_mut().ok_or("No hay lienzo de controles")?;
-        c.clear();
         let hover = l.hit(self.mode, f.x, f.y);
         let progress = self
             .fraction
@@ -334,9 +513,60 @@ impl Controls {
                 }
             })
             .clamp(0.0, 1.0);
+        let shown = self
+            .fraction
+            .filter(|_| self.drag == Some(Button::Seek))
+            .map(|p| p * f.duration)
+            .unwrap_or(f.time);
+        let volume = self
+            .fraction
+            .filter(|_| self.drag == Some(Button::Volume))
+            .unwrap_or(f.volume / 100.0);
+        let seek_width = l
+            .regions
+            .iter()
+            .find(|(b, _)| *b == Button::Seek)
+            .map_or(1, |(_, r)| r.w);
+        let key = format!(
+            "{}x{}/{:?}/{:?}/{:?}/{}/{}/{}/{}/{}/{}/{}",
+            f.w,
+            f.h,
+            self.mode,
+            self.glasses,
+            hover,
+            (progress * seek_width as f64) as i32,
+            shown as u64,
+            f.duration as u64,
+            (volume * 1000.0) as u32,
+            f.paused,
+            f.muted,
+            f.volume_feedback
+        );
+        if key == self.last {
+            return Ok(());
+        }
+        if self
+            .canvas
+            .as_ref()
+            .is_none_or(|c| c.width != l.width || c.height != l.panel)
+        {
+            self.canvas = Some(Canvas::new(l.width, l.panel)?);
+        }
+        let c = self.canvas.as_mut().ok_or("No hay lienzo de controles")?;
+        c.clear(&l);
+        c.text_clipped(
+            l.shelf.x + 10,
+            0,
+            l.shelf.w - 20,
+            l.panel * 24 / 100,
+            &self.title,
+        );
         let mut texts = Vec::new();
         for (button, r) in &l.regions {
             let bright = if hover == Some(*button) { 255 } else { 195 };
+            if hover == Some(*button) && !matches!(button, Button::Seek | Button::Volume) {
+                c.rounded(*r, (l.size / 6).max(4), [52, 49, 47, 255]);
+            }
             let cy = r.y + r.h / 2;
             match button {
                 Button::Seek => {
@@ -350,14 +580,14 @@ impl Controls {
                         65,
                     );
                     let filled = (progress * r.w as f64) as i32;
-                    c.rect(
+                    c.color_rect(
                         Rect {
                             x: r.x,
                             y: cy - 2,
                             w: filled,
                             h: 4,
                         },
-                        225,
+                        [188, 217, 147, 255],
                     );
                     c.rect(
                         Rect {
@@ -423,9 +653,53 @@ impl Controls {
                         }
                     }
                 }
+                Button::PreviousChapter | Button::NextChapter => {
+                    let d = (r.h / 4).max(3);
+                    let cx = r.x + r.w / 2;
+                    let right = *button == Button::NextChapter;
+                    let tip = if right { cx + d / 2 } else { cx - d / 2 };
+                    let base = if right { cx - d / 2 } else { cx + d / 2 };
+                    for dy in -d..=d {
+                        let length = (d - dy.abs()).max(1);
+                        c.rect(
+                            Rect {
+                                x: if right { base } else { tip + d - length },
+                                y: cy + dy,
+                                w: length,
+                                h: 1,
+                            },
+                            bright,
+                        );
+                    }
+                    c.rect(
+                        Rect {
+                            x: if right { cx + d } else { cx - d - 2 },
+                            y: cy - d,
+                            w: 2,
+                            h: 2 * d,
+                        },
+                        bright,
+                    );
+                }
+                Button::Chapters => {
+                    let x = r.x + r.w / 4;
+                    for dy in [-r.h / 5, 0, r.h / 5] {
+                        c.rect(
+                            Rect {
+                                x,
+                                y: cy + dy,
+                                w: r.w / 2,
+                                h: 2,
+                            },
+                            bright,
+                        );
+                    }
+                }
                 Button::Back => texts.push((r.x, cy - l.panel / 10, "−10".into())),
                 Button::Forward => texts.push((r.x, cy - l.panel / 10, "+10".into())),
                 Button::Stereo => texts.push((r.x + r.w / 5, cy - l.panel / 10, "3D".into())),
+                Button::Info => texts.push((r.x + r.w / 4, cy - l.panel / 10, "ⓘ".into())),
+                Button::Swap => texts.push((r.x + r.w / 5, cy - l.panel / 10, "⇄".into())),
                 Button::Audio => texts.push((
                     r.x + r.w / 8,
                     cy - l.panel / 10,
@@ -436,6 +710,7 @@ impl Controls {
                     cy - l.panel / 10,
                     if r.w >= l.size * 2 { "Subs" } else { "S" }.into(),
                 )),
+                Button::Options => texts.push((r.x + r.w / 5, cy - l.panel / 10, "⋯".into())),
                 Button::Mute => {
                     let x = r.x + r.w / 3;
                     c.rect(
@@ -492,33 +767,58 @@ impl Controls {
                 }
             }
         }
-        let shown = self
-            .fraction
-            .filter(|_| self.drag == Some(Button::Seek))
-            .map(|p| p * f.duration)
-            .unwrap_or(f.time);
-        if l.time_width >= l.size * 2 {
-            texts.push((
-                l.time_x,
-                l.panel * 58 / 100 + l.size / 2 - l.panel / 10,
-                if l.time_width < l.size * 5 {
-                    time(shown)
-                } else {
-                    format!("{} / {}", time(shown), time(f.duration))
-                },
-            ));
+        if l.width >= 600 {
+            let seek = l
+                .regions
+                .iter()
+                .find(|(b, _)| *b == Button::Seek)
+                .unwrap()
+                .1;
+            let y = seek.y + seek.h / 2 - l.panel / 10;
+            texts.push((l.shelf.x + (l.panel / 7), y, time(shown)));
+            texts.push((seek.x + seek.w + l.size / 3, y, time(f.duration)));
         }
-        if let Some(button @ (Button::Audio | Button::Subtitles)) = hover {
+        if let Some(
+            button @ (Button::Audio
+            | Button::Subtitles
+            | Button::PreviousChapter
+            | Button::Chapters
+            | Button::NextChapter
+            | Button::Info
+            | Button::Swap),
+        ) = hover
+        {
             // A descriptive hint also explains compact A/S buttons in small windows.
             texts.push((
                 l.width / 2 - l.size * 3,
-                l.panel / 3,
-                if button == Button::Audio {
-                    "Pista de audio"
-                } else {
-                    "Subtítulos"
+                l.panel * 42 / 100,
+                match button {
+                    Button::Info => "Información de audio y vídeo",
+                    Button::Swap => "Intercambiar ojos izquierdo / derecho",
+                    Button::Audio => "Pista de audio",
+                    Button::Subtitles => "Subtítulos",
+                    Button::PreviousChapter => "Capítulo anterior",
+                    Button::NextChapter => "Capítulo siguiente",
+                    _ => "Ir a un capítulo",
                 }
                 .into(),
+            ));
+        }
+        if f.volume_feedback != 0 {
+            let label = match f.volume_feedback {
+                2 => "Sonido silenciado".to_owned(),
+                3 => format!("Sonido activado · {:.0} %", f.volume),
+                1 => format!("Volumen ↑ {:.0} %", f.volume),
+                _ => format!("Volumen ↓ {:.0} %", f.volume),
+            };
+            let font = (l.panel * 22 / 100)
+                .clamp(14, 36)
+                .min((l.width / 18).max(12));
+            let text_width = label.chars().count() as i32 * font / 2;
+            texts.push((
+                ((l.width - text_width) / 2).max(4),
+                l.panel * 42 / 100,
+                label,
             ));
         }
         for (x, y, text) in texts {
@@ -560,19 +860,28 @@ impl Controls {
             "down" => {
                 let hit = l.hit(self.mode, f.x, f.y);
                 self.drag = hit;
+                self.drag_second_eye = match self.mode {
+                    Projection::Ou => f.y >= (l.height / 2) as f64,
+                    Projection::FramePack => f.y >= l.framepack_panels()[1].y as f64,
+                    _ => f.x >= (l.width / 2) as f64,
+                };
                 if let Some(b @ (Button::Seek | Button::Volume)) = hit {
                     self.fraction = l.fraction(b, self.mode, f.x, f.y);
                 }
             }
             "move" => {
                 if let Some(b @ (Button::Seek | Button::Volume)) = self.drag {
-                    self.fraction = l.fraction(b, self.mode, f.x, f.y);
+                    self.fraction = l.drag_fraction(b, self.mode, self.drag_second_eye, f.x);
                 }
             }
             "up" => {
                 let pressed = self.drag.take();
                 let hit = l.hit(self.mode, f.x, f.y);
-                let fraction = self.fraction.take();
+                // Release can arrive before the last throttled mouse_move.
+                let fraction = pressed
+                    .filter(|b| matches!(b, Button::Seek | Button::Volume))
+                    .and_then(|b| l.drag_fraction(b, self.mode, self.drag_second_eye, f.x))
+                    .or(self.fraction.take());
                 match pressed {
                     Some(Button::Seek) if f.duration > 0.0 => {
                         if let Some(p) = fraction {
@@ -586,11 +895,17 @@ impl Controls {
                     }
                     Some(b) if Some(b) == hit => match b {
                         Button::Play => m.command_async(&["cycle", "pause"], 2)?,
+                        Button::PreviousChapter => return Ok(Input::ChapterStep(-1)),
+                        Button::Chapters => return Ok(Input::Chapters),
+                        Button::NextChapter => return Ok(Input::ChapterStep(1)),
                         Button::Back => m.seek(-10.0, false)?,
                         Button::Forward => m.seek(10.0, false)?,
                         Button::Mute => m.command_async(&["cycle", "mute"], 2)?,
                         Button::Fullscreen => m.command_async(&["cycle", "fullscreen"], 2)?,
                         Button::Stereo => return Ok(Input::Menu),
+                        Button::Info => return Ok(Input::Info),
+                        Button::Swap => return Ok(Input::Swap),
+                        Button::Options => return Ok(Input::Options),
                         Button::Audio => return Ok(Input::Audio),
                         Button::Subtitles => return Ok(Input::Subtitles),
                         _ => {}
@@ -619,12 +934,239 @@ fn time(t: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn information_and_swap_buttons_work_from_each_output_eye() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        for (k, v) in [
+            ("config", "no"),
+            ("vo", "null"),
+            ("ao", "null"),
+            ("idle", "yes"),
+        ] {
+            m.option(k, v).unwrap();
+        }
+        m.init().unwrap();
+        let l = Layout::new(1920, 1080).unwrap();
+        let pixels = vec![0; (l.width * l.panel * 4) as usize];
+        for mode in [
+            Projection::Mono,
+            Projection::Sbs,
+            Projection::Ou,
+            Projection::FramePack,
+        ] {
+            let mut c = Controls {
+                mode,
+                ..Default::default()
+            };
+            let planes = control_layout::project(&pixels, &l, mode, Glasses::RedCyan);
+            for plane in planes {
+                for button in [Button::Info, Button::Swap] {
+                    let r = l.regions.iter().find(|(b, _)| *b == button).unwrap().1;
+                    let x = plane.x as f64
+                        + (r.x as f64 + r.w as f64 / 2.0) * plane.width as f64 / l.width as f64;
+                    let y = plane.y as f64
+                        + (r.y as f64 + r.h as f64 / 2.0) * plane.height as f64 / l.panel as f64;
+                    let body = format!("1920|1080|{x}|{y}|0|30|50|1|0");
+                    c.input(&m, "down", &body).unwrap();
+                    let result = c.input(&m, "up", &body).unwrap();
+                    assert!(
+                        matches!(
+                            (button, result),
+                            (Button::Info, Input::Info) | (Button::Swap, Input::Swap)
+                        ),
+                        "Wrong button in {mode:?}"
+                    );
+                }
+            }
+        }
+    }
     use crate::mpv::ClientMessage;
     use std::{
         ffi::CStr,
         path::Path,
         time::{Duration, Instant},
     };
+    #[test]
+    fn ten_second_buttons_seek_from_each_eye_in_sbs_ou_and_framepack() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        for (k, v) in [
+            ("config", "no"),
+            ("vo", "null"),
+            ("ao", "null"),
+            ("pause", "yes"),
+            ("idle", "yes"),
+        ] {
+            m.option(k, v).unwrap();
+        }
+        m.init().unwrap();
+        m.command(&[
+            "loadfile",
+            root.join("verificacion/muestras/pistas-qa.mkv")
+                .to_str()
+                .unwrap(),
+        ])
+        .unwrap();
+        fn position(m: &mut Mpv, target: f64) {
+            let until = Instant::now() + Duration::from_secs(5);
+            loop {
+                let event = m.wait(0.02);
+                let (id, cookie) = (event.id, event.userdata);
+                if id == 5 && cookie & (1_u64 << 63) != 0 {
+                    m.seek_reply(cookie).unwrap();
+                }
+                if m.get("time-pos")
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .is_some_and(|p| (p - target).abs() < 0.1)
+                {
+                    return;
+                }
+                assert!(Instant::now() < until, "Did not reach {target}");
+            }
+        }
+        position(&mut m, 0.0);
+        let l = Layout::new(1920, 1080).unwrap();
+        let pixels = vec![255; (l.width * l.panel * 4) as usize];
+        for mode in [Projection::Sbs, Projection::Ou, Projection::FramePack] {
+            let mut c = Controls {
+                mode,
+                ..Default::default()
+            };
+            for plane in control_layout::project(&pixels, &l, mode, Glasses::RedCyan) {
+                m.command(&["seek", "15", "absolute+exact"]).unwrap();
+                position(&mut m, 15.0);
+                for (button, target) in [(Button::Back, 5.0), (Button::Forward, 15.0)] {
+                    let r = l.regions.iter().find(|(b, _)| *b == button).unwrap().1;
+                    let x = plane.x as f64
+                        + (r.x as f64 + r.w as f64 / 2.0) * plane.width as f64 / l.width as f64;
+                    let y = plane.y as f64
+                        + (r.y as f64 + r.h as f64 / 2.0) * plane.height as f64 / l.panel as f64;
+                    let body = format!("1920|1080|{x}|{y}|15|30|50|1|0");
+                    c.input(&m, "down", &body).unwrap();
+                    c.input(&m, "up", &body).unwrap();
+                    position(&mut m, target);
+                }
+            }
+        }
+    }
+    #[test]
+    fn slider_release_uses_final_coordinate_outside_panel_in_each_sbs_eye() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        for (k, v) in [
+            ("config", "no"),
+            ("vo", "null"),
+            ("ao", "null"),
+            ("idle", "yes"),
+        ] {
+            m.option(k, v).unwrap();
+        }
+        m.init().unwrap();
+        let mut c = Controls {
+            mode: Projection::Sbs,
+            ..Default::default()
+        };
+        let l = Layout::new(1920, 1080).unwrap();
+        let r = l
+            .regions
+            .iter()
+            .find(|(b, _)| *b == Button::Volume)
+            .unwrap()
+            .1;
+        for second in [false, true] {
+            m.set("volume", "25").unwrap();
+            let offset = if second { 960.0 } else { 0.0 };
+            let x = |f: f64| {
+                offset
+                    + (r.x as f64 + f * r.w as f64) / 2.0
+                    + control_layout::depth_shift(1920, 960, second) as f64
+            };
+            let body = |x: f64, y: f64| format!("1920|1080|{x}|{y}|0|120|50|1|0");
+            let y = (1080 - l.panel + r.y + r.h / 2) as f64;
+            c.input(&m, "down", &body(x(0.1), y)).unwrap();
+            // Deliberately no mouse_move: fast release outside the panel.
+            c.input(&m, "up", &body(x(0.83), 400.0)).unwrap();
+            let until = Instant::now() + Duration::from_secs(2);
+            while m
+                .get("volume")
+                .and_then(|v| v.parse::<f64>().ok())
+                .is_none_or(|v| (v - 83.0).abs() > 0.1)
+            {
+                std::thread::sleep(Duration::from_millis(10));
+                assert!(Instant::now() < until);
+            }
+        }
+    }
+    #[test]
+    fn seek_release_is_precise_in_each_sbs_eye_without_last_move_event() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        for (k, v) in [
+            ("config", "no"),
+            ("vo", "null"),
+            ("ao", "null"),
+            ("idle", "yes"),
+            ("pause", "yes"),
+        ] {
+            m.option(k, v).unwrap();
+        }
+        m.init().unwrap();
+        m.command(&[
+            "loadfile",
+            root.join("verificacion/muestras/pistas-qa.mkv")
+                .to_str()
+                .unwrap(),
+        ])
+        .unwrap();
+        let until = Instant::now() + Duration::from_secs(5);
+        while m.get("seekable").as_deref() != Some("yes") {
+            m.wait(0.05);
+            assert!(Instant::now() < until);
+        }
+        let mut c = Controls {
+            mode: Projection::Sbs,
+            ..Default::default()
+        };
+        let l = Layout::new(1920, 1080).unwrap();
+        let r = l
+            .regions
+            .iter()
+            .find(|(b, _)| *b == Button::Seek)
+            .unwrap()
+            .1;
+        for (second, target) in [(false, 0.73), (true, 0.31)] {
+            let offset = if second { 960.0 } else { 0.0 };
+            let x = |f: f64| {
+                offset
+                    + (r.x as f64 + f * r.w as f64) / 2.0
+                    + control_layout::depth_shift(1920, 960, second) as f64
+            };
+            let body = |x: f64, y: f64| format!("1920|1080|{x}|{y}|0|30|50|1|0");
+            c.input(
+                &m,
+                "down",
+                &body(x(0.1), (1080 - l.panel + r.y + r.h / 2) as f64),
+            )
+            .unwrap();
+            c.input(&m, "up", &body(x(target), 300.0)).unwrap();
+            let until = Instant::now() + Duration::from_secs(5);
+            loop {
+                let event = m.wait(0.05);
+                let (id, cookie) = (event.id, event.userdata);
+                if id == 5 && cookie & (1 << 63) != 0 {
+                    m.seek_reply(cookie).unwrap();
+                }
+                if m.get("time-pos")
+                    .and_then(|v| v.parse::<f64>().ok())
+                    .is_some_and(|v| (v - target * 30.0).abs() < 0.05)
+                {
+                    break;
+                }
+                assert!(Instant::now() < until, "No alcanza el punto SBS {target}");
+            }
+        }
+    }
     #[test]
     fn lua_hidden_first_click_popup_lifecycle_and_idle() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));

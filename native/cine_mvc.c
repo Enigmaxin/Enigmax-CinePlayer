@@ -10,6 +10,7 @@
 #include "blockinput.h"
 #include <libavformat/avformat.h>
 #include <libavcodec/bsf.h>
+#include <libavcodec/avcodec.h>
 #include <libavutil/mathematics.h>
 #include <windows.h>
 #include <stdatomic.h>
@@ -316,3 +317,79 @@ reset_decoder:
 EC_API void ec_mvc_cancel(void *context){Engine *e=context;if(e)atomic_store(&e->cancelled,1);}
 EC_API const char *ec_mvc_error(void *context){Engine *e=context;return e?e->error:"MVC cerrado";}
 
+
+/* This reader does not decrypt anything. Only admit a clear stream after a
+ * real software decode, and keep the original libbluray path for other discs. */
+typedef struct {Source source;File *file;atomic_int cancelled;double deadline;char error[512];} DiscStream;
+EC_API void ec_disc_stream_close(void *ptr){DiscStream *d=ptr;if(!d)return;file_close(d->file);source_close(&d->source);free(d);}
+static int disc_interrupted(void *ptr){DiscStream *d=ptr;return atomic_load(&d->cancelled)||now()>d->deadline;}
+EC_API void *ec_disc_stream_open(const char *path,int id,int unused,EC_Info *info,char *err,int cap){
+    (void)unused;DiscStream *d=calloc(1,sizeof(*d));if(!d)return NULL;atomic_init(&d->cancelled,0);d->deadline=now()+DECODE_TIMEOUT;
+    Clip *clips=NULL;int count=0;EC_Title title;AVFormatContext *fmt=NULL;AVIOContext *io=NULL;AVCodecContext *dec=NULL;AVPacket *packet=NULL;AVFrame *frame=NULL;
+    if(source_open(&d->source,path,d->error,sizeof(d->error))<0)goto fail;
+    File *marker=file_open(&d->source,"AACS/Unit_Key_RO.inf");if(!marker){snprintf(d->error,sizeof(d->error),"No corresponde a un rechazo por metadatos AACS");goto fail;}file_close(marker);
+    if(playlist(&d->source,id,&clips,&count,&title)<0||count!=1||title.stereo){snprintf(d->error,sizeof(d->error),"La lectura alternativa requiere un título 2D de un único clip");goto fail;}
+    char name[80];snprintf(name,sizeof(name),"BDMV/STREAM/%s.m2ts",clips[0].id);d->file=file_open(&d->source,name);if(!d->file)goto fail;
+    uint8_t *buffer=av_malloc(IO_BUFFER);if(!buffer)goto fail;io=avio_alloc_context(buffer,IO_BUFFER,0,d->file,avio_read_cb,NULL,avio_seek_cb);if(!io){av_free(buffer);goto fail;}
+    fmt=avformat_alloc_context();if(!fmt)goto fail;fmt->pb=io;fmt->flags|=AVFMT_FLAG_CUSTOM_IO;fmt->probesize=2*1024*1024;fmt->max_analyze_duration=2*AV_TIME_BASE;fmt->interrupt_callback=(AVIOInterruptCB){disc_interrupted,d};
+    if(avformat_open_input(&fmt,NULL,av_find_input_format("mpegts"),NULL)<0||avformat_find_stream_info(fmt,NULL)<0)goto fail;
+    int video=av_find_best_stream(fmt,AVMEDIA_TYPE_VIDEO,-1,-1,NULL,0);if(video<0)goto fail;
+    const AVCodec *codec=avcodec_find_decoder(fmt->streams[video]->codecpar->codec_id);if(!codec)goto fail;
+    dec=avcodec_alloc_context3(codec);if(!dec||avcodec_parameters_to_context(dec,fmt->streams[video]->codecpar)<0)goto fail;dec->thread_count=1;
+    if(avcodec_open2(dec,codec,NULL)<0)goto fail;packet=av_packet_alloc();frame=av_frame_alloc();if(!packet||!frame)goto fail;
+    int decoded=0;
+    for(int i=0;i<256&&!disc_interrupted(d);i++){
+        if(av_read_frame(fmt,packet)<0)break;
+        if(packet->stream_index==video&&avcodec_send_packet(dec,packet)>=0&&avcodec_receive_frame(dec,frame)==0){decoded=1;av_packet_unref(packet);break;}
+        av_packet_unref(packet);
+    }
+    if(!decoded){snprintf(d->error,sizeof(d->error),"El flujo no se pudo verificar como vídeo legible; puede estar cifrado o dañado");goto fail;}
+    if(info){memset(info,0,sizeof(*info));info->duration=title.duration;info->playlist=id;info->clips=1;info->audio_delay=fmt->start_time==AV_NOPTS_VALUE?0:fmax(0.0,clips[0].in-(double)fmt->start_time/AV_TIME_BASE);}
+    av_frame_free(&frame);av_packet_free(&packet);avcodec_free_context(&dec);avformat_close_input(&fmt);av_freep(&io->buffer);avio_context_free(&io);free(clips);clips=NULL;
+    if(file_seek(d->file,0,SEEK_SET)<0)goto fail;return d;
+fail:av_frame_free(&frame);av_packet_free(&packet);avcodec_free_context(&dec);avformat_close_input(&fmt);if(io){av_freep(&io->buffer);avio_context_free(&io);}free(clips);if(!d->error[0])snprintf(d->error,sizeof(d->error),"No se pudo verificar el flujo del título seleccionado");set_error(err,cap,d->error);ec_disc_stream_close(d);return NULL;
+}
+EC_API int64_t ec_disc_stream_read(void *ptr,void *buf,uint64_t n){DiscStream *d=ptr;if(!d||!buf||!n||atomic_load(&d->cancelled))return -1;int r=file_read(d->file,buf,(int)(n>IO_BUFFER?IO_BUFFER:n));return r==AVERROR_EOF?0:r;}
+EC_API int64_t ec_disc_stream_seek(void *ptr,int64_t pos){DiscStream *d=ptr;return d&&pos>=0&&pos<=d->file->size?file_seek(d->file,pos,SEEK_SET):-1;}
+EC_API int64_t ec_disc_stream_size(void *ptr){DiscStream *d=ptr;return d?d->file->size:-1;}
+EC_API void ec_disc_stream_cancel(void *ptr){DiscStream *d=ptr;if(d)atomic_store(&d->cancelled,1);}
+EC_API const char *ec_disc_stream_error(void *ptr){DiscStream *d=ptr;return d?d->error:"Disco cerrado";}
+/* Header/NAL-only identification: no decoder, no image analysis. Local files only. */
+static int probe_interrupt(void *p){ return now()>*(double*)p; }
+#include "probe_nal.h"
+
+EC_API int ec_probe_mvc(const char *path){
+    if(!path||!path[0]||strlen(path)>32760)return -1;
+    double deadline=now()+1.0;
+    AVFormatContext *f=avformat_alloc_context();AVBSFContext *bsf=NULL;AVPacket *packet=NULL,*filtered=NULL;
+    int result=0;
+    if(!f)return -1;
+    f->interrupt_callback=(AVIOInterruptCB){probe_interrupt,&deadline};
+    f->probesize=512*1024;f->max_analyze_duration=0;
+    AVDictionary *options=NULL;av_dict_set(&options,"protocol_whitelist","file",0);
+    if(avformat_open_input(&f,path,NULL,&options)<0){av_dict_free(&options);return -1;}
+    av_dict_free(&options);
+    int stream=-1;
+    for(unsigned i=0;i<f->nb_streams;i++)if(f->streams[i]->codecpar->codec_id==AV_CODEC_ID_H264){stream=(int)i;break;}
+    if(stream<0)goto done;
+    AVCodecParameters *par=f->streams[stream]->codecpar;
+    if(par->profile==118||par->profile==128){result=1;goto done;}
+    const AVBitStreamFilter *filter=av_bsf_get_by_name("h264_mp4toannexb");
+    if(!filter||av_bsf_alloc(filter,&bsf)<0||avcodec_parameters_copy(bsf->par_in,par)<0||av_bsf_init(bsf)<0)goto done;
+    packet=av_packet_alloc();filtered=av_packet_alloc();if(!packet||!filtered)goto done;
+    size_t bytes=0;
+    for(int count=0;count<64&&bytes<2*1024*1024&&now()<deadline;count++){
+        if(av_read_frame(f,packet)<0)break;
+        bytes+=(size_t)packet->size;
+        if(packet->stream_index==stream&&av_bsf_send_packet(bsf,packet)>=0){
+            while(av_bsf_receive_packet(bsf,filtered)>=0){
+                if(ec_mvc_nals(filtered->data,(size_t)filtered->size))result=1;
+                av_packet_unref(filtered);
+                if(result)break;
+            }
+        }
+        av_packet_unref(packet);if(result)break;
+    }
+done:
+    av_packet_free(&packet);av_packet_free(&filtered);av_bsf_free(&bsf);avformat_close_input(&f);return result;
+}

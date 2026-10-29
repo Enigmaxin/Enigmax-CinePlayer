@@ -23,4 +23,12 @@ EC_API int64_t ec_mvc_size(void *context);
 EC_API void ec_mvc_cancel(void *context);
 EC_API const char *ec_mvc_error(void *context);
 EC_API void ec_mvc_close(void *context);
+/* Clear, single-clip UDF fallback when stale AACS metadata rejects bd://. */
+EC_API void *ec_disc_stream_open(const char*,int,int,EC_Info*,char*,int);
+EC_API int64_t ec_disc_stream_read(void*,void*,uint64_t);
+EC_API int64_t ec_disc_stream_seek(void*,int64_t);
+EC_API int64_t ec_disc_stream_size(void*);
+EC_API void ec_disc_stream_cancel(void*);
+EC_API const char *ec_disc_stream_error(void*);
+EC_API void ec_disc_stream_close(void*);
 #endif

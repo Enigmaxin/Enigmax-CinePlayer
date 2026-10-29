@@ -1,8 +1,17 @@
 #![windows_subsystem = "windows"]
+#[cfg(test)]
+mod audio_audit;
+mod cinema_dialog;
 mod controls;
+mod detection;
 mod mpv;
 mod mvc;
 mod player;
+mod popup;
+#[cfg(test)]
+mod render_audit;
+#[cfg(test)]
+mod stability_audit;
 mod subtitles;
 mod sync_probe;
 mod updater;
@@ -25,6 +34,7 @@ fn configure(m: &Mpv, probe: bool, dir: &std::path::Path) -> Result<(), String> 
         ("config", "no"),
         ("load-scripts", "no"),
         ("osc", "no"),
+        ("osd-bar", "no"),
         ("script-opts", "osc-idlescreen=no"),
         ("input-default-bindings", "yes"),
         ("input-vo-keyboard", "yes"),
@@ -41,10 +51,16 @@ fn configure(m: &Mpv, probe: bool, dir: &std::path::Path) -> Result<(), String> 
                 "${?media-title: — ${media-title}}"
             ),
         ),
-        ("vo", "gpu-next"),
+        ("vo", "gpu-next,gpu"),
         ("gpu-api", "d3d11"),
         ("gpu-context", "d3d11"),
         ("hwdec", "auto"),
+        // mpv probes safe direct methods, copy methods, then software. Preserve
+        // its buffered retry logic instead of reloading the movie ourselves.
+        ("hwdec-software-fallback", "3"),
+        ("vd-lavc-dr", "auto"),
+        ("d3d11-warp", "auto"),
+        ("d3d11-exclusive-fs", "no"),
         ("target-colorspace-hint", "auto"),
         ("ao", "wasapi"),
         ("audio-channels", "auto-safe"),
@@ -62,6 +78,11 @@ fn configure(m: &Mpv, probe: bool, dir: &std::path::Path) -> Result<(), String> 
     ] {
         m.option(k, v)?;
     }
+    let cpus = std::thread::available_parallelism().map_or(1, usize::from);
+    m.option(
+        "vd-lavc-threads",
+        &cineplayer_core::performance::decoder_threads(cpus).to_string(),
+    )?;
     let script = dir.join("assets/enigmax_controls.lua");
     if !script.is_file() {
         return Err("Falta el módulo de controles inferiores".into());
@@ -69,6 +90,10 @@ fn configure(m: &Mpv, probe: bool, dir: &std::path::Path) -> Result<(), String> 
     m.option("scripts", script.to_str().ok_or("Ruta Unicode inválida")?)?;
     m.option("script-opts", &format!("enigmax-client={}", m.name()))?;
     if probe {
+        if let Some(path) = std::env::var_os("ENIGMAX_PROBE_LOG") {
+            m.option("log-file", path.to_str().ok_or("Ruta de log inválida")?)?;
+            m.option("msg-level", "all=debug")?;
+        }
         m.option(
             "pause",
             if std::env::var_os("ENIGMAX_PROBE_PLAY_SECONDS").is_some() {
@@ -97,11 +122,36 @@ fn bind(m: &Mpv) -> Result<(), String> {
         ("Ctrl+s", "sub"),
         ("1", "original"),
         ("F1", "help"),
+        ("q", "quit"),
+        ("Q", "quit"),
     ] {
         m.command(&[
             "keybind",
             key,
             &format!("script-message-to {name} {action}"),
+        ])?;
+    }
+    for (key, seek) in [
+        ("LEFT", "-5"),
+        ("RIGHT", "5"),
+        ("UP", "60"),
+        ("DOWN", "-60"),
+        ("Shift+LEFT", "-1 exact"),
+        ("Shift+RIGHT", "1 exact"),
+        ("WHEEL_LEFT", "-10"),
+        ("WHEEL_RIGHT", "10"),
+    ] {
+        m.command(&[
+            "keybind",
+            key,
+            &format!("no-osd seek {seek}; script-message-to enigmax_controls show"),
+        ])?;
+    }
+    for (key, delta) in [("9", "-2"), ("/", "-2"), ("0", "2"), ("*", "2")] {
+        m.command(&[
+            "keybind",
+            key,
+            &format!("no-osd add volume {delta}; script-message-to enigmax_controls show"),
         ])?;
     }
     Ok(())
@@ -113,7 +163,84 @@ fn owner(m: &Mpv) -> usize {
 fn text(m: &Mpv, s: &str) -> Result<(), String> {
     m.command(&["show-text", s, "7000"])
 }
+fn chapter_entries(m: &Mpv) -> Vec<(usize, f64, String)> {
+    let raw = m.get("chapter-list").unwrap_or_default();
+    let data: serde_json::Value = serde_json::from_str(&raw).unwrap_or_default();
+    data.as_array()
+        .into_iter()
+        .flatten()
+        .take(10000)
+        .enumerate()
+        .filter_map(|(i, c)| {
+            let time = c
+                .get("time")?
+                .as_f64()
+                .filter(|t| t.is_finite() && *t >= 0.0)?;
+            let title = c.get("title").and_then(|t| t.as_str()).unwrap_or("");
+            let title = title
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(160)
+                .collect::<String>();
+            Some((i, time, title))
+        })
+        .collect()
+}
+fn chapter_navigation(m: &Mpv, step: Option<i32>) -> Result<(), String> {
+    let entries = chapter_entries(m);
+    if entries.is_empty() {
+        return text(m, "Este vídeo no contiene capítulos");
+    }
+    let current = m
+        .get("chapter")
+        .and_then(|v| v.parse::<i32>().ok())
+        .unwrap_or(-1);
+    if let Some(step) = step {
+        let index = (current + step).clamp(0, entries.last().map(|e| e.0 as i32).unwrap_or(0));
+        return m.command_async(&["set", "chapter", &index.to_string()], 3);
+    }
+    let items = entries
+        .iter()
+        .map(|(index, time, title)| {
+            let seconds = *time as u64;
+            let mut entry = popup::Entry::action(
+                50000 + *index as u32,
+                format!(
+                    "{} · {:02}:{:02}:{:02}{}{}",
+                    index + 1,
+                    seconds / 3600,
+                    seconds / 60 % 60,
+                    seconds % 60,
+                    if title.is_empty() { "" } else { " · " },
+                    title
+                ),
+            );
+            entry.checked = *index as i32 == current;
+            entry
+        })
+        .collect();
+    let id = popup::show_anchored(
+        m,
+        "Capítulos",
+        items,
+        cineplayer_core::control_layout::Button::Chapters,
+    )?;
+    if id >= 50000 && entries.iter().any(|e| e.0 == (id - 50000) as usize) {
+        m.command_async(&["set", "chapter", &(id - 50000).to_string()], 3)?;
+    }
+    Ok(())
+}
 fn help(m: &Mpv) -> Result<(), String> {
+    if popup::stereo(m) {
+        windows::player_message(
+            m,
+            &format!(
+                "{APP_NAME_VERSION}\nCtrl+O: abrir vídeo\nClic derecho / M: menú general\nCtrl+3: vídeo 3D\nEspacio: pausa\nF / doble clic: pantalla completa\n−10 / +10 y flechas: buscar\n1: tamaño original\nQ: cerrar"
+            ),
+            false,
+        );
+        return Ok(());
+    }
     text(
         m,
         &format!(
@@ -160,32 +287,59 @@ fn track_menus(m: &Mpv) -> Result<TrackMenus, String> {
     let mut actions = Vec::new();
     let tracks = windows::Menu::new()?;
     let subs = windows::Menu::new()?;
-    subs.item(
-        300,
-        "Desactivar subtítulos",
-        m.get("sid").as_deref() == Some("no"),
-    )?;
+    tracks.label("Audio")?;
+    tracks.separator();
+    subs.label("Subtítulos")?;
+    subs.separator();
+    subs.item(300, "Desactivados", m.get("sid").as_deref() == Some("no"))?;
     actions.push((300, Action::Track("sid".into(), "no".into())));
-    let count = m
-        .get("track-list/count")
-        .and_then(|v| v.parse::<usize>().ok())
-        .unwrap_or(0)
-        .min(256);
-    for i in 0..count {
-        let prefix = format!("track-list/{i}");
-        let kind = m.get(&format!("{prefix}/type")).unwrap_or_default();
+    // One consistent snapshot instead of up to 1,536 synchronous property
+    // queries. The decoder can keep working while the native menu is open.
+    let snapshot: serde_json::Value =
+        serde_json::from_str(&m.get("track-list").unwrap_or_default()).unwrap_or_default();
+    for (i, entry) in snapshot
+        .as_array()
+        .into_iter()
+        .flatten()
+        .take(256)
+        .enumerate()
+    {
+        let kind = entry["type"].as_str().unwrap_or_default();
         if kind != "audio" && kind != "sub" {
             continue;
         }
-        let Some(track) = m.get(&format!("{prefix}/id")) else {
+        let Some(track) = entry["id"]
+            .as_i64()
+            .filter(|id| *id >= 0)
+            .map(|id| id.to_string())
+        else {
             continue;
         };
-        let title = m.get(&format!("{prefix}/title")).unwrap_or_default();
-        let lang = m.get(&format!("{prefix}/lang")).unwrap_or_default();
-        let codec = m.get(&format!("{prefix}/codec")).unwrap_or_default();
+        let clean = |key: &str| {
+            entry[key]
+                .as_str()
+                .unwrap_or_default()
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(160)
+                .collect::<String>()
+        };
+        let title = clean("title");
+        let lang = clean("lang");
+        let codec = clean("codec");
         let id = 400 + i as u32;
-        let label = format!("{track}: {lang} {title} [{codec}]");
-        let selected = m.get(&format!("{prefix}/selected")).as_deref() == Some("yes");
+        let heading = match (lang.as_str(), title.as_str()) {
+            ("", "") => format!("Pista {track}"),
+            ("", _) => title,
+            (_, "") => lang,
+            _ => format!("{lang} · {title}"),
+        };
+        let channels = entry["audio-channels"]
+            .as_i64()
+            .map(|n| format!(" · {n} canales"))
+            .unwrap_or_default();
+        let label = format!("{heading}\n{}{channels}", codec.to_uppercase());
+        let selected = entry["selected"].as_bool().unwrap_or(false);
         if kind == "audio" {
             tracks.item(id, &label, selected)?;
         } else {
@@ -202,6 +356,10 @@ fn track_menus(m: &Mpv) -> Result<TrackMenus, String> {
     {
         tracks.label("Este archivo no contiene pistas de audio")?;
     }
+    subs.separator();
+    subs.item(2, "Añadir subtítulos…", false)?;
+    subs.item(58, "Ajustar sincronización…", false)?;
+    actions.extend([(2, Action::Id(2)), (58, Action::Id(58))]);
     Ok((tracks, subs, actions))
 }
 fn choose_track(m: &Mpv, s: &mut State, sub: bool) -> Result<(), String> {
@@ -212,12 +370,13 @@ fn choose_track(m: &Mpv, s: &mut State, sub: bool) -> Result<(), String> {
     }
     Ok(())
 }
-fn menu(m: &Mpv, s: &State) -> Result<Option<Action>, String> {
+type MenuActions = Vec<(u32, Action)>;
+fn build_menu(m: &Mpv, s: &State, remaining: bool) -> Result<(windows::Menu, MenuActions), String> {
     let root = windows::Menu::new()?;
     root.item(1, "Abrir vídeo…\tCtrl+O", false)?;
     root.item(2, "Añadir subtítulos…\tCtrl+S", false)?;
     root.separator();
-    player::menu(&root, m, s)?;
+    player::menu(&root, m, s, !remaining)?;
     let ar = windows::Menu::new()?;
     for (id, label, aspect) in [
         (20, "Según el formato", None),
@@ -241,8 +400,8 @@ fn menu(m: &Mpv, s: &State) -> Result<Option<Action>, String> {
     let audio = windows::Menu::new()?;
     for (id, label, value) in [
         (40, "TV / altavoces: decodificar a PCM", 0),
-        (41, "Receptor: AC3 / DTS", 1),
-        (42, "Receptor HDMI: AC3 / EAC3 / DTS-HD / TrueHD", 2),
+        (41, "Salida Óptica/Coaxial", 1),
+        (42, "Salida Bitstream HDMI", 2),
     ] {
         audio.item(id, label, s.passthrough == value)?;
     }
@@ -274,10 +433,12 @@ fn menu(m: &Mpv, s: &State) -> Result<Option<Action>, String> {
         }
     }
     root.submenu("Dispositivo de sonido", devices)?;
-    let (tracks, subs, track_actions) = track_menus(m)?;
-    actions.extend(track_actions);
-    root.submenu("Pista de audio", tracks)?;
-    root.submenu("Pista de subtítulos", subs)?;
+    if !remaining {
+        let (tracks, subs, track_actions) = track_menus(m)?;
+        actions.extend(track_actions);
+        root.submenu("Pista de audio", tracks)?;
+        root.submenu("Pista de subtítulos", subs)?;
+    }
     root.separator();
     root.item(50, "Pausa / continuar\tEspacio", false)?;
     root.item(
@@ -294,6 +455,10 @@ fn menu(m: &Mpv, s: &State) -> Result<Option<Action>, String> {
     about.item(57, "Buscar actualizaciones…", false)?;
     root.submenu("Acerca de", about)?;
     root.item(55, "Cerrar\tQ", false)?;
+    Ok((root, actions))
+}
+fn menu(m: &Mpv, s: &State, remaining: bool) -> Result<Option<Action>, String> {
+    let (root, mut actions) = build_menu(m, s, remaining)?;
     let id = root.show(m)?;
     Ok(if id == 0 {
         None
@@ -310,6 +475,7 @@ fn open(m: &Mpv, s: &mut State, sub: bool) -> Result<(), String> {
         if sub {
             m.command(&["sub-add", value, "select"])?;
         } else {
+            s.capture_position(m);
             s.new_open();
             player::load(m, s, value, None)?;
         }
@@ -321,42 +487,142 @@ fn original(m: &Mpv) -> Result<(), String> {
     m.set("window-scale", "1")
 }
 fn info(m: &Mpv, s: &State) {
-    let mut report = format!(
-        "{APP_NAME_VERSION}\nPresentación: {} · {}\n{}\n\n",
-        s.prefs.layout.label(),
-        s.prefs.output.label(),
-        s.pipeline
-    );
-    for p in [
-        "mpv-version",
-        "ffmpeg-version",
-        "video-format",
-        "video-params/w",
-        "video-params/h",
-        "video-params/primaries",
-        "video-params/gamma",
-        "video-out-params/w",
-        "video-out-params/h",
-        "hwdec-current",
-        "display-colorspace",
-        "display-hidpi-scale",
-        "audio-codec-name",
-        "audio-params/format",
-        "audio-out-params/format",
-        "current-ao",
-        "frame-drop-count",
-        "decoder-frame-drop-count",
-        "demuxer-cache-state/cache-bytes",
-    ] {
-        report.push_str(&format!(
-            "{p}: {}\n",
-            m.get(p).unwrap_or_else(|| "No disponible".into())
-        ));
+    let get = |key: &str| {
+        m.get(key)
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| "No disponible".into())
+    };
+    let bytes = std::fs::metadata(&s.source)
+        .ok()
+        .map(|f| cineplayer_core::media::size(f.len()))
+        .unwrap_or_else(|| "No disponible".into());
+    let filename = cineplayer_core::media::title(&s.source, "");
+    let fps = m
+        .get("container-fps")
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|v| v.is_finite() && *v > 0.0)
+        .map(|v| {
+            format!("{v:.3}")
+                .trim_end_matches('0')
+                .trim_end_matches('.')
+                .to_owned()
+        })
+        .unwrap_or_else(|| "No disponible".into());
+    let pixels = m
+        .get("video-params/hw-pixelformat")
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| get("video-params/pixelformat"));
+    let mut lines = vec![
+        "ARCHIVO".to_owned(),
+        s.display_title.clone(),
+        format!(
+            "{} · {} · {}",
+            cineplayer_core::media::title(&s.source, ""),
+            get("file-format"),
+            bytes
+        ),
+        "VÍDEO".into(),
+        format!(
+            "{} · {}×{} · {} fps · {}",
+            get("video-format"),
+            get("video-params/w"),
+            get("video-params/h"),
+            fps,
+            cineplayer_core::media::bitrate(m.get("video-bitrate"))
+        ),
+        format!(
+            "Color: {} / {} / {} · {}",
+            get("video-params/primaries"),
+            get("video-params/gamma"),
+            get("video-params/colormatrix"),
+            get("video-params/colorlevels")
+        ),
+        format!(
+            "Píxeles: {} · Decodificación: {}",
+            pixels,
+            get("hwdec-current")
+        ),
+        format!(
+            "Renderizador: {} · Descartados: {}",
+            get("current-vo"),
+            get("frame-drop-count")
+        ),
+        if s.input_layout(m).packed() {
+            format!(
+                "3D: {} → {}",
+                s.input_layout(m).label(),
+                s.prefs.output.label()
+            )
+        } else {
+            "Presentación: 2D".into()
+        },
+    ];
+    if s.display_title.is_empty() || s.display_title == filename {
+        lines.remove(1);
     }
-    report.push_str("\nHDR10+ / Dolby Vision: no se garantiza envío de metadatos propietarios.\nEl modo HDR automático requiere la configuración HDR adecuada en Windows.");
-    windows::message(&report, false);
+    let tracks: serde_json::Value =
+        serde_json::from_str(&m.get("track-list").unwrap_or_default()).unwrap_or_default();
+    for (kind, heading) in [("audio", "AUDIOS"), ("sub", "SUBTÍTULOS")] {
+        lines.push(heading.into());
+        let mut found = false;
+        for t in tracks
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|t| t["type"].as_str() == Some(kind))
+        {
+            found = true;
+            let field = |k: &str| t[k].as_str().unwrap_or("");
+            let id = t["id"].as_i64().unwrap_or(0);
+            let selected = if t["selected"].as_bool() == Some(true) {
+                "●"
+            } else {
+                "○"
+            };
+            let mut details = vec![
+                field("codec").to_owned(),
+                field("lang").to_owned(),
+                field("title").to_owned(),
+            ];
+            if kind == "audio" {
+                if let Some(n) = t["demux-samplerate"].as_u64() {
+                    details.push(format!("{n} Hz"));
+                }
+                if let Some(n) = t["demux-channel-count"].as_u64() {
+                    details.push(format!("{n} canales"));
+                }
+                if let Some(n) = t["demux-bitrate"].as_u64() {
+                    details.push(cineplayer_core::media::bitrate(Some(n.to_string())));
+                }
+            }
+            details.retain(|s| !s.is_empty());
+            lines.push(format!("{selected} {id} · {}", details.join(" · ")));
+        }
+        if !found {
+            lines.push("Sin pistas".into());
+        }
+        if kind == "audio" {
+            lines.push(format!(
+                "Salida: {} · {}",
+                get("audio-out-params/format"),
+                get("audio-out-params/hr-channels")
+            ));
+        }
+    }
+    let entries = lines
+        .into_iter()
+        .map(|label| {
+            let mut e = popup::Entry::action(0, label);
+            e.enabled = false;
+            e
+        })
+        .collect();
+    let _ = popup::show_information(m, "Información de audio y vídeo", entries);
 }
 fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
+    if s.closing {
+        return Ok(());
+    }
     match a {
         Action::Track(k, v) => return m.command_async(&["set", &k, &v], 3),
         Action::Device(d) => {
@@ -430,7 +696,8 @@ fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
             }
             54 => return help(m),
             56 => {
-                windows::message(
+                windows::player_message(
+                    m,
                     &format!(
                         "{APP_NAME_VERSION}\nReproductor de vídeo para Windows 11 (x64)\n\nMotor de reproducción: {}\nFFmpeg: {}",
                         m.get("mpv-version")
@@ -446,8 +713,48 @@ fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
                 updater::start_manual();
                 return Ok(());
             }
+            58 => {
+                let delay = m
+                    .get("sub-delay")
+                    .and_then(|v| v.parse::<f64>().ok())
+                    .filter(|v| v.is_finite())
+                    .unwrap_or(0.0);
+                let chosen = windows::choose(
+                    m,
+                    "Sincronización de subtítulos",
+                    &format!(
+                        "Retraso actual: {delay:+.2} s\nUn valor positivo retrasa los subtítulos."
+                    ),
+                    &[
+                        (101, "Adelantar 0,5 s"),
+                        (102, "Adelantar 0,1 s"),
+                        (103, "Restablecer a 0"),
+                        (104, "Retrasar 0,1 s"),
+                        (105, "Retrasar 0,5 s"),
+                    ],
+                )?;
+                let next = match chosen {
+                    101 => delay - 0.5,
+                    102 => delay - 0.1,
+                    103 => 0.0,
+                    104 => delay + 0.1,
+                    105 => delay + 0.5,
+                    _ => return Ok(()),
+                };
+                return m.command_async(
+                    &[
+                        "set",
+                        "sub-delay",
+                        &next.clamp(-86400.0, 86400.0).to_string(),
+                    ],
+                    3,
+                );
+            }
             55 => {
+                s.capture_position(m);
+                s.flush_history();
                 m.reset_seeks();
+                s.closing = true;
                 return m.command_async(&["quit"], 0);
             }
             1000..=6095 => return player::action(m, s, id),
@@ -470,9 +777,17 @@ fn run() -> Result<(), String> {
     let mut m = Mpv::new(&dir.join("libmpv-2.dll"))?;
     configure(&m, probe, dir)?;
     m.init()?;
-    for (i, p) in ["sid", "sub-ass-extradata", "sub-text/ass-full"]
-        .iter()
-        .enumerate()
+    for (i, p) in [
+        "sid",
+        "sub-ass-extradata",
+        "sub-text/ass-full",
+        "metadata",
+        "video-params/w",
+        "aid",
+        "track-list",
+    ]
+    .iter()
+    .enumerate()
     {
         m.observe_string(p, 100 + i as u64)?;
     }
@@ -502,10 +817,24 @@ fn run() -> Result<(), String> {
             Output::Anaglyph
         } else if parts.contains(&"right") {
             Output::Right
-        } else if parts[0] == "original" || parts.contains(&"both") {
+        } else if parts[0] == "original"
+            || parts.contains(&"both")
+            || parts.contains(&"sbs1080")
+            || parts.contains(&"sbs2160")
+            || parts.contains(&"framepack")
+        {
             Output::Original
         } else {
             Output::Left
+        };
+        state.prefs.delivery = if parts.contains(&"framepack") {
+            cineplayer_core::stereo::Delivery::FramePack
+        } else if parts.contains(&"sbs1080") {
+            cineplayer_core::stereo::Delivery::FullSbs
+        } else if parts.contains(&"sbs2160") {
+            cineplayer_core::stereo::Delivery::Anamorphic
+        } else {
+            cineplayer_core::stereo::Delivery::Native
         };
         state.prefs.glasses = if parts.contains(&"gm") {
             Glasses::GreenMagenta
@@ -532,7 +861,6 @@ fn run() -> Result<(), String> {
         }
         state.prefs.swap = parts.contains(&"swap");
         if parts.contains(&"cal") {
-            state.prefs.convergence = 0.01;
             state.prefs.left_gain = 1.1;
             state.prefs.right_gain = 0.9;
         }
@@ -566,8 +894,6 @@ fn run() -> Result<(), String> {
         } else {
             player::load(&m, &mut state, path, None)?;
         }
-    } else {
-        help(&m)?;
     }
     let started = Instant::now();
     let play_seconds = std::env::var("ENIGMAX_PROBE_PLAY_SECONDS")
@@ -587,8 +913,15 @@ fn run() -> Result<(), String> {
         None
     };
     loop {
-        // No polling in normal playback: Rust sleeps until libmpv delivers an event.
-        let e = m.wait(if probe { 0.2 } else { -1.0 });
+        // Only a pending bounded background probe needs timed wakeups. Normal
+        // playback sleeps until libmpv delivers an event; no resident polling.
+        let e = m.wait(if probe {
+            0.2
+        } else if state.detection.as_ref().is_some_and(|p| p.waiting()) {
+            0.1
+        } else {
+            -1.0
+        });
         let id = e.id;
         let reply = (e.userdata, e.error);
         // Do not issue more commands after quit. END_FILE/QUIT can precede
@@ -596,6 +929,7 @@ fn run() -> Result<(), String> {
         if id == 1
             || (id == 7 && !e.data.is_null() && unsafe { (*e.data.cast::<EndFile>()).reason } == 3)
         {
+            state.flush_history();
             m.reset_seeks();
             break;
         }
@@ -666,6 +1000,7 @@ fn run() -> Result<(), String> {
             if let Some(path) = incoming
                 && !path.starts_with("bd://")
                 && !path.starts_with("cine-mvc://")
+                && !path.starts_with("cine-disc://")
                 && path != state.source
             {
                 // Drag and drop reaches mpv as loadfile. Redirect at START_FILE,
@@ -684,10 +1019,30 @@ fn run() -> Result<(), String> {
                 }
             }
         }
+        let mut disc_detail = String::new();
+        if end_error.is_some()
+            && !redirecting
+            && !state.disc_direct
+            && state.raw.is_none()
+            && !state.titles.is_empty()
+        {
+            match player::fallback_disc(&m, &mut state) {
+                Ok(true) => continue,
+                Err(detail) => {
+                    let _ = std::fs::write(dir.join("config/disc-fallback-error.txt"), &detail);
+                    disc_detail = detail;
+                }
+                _ => {}
+            }
+        }
         if let Some(err) = end_error
             && !redirecting
         {
-            let detail = m.mvc()?.error();
+            let detail = if disc_detail.is_empty() {
+                m.mvc()?.error()
+            } else {
+                disc_detail
+            };
             let msg = format!("No se pudo reproducir el archivo (libmpv {err}). {detail}");
             if probe {
                 return Err(msg);
@@ -736,6 +1091,7 @@ fn run() -> Result<(), String> {
             if let Some(path) = m.get("path")
                 && !path.starts_with("bd://")
                 && !path.starts_with("cine-mvc://")
+                && !path.starts_with("cine-disc://")
                 && path != state.source
             {
                 player::load(&m, &mut state, &path, None)?;
@@ -752,18 +1108,15 @@ fn run() -> Result<(), String> {
             if probe && let Ok(sid) = std::env::var("ENIGMAX_PROBE_SID") {
                 m.set("sid", &sid)?;
             }
-            if let Some(pos) = state.resume.take().or_else(|| {
-                if probe {
-                    std::env::var("ENIGMAX_PROBE_START")
-                        .ok()
-                        .filter(|v| !v.is_empty())
-                } else {
-                    None
-                }
-            }) && let Ok(pos) = pos.parse::<f64>()
-            {
-                m.seek(pos, true)?;
+            if probe && state.resume.is_none() {
+                state.resume = std::env::var("ENIGMAX_PROBE_START")
+                    .ok()
+                    .filter(|v| !v.is_empty());
             }
+        }
+        state.restore_tracks(&m)?;
+        if id == 8 || id == 17 || (id == 22 && matches!(reply.0, 100 | 105 | 106)) {
+            state.capture_tracks(&m);
         }
         let subs_changed = if !state.pending_load && (id == 22 || id == 8) {
             match player::subtitle_event(&m, &mut state) {
@@ -841,17 +1194,25 @@ fn run() -> Result<(), String> {
                             .input(&m, kind, body)
                             .and_then(|input| match input {
                                 controls::Input::None => Ok(()),
+                                controls::Input::Info => {
+                                    info(&m, &state);
+                                    Ok(())
+                                }
+                                controls::Input::Swap => player::action(&m, &mut state, 1024),
                                 controls::Input::Audio => choose_track(&m, &mut state, false),
                                 controls::Input::Subtitles => choose_track(&m, &mut state, true),
-                                controls::Input::Menu => player::stereo_menu(&m, &state)
-                                    .and_then(|menu| menu.show(&m))
-                                    .and_then(|id| {
-                                        if id == 0 {
-                                            Ok(())
-                                        } else {
-                                            action(&m, &mut state, Action::Id(id))
-                                        }
-                                    }),
+                                controls::Input::Options => menu(&m, &state, true).and_then(|a| {
+                                    if let Some(a) = a {
+                                        action(&m, &mut state, a)
+                                    } else {
+                                        Ok(())
+                                    }
+                                }),
+                                controls::Input::Chapters => chapter_navigation(&m, None),
+                                controls::Input::ChapterStep(step) => {
+                                    chapter_navigation(&m, Some(step))
+                                }
+                                controls::Input::Menu => player::choose_view(&m, &mut state),
                             })
                     } else {
                         Err("Faltan datos del ratón".into())
@@ -866,28 +1227,87 @@ fn run() -> Result<(), String> {
                             action(&m, &mut state, Action::Id(id))
                         }
                     }),
-                "menu" => menu(&m, &state).and_then(|a| {
+                "menu" => menu(&m, &state, false).and_then(|a| {
                     if let Some(a) = a {
                         action(&m, &mut state, a)
                     } else {
                         Ok(())
                     }
                 }),
+                "toggle-pause" => {
+                    if !state.pending_load && m.get("idle-active").as_deref() == Some("no") {
+                        m.command_async(&["cycle", "pause"], 1)
+                    } else {
+                        Ok(())
+                    }
+                }
+                "quit" => action(&m, &mut state, Action::Id(55)),
+                "checkpoint" => {
+                    if client_args.get(3) == m.get("path").as_ref()
+                        && let (Some(pos), Some(duration)) =
+                            (client_args.get(1), client_args.get(2))
+                    {
+                        state.checkpoint(pos, duration);
+                    }
+                    Ok(())
+                }
                 "open" => open(&m, &mut state, false),
+                "idle-draw" => controls.idle_draw(&m, state.last_video().is_some()),
+                "idle-click" => {
+                    let x = client_args.get(1).and_then(|s| s.parse::<i32>().ok());
+                    let y = client_args.get(2).and_then(|s| s.parse::<i32>().ok());
+                    if let (Some(x), Some(y)) = (x, y) {
+                        match controls.idle_hit(&m, x, y) {
+                            Some(false) => open(&m, &mut state, false),
+                            Some(true) if state.last_video().is_some() => {
+                                player::resume_last(&m, &mut state)
+                            }
+                            Some(true) => Ok(()),
+                            None => Ok(()),
+                        }
+                    } else {
+                        Ok(())
+                    }
+                }
                 "sub" => open(&m, &mut state, true),
                 "original" => original(&m),
                 "help" => help(&m),
                 _ => Ok(()),
             };
             if let Err(e) = result {
+                if state.closing {
+                    break;
+                }
                 if probe {
                     return Err(e);
                 }
                 runtime_error(&m, dir, "Acción del usuario", &e);
             }
         }
-        if id == 8 || id == 17 || subs_changed {
+        // Do not process queued seek/track/UI replies once the user requested
+        // quit. mpv_terminate_destroy performs the complete native teardown.
+        if state.closing {
+            break;
+        }
+        if id == 8 || id == 17 || subs_changed || (id == 22 && reply.0 == 103) {
+            if !state.pending_load {
+                state.display_title = cineplayer_core::media::title(
+                    &state.source,
+                    &m.get("metadata").unwrap_or_default(),
+                );
+            }
+            player::ask_resume(&m, &mut state)?;
             player::ask_view(&m, &mut state)?;
+        }
+        state.restore_position(&m)?;
+        if let Err(error) = state.remember_ready(&m) {
+            let _ = std::fs::write(dir.join("config/last-video-error.txt"), error);
+        }
+        if let Err(error) = player::poll_detection(&m, &mut state) {
+            if probe {
+                return Err(error);
+            }
+            runtime_error(&m, dir, "Detección estructural 3D", &error);
         }
         if let Err(e) = controls.sync(&m, &state) {
             if probe {
@@ -946,6 +1366,10 @@ fn run() -> Result<(), String> {
                     "osd-width",
                     "osd-height",
                     "hwdec-current",
+                    "hwdec",
+                    "hwdec-software-fallback",
+                    "vd-lavc-threads",
+                    "display-hidpi-scale",
                     "video-params/primaries",
                     "video-params/gamma",
                     "target-trc",
@@ -953,7 +1377,14 @@ fn run() -> Result<(), String> {
                     "sid",
                     "sub-text",
                     "audio-codec-name",
+                    "audio-params",
+                    "audio-out-params",
+                    "audio-device",
+                    "audio-spdif",
+                    "audio-exclusive",
+                    "audio-channels",
                     "track-list",
+                    "chapter-list",
                 ]
                 .iter()
                 .map(|p| format!("{p}: {}", m.get(p).unwrap_or_default()))
@@ -963,7 +1394,10 @@ fn run() -> Result<(), String> {
                     path.with_extension("txt"),
                     format!(
                         "{}\nMPLS: {}\nMVC: {:?}\nPipeline: {}\nError MVC: {}\nASS 3D: {}",
-                        report,
+                        format_args!(
+                            "{report}\nVentana / monitor: {}",
+                            windows::display_geometry(owner(&m)).unwrap_or_default()
+                        ),
                         state.title,
                         state.raw,
                         state.pipeline,
@@ -978,6 +1412,7 @@ fn run() -> Result<(), String> {
             }
         }
     }
+    state.flush_history();
     Ok(())
 }
 fn main() {
@@ -996,6 +1431,655 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cineplayer_core::stereo::Settings;
+    #[test]
+    fn quit_enters_terminal_state_before_pending_control_replies() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let temp = tempfile::tempdir().unwrap();
+        let m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.init().unwrap();
+        let mut state = State::new(temp.path(), true);
+        m.command_async(&["set", "invalid-property-for-shutdown-test", "x"], 3)
+            .unwrap();
+        let start = Instant::now();
+        action(&m, &mut state, Action::Id(55)).unwrap();
+        assert!(state.closing);
+        // A queued action must not change preferences or submit more commands.
+        action(&m, &mut state, Action::Id(31)).unwrap();
+        assert!(!state.hdr_sdr);
+        drop(m);
+        assert!(start.elapsed() < Duration::from_secs(10));
+    }
+    #[test]
+    fn chapter_navigation_reads_real_metadata_and_clamps_boundaries() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        for (k, v) in [
+            ("config", "no"),
+            ("vo", "null"),
+            ("ao", "null"),
+            ("pause", "yes"),
+            ("idle", "yes"),
+        ] {
+            m.option(k, v).unwrap();
+        }
+        m.init().unwrap();
+        m.command(&[
+            "loadfile",
+            fixture_dir().join("chapters-qa.mkv").to_str().unwrap(),
+        ])
+        .unwrap();
+        let until = Instant::now() + Duration::from_secs(8);
+        while chapter_entries(&m).len() != 3 {
+            m.wait(0.02);
+            assert!(Instant::now() < until, "No se cargan los capítulos");
+        }
+        let entries = chapter_entries(&m);
+        assert_eq!(entries[1].1, 8.0);
+        assert_eq!(entries[1].2, "Segundo capítulo");
+        for (step, expected) in [(-1, 0), (1, 1), (1, 2), (1, 2), (-1, 1)] {
+            chapter_navigation(&m, Some(step)).unwrap();
+            let until = Instant::now() + Duration::from_secs(3);
+            while m.get("chapter").as_deref() != Some(&expected.to_string()) {
+                m.wait(0.02);
+                assert!(Instant::now() < until, "No se llega al capítulo {expected}");
+            }
+        }
+    }
+    fn fixture_dir() -> PathBuf {
+        std::env::var_os("ENIGMAX_TEST_FIXTURES")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("verificacion/muestras")
+            })
+    }
+    #[test]
+    fn obsolete_depth_profiles_cannot_shift_real_video() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let temp = tempfile::tempdir().unwrap();
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.init().unwrap();
+        let mut s = State::new(temp.path(), true);
+        for (name, layout) in [
+            ("fullsbs.mkv", Layout::FullSbs),
+            ("hsbs.mkv", Layout::HalfSbs),
+            ("fullou.mkv", Layout::FullOu),
+            ("hou.mkv", Layout::HalfOu),
+        ] {
+            s.prefs.layout = layout;
+            s.prefs.output = Output::Original;
+            player::load(
+                &m,
+                &mut s,
+                root.join("verificacion/muestras")
+                    .join(name)
+                    .to_str()
+                    .unwrap(),
+                None,
+            )
+            .unwrap();
+            pump(&mut m, &mut s, |m, s| {
+                !s.pending_load && m.get("time-pos").is_some()
+            });
+            m.set("sid", "no").unwrap();
+            for (output, delivery) in [
+                (Output::Original, cineplayer_core::stereo::Delivery::Native),
+                (
+                    Output::Original,
+                    cineplayer_core::stereo::Delivery::Anamorphic,
+                ),
+                (
+                    Output::Original,
+                    cineplayer_core::stereo::Delivery::FramePack,
+                ),
+                (Output::Anaglyph, cineplayer_core::stereo::Delivery::Native),
+            ] {
+                s.prefs.output = output;
+                s.prefs.delivery = delivery;
+                s.prefs = Settings::decode(&(s.prefs.encode() + "convergence=-0.02\n")).unwrap();
+                s.applied = None;
+                apply(&m, &mut s).unwrap();
+                settle(&mut m, &mut s);
+                let before = m.screenshot_pixels().unwrap();
+                s.prefs = Settings::decode(&(s.prefs.encode() + "convergence=0.02\n")).unwrap();
+                s.applied = None;
+                apply(&m, &mut s).unwrap();
+                settle(&mut m, &mut s);
+                let after = m.screenshot_pixels().unwrap();
+                assert!(
+                    changed_pixels(&before, &after) <= 30,
+                    "Obsolete profile changed {name} {output:?} {delivery:?}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn obsolete_depth_profiles_preserve_subtitles_and_authored_ass() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let temp = tempfile::tempdir().unwrap();
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.option(
+            "log-file",
+            root.join("verificacion/subtitle-depth.log")
+                .to_str()
+                .unwrap(),
+        )
+        .unwrap();
+        m.option("msg-level", "all=v").unwrap();
+        m.init().unwrap();
+        for (i, p) in ["sid", "sub-ass-extradata", "sub-text/ass-full"]
+            .iter()
+            .enumerate()
+        {
+            m.observe_string(p, 100 + i as u64).unwrap();
+        }
+        let mut s = State::new(temp.path(), true);
+        s.prefs.layout = Layout::HalfSbs;
+        s.prefs.output = Output::Original;
+        player::load(
+            &m,
+            &mut s,
+            root.join("verificacion/muestras/ass3d-black.mkv")
+                .to_str()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        pump(&mut m, &mut s, |m, s| {
+            !s.pending_load && m.get("time-pos").is_some()
+        });
+        m.seek(1.0, true).unwrap();
+        settle(&mut m, &mut s);
+        fn centers(shot: &(usize, usize, Vec<u8>), horizontal: bool) -> [f64; 2] {
+            let (w, h, pixels) = shot;
+            let mut sums = [0_u64; 2];
+            let mut counts = [0_u64; 2];
+            for y in 0..*h {
+                for x in 0..*w {
+                    let i = (y * w + x) * 4;
+                    if pixels[i..i + 3].iter().all(|v| *v > 200) {
+                        let eye = if horizontal {
+                            usize::from(x >= w / 2)
+                        } else {
+                            usize::from(y >= h / 2)
+                        };
+                        sums[eye] += x as u64;
+                        counts[eye] += 1;
+                    }
+                }
+            }
+            assert!(
+                counts.iter().all(|n| *n > 20),
+                "Missing subtitle eye: {counts:?}"
+            );
+            [
+                sums[0] as f64 / counts[0] as f64,
+                sums[1] as f64 / counts[1] as f64,
+            ]
+        }
+        for extension in ["srt", "ass", "sup"] {
+            if extension == "sup" {
+                player::load(
+                    &m,
+                    &mut s,
+                    root.join("verificacion/muestras/depth-qa-pgs.mkv")
+                        .to_str()
+                        .unwrap(),
+                    None,
+                )
+                .unwrap();
+                pump(&mut m, &mut s, |m, s| {
+                    !s.pending_load && m.get("time-pos").is_some()
+                });
+                m.set("sid", "1").unwrap();
+            } else {
+                m.command(&[
+                    "sub-add",
+                    root.join(format!("verificacion/muestras/depth-qa.{extension}"))
+                        .to_str()
+                        .unwrap(),
+                    "select",
+                ])
+                .unwrap();
+            }
+            settle(&mut m, &mut s);
+            m.seek(0.0, true).unwrap();
+            m.set("pause", "no").unwrap();
+            settle(&mut m, &mut s);
+            m.set("pause", "yes").unwrap();
+            for layout in [
+                Layout::FullSbs,
+                Layout::HalfSbs,
+                Layout::FullOu,
+                Layout::HalfOu,
+            ] {
+                s.prefs.layout = layout;
+                s.prefs.ass_mode = cineplayer_core::ass3d::Mode::Off;
+                let mut measurements = vec![];
+                for depth in [-0.02, 0.0, 0.02] {
+                    s.prefs = Settings::decode(&format!("{}sub_depth={depth}\n", s.prefs.encode()))
+                        .unwrap();
+                    s.applied = None;
+                    apply(&m, &mut s).unwrap();
+                    settle(&mut m, &mut s);
+                    m.command(&[
+                        "screenshot-to-file",
+                        root.join(format!(
+                            "verificacion/depth-{extension}-{layout:?}-{depth:.2}.png"
+                        ))
+                        .to_str()
+                        .unwrap(),
+                        "subtitles",
+                    ])
+                    .unwrap();
+                    measurements.push(centers(
+                        &m.screenshot_pixels().unwrap(),
+                        layout.horizontal(),
+                    ));
+                }
+                assert!(
+                    (measurements[2][0] - measurements[0][0]).abs() < 0.5,
+                    "Left {extension} {layout:?}: {measurements:?}"
+                );
+                assert!(
+                    (measurements[2][1] - measurements[0][1]).abs() < 0.5,
+                    "Right {extension} {layout:?}: {measurements:?}"
+                );
+                println!("{extension} {layout:?}: measured subtitle centers {measurements:?}");
+            }
+        }
+        // Restore the embedded stereoscopic ASS. Its original disparity remains;
+        // obsolete profile depth must not shift either authored eye position.
+        m.command(&[
+            "sub-add",
+            root.join("verificacion/muestras/ass3d-sbs.ass")
+                .to_str()
+                .unwrap(),
+            "select",
+        ])
+        .unwrap();
+        s.prefs.layout = Layout::HalfSbs;
+        s.prefs.ass_mode = cineplayer_core::ass3d::Mode::Sbs;
+        settle(&mut m, &mut s);
+        let mut measurements = vec![];
+        for depth in [-0.02, 0.02] {
+            s.prefs =
+                Settings::decode(&format!("{}sub_depth={depth}\n", s.prefs.encode())).unwrap();
+            s.applied = None;
+            apply(&m, &mut s).unwrap();
+            settle(&mut m, &mut s);
+            measurements.push(centers(&m.screenshot_pixels().unwrap(), true));
+        }
+        assert!(
+            (measurements[1][0] - measurements[0][0]).abs() < 0.5,
+            "Packed ASS left {measurements:?}"
+        );
+        assert!(
+            (measurements[1][1] - measurements[0][1]).abs() < 0.5,
+            "Packed ASS right {measurements:?}"
+        );
+    }
+    fn settle(m: &mut Mpv, s: &mut State) {
+        let until = Instant::now() + Duration::from_millis(400);
+        pump(m, s, |_, _| Instant::now() >= until);
+    }
+    fn changed_pixels(a: &(usize, usize, Vec<u8>), b: &(usize, usize, Vec<u8>)) -> usize {
+        let w = a.0.min(b.0).min(960);
+        let h = a.1.min(b.1).min(540);
+        (0..h)
+            .flat_map(|y| (0..w).map(move |x| (x, y)))
+            .filter(|&(x, y)| {
+                let ai = ((y * a.1 / h) * a.0 + x * a.0 / w) * 4;
+                let bi = ((y * b.1 / h) * b.0 + x * b.0 / w) * 4;
+                a.2[ai..ai + 3]
+                    .iter()
+                    .zip(&b.2[bi..bi + 3])
+                    .any(|(a, b)| a.abs_diff(*b) > 32)
+            })
+            .count()
+    }
+    #[test]
+    #[ignore = "Requires ENIGMAX_TEST_CLEAR_DISC_ISO pointing to the authorized clear ISO"]
+    fn clear_iso_fallback_seeks_tracks_and_quit() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let path = std::env::var("ENIGMAX_TEST_CLEAR_DISC_ISO").unwrap();
+        let temp = tempfile::tempdir().unwrap();
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.option("pause", "yes").unwrap();
+        if let Some(log) = std::env::var_os("ENIGMAX_TEST_ISO_LOG") {
+            m.option("log-file", log.to_str().unwrap()).unwrap();
+            m.option("msg-level", "all=debug").unwrap();
+        }
+        m.init().unwrap();
+        m.register_mvc(Box::new(mvc::Registry::new(
+            &root.join("runtime/cine_mvc.dll"),
+        )))
+        .unwrap();
+        let mut state = State::new(temp.path(), true);
+        player::load(&m, &mut state, &path, None).unwrap();
+        let until = Instant::now() + Duration::from_secs(15);
+        loop {
+            let e = m.wait(0.05);
+            if e.id == 7 && !e.data.is_null() && unsafe { (*e.data.cast::<EndFile>()).reason } == 4
+            {
+                break;
+            }
+            assert!(Instant::now() < until);
+        }
+        assert!(player::fallback_disc(&m, &mut state).unwrap());
+        pump(&mut m, &mut state, |m, s| {
+            !s.pending_load && m.get("video-params/w").as_deref() == Some("3840")
+        });
+        assert!(
+            !player::fallback_disc(&m, &mut state).unwrap(),
+            "No retry loops"
+        );
+        for target in [120.0, 600.0, 8000.0, 30.0] {
+            m.seek(target, true).unwrap();
+            pump(&mut m, &mut state, |m, _| {
+                m.get("time-pos")
+                    .and_then(|v| v.parse::<f64>().ok())
+                    .is_some_and(|v| (v - target).abs() < 0.15)
+            });
+            println!("ISO seek {target}: {:?}", m.get("time-pos"));
+        }
+        let (_, _, tracks) = track_menus(&m).unwrap();
+        let mut audio = 0;
+        let mut sub = 0;
+        for (_, track) in tracks {
+            if let Action::Track(key, value) = track {
+                if key == "aid" && audio < 2 {
+                    action(&m, &mut state, Action::Track(key.clone(), value.clone())).unwrap();
+                    pump(&mut m, &mut state, |m, _| {
+                        m.get(&key).as_deref() == Some(value.as_str())
+                    });
+                    audio += 1;
+                }
+                if key == "sid" && value != "no" && sub == 0 {
+                    action(&m, &mut state, Action::Track(key.clone(), value.clone())).unwrap();
+                    pump(&mut m, &mut state, |m, _| {
+                        m.get(&key).as_deref() == Some(value.as_str())
+                    });
+                    sub += 1;
+                }
+            }
+        }
+        assert_eq!((audio, sub), (2, 1));
+        action(&m, &mut state, Action::Id(55)).unwrap();
+        let until = Instant::now() + Duration::from_secs(10);
+        loop {
+            let event = m.wait(0.05);
+            if event.id != 0 {
+                println!("ISO quit event={} error={}", event.id, event.error);
+            }
+            if event.id == 1 {
+                break;
+            }
+            assert!(Instant::now() < until);
+        }
+    }
+    #[test]
+    fn clear_disc_stream_is_verified_and_malformed_or_multiclip_is_rejected() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let temp = tempfile::tempdir().unwrap();
+        for dir in ["AACS", "BDMV/PLAYLIST", "BDMV/STREAM"] {
+            std::fs::create_dir_all(temp.path().join(dir)).unwrap();
+        }
+        std::fs::write(
+            temp.path().join("AACS/Unit_Key_RO.inf"),
+            b"synthetic metadata only",
+        )
+        .unwrap();
+        let playlist = |count: u16| {
+            let mut b = vec![0u8; 42];
+            b[..8].copy_from_slice(b"MPLS0300");
+            b[8..12].copy_from_slice(&32u32.to_be_bytes());
+            b[38..40].copy_from_slice(&count.to_be_bytes());
+            for _ in 0..count {
+                b.extend_from_slice(&20u16.to_be_bytes());
+                let mut item = [0u8; 20];
+                item[..5].copy_from_slice(b"00001");
+                item[12..16].copy_from_slice(&63000u32.to_be_bytes());
+                item[16..20].copy_from_slice(&333000u32.to_be_bytes());
+                b.extend_from_slice(&item);
+            }
+            b
+        };
+        let mpls = temp.path().join("BDMV/PLAYLIST/00000.mpls");
+        std::fs::write(&mpls, playlist(1)).unwrap();
+        let stream = temp.path().join("BDMV/STREAM/00001.m2ts");
+        std::fs::copy(fixture_dir().join("disc-clear.m2ts"), &stream).unwrap();
+        let registry = mvc::Registry::new(&root.join("runtime/cine_mvc.dll"));
+        let info = registry
+            .prepare_disc(temp.path().to_str().unwrap(), 0, "cine-disc://test")
+            .unwrap();
+        assert!((info.duration - 6.0).abs() < 0.001);
+        std::fs::write(&mpls, playlist(2)).unwrap();
+        assert!(
+            registry
+                .prepare_disc(temp.path().to_str().unwrap(), 0, "cine-disc://bad")
+                .is_err()
+        );
+        std::fs::write(&mpls, playlist(1)).unwrap();
+        std::fs::write(&stream, vec![0xa5u8; 65536]).unwrap();
+        assert!(
+            registry
+                .prepare_disc(temp.path().to_str().unwrap(), 0, "cine-disc://bad")
+                .is_err()
+        );
+    }
+    #[test]
+    fn toolbar_menu_keeps_all_other_context_options_including_disc_titles() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.init().unwrap();
+        let mut state = State::new(root, true);
+        state.titles.push(mvc::Title::default());
+        let all = build_menu(&m, &state, false).unwrap().0.labels();
+        let remaining = build_menu(&m, &state, true).unwrap().0.labels();
+        let expected: Vec<_> = all
+            .into_iter()
+            .filter(|s| {
+                !s.starts_with("Vídeo 3D") && s != "Pista de audio" && s != "Pista de subtítulos"
+            })
+            .collect();
+        assert_eq!(remaining, expected);
+        assert!(remaining.iter().any(|s| s.starts_with("Títulos Blu-ray")));
+        assert!(remaining.iter().any(|s| s == "Acerca de"));
+    }
+    #[test]
+    fn native_fullscreen_covers_monitor_and_software_decode_is_available() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.option("hwdec", "no").unwrap(); // exercise the final fallback path from startup
+        m.option("pause", "no").unwrap();
+        m.init().unwrap();
+        let file = fixture_dir().join("fullsbs.mkv");
+        m.command(&["loadfile", file.to_str().unwrap()]).unwrap();
+        fn wait_for(m: &mut Mpv, condition: impl Fn(&Mpv) -> bool) {
+            let limit = Instant::now() + Duration::from_secs(10);
+            while Instant::now() < limit {
+                m.wait(0.05);
+                if condition(m) {
+                    return;
+                }
+            }
+            panic!(
+                "Fullscreen/software state not reached: {:?}; {:?}",
+                m.get("time-pos"),
+                windows::display_geometry(owner(m))
+            );
+        }
+        wait_for(&mut m, |m| {
+            m.get("time-pos")
+                .and_then(|v| v.parse::<f64>().ok())
+                .is_some_and(|v| v > 0.2)
+        });
+        assert_eq!(m.get("hwdec-current").as_deref(), Some("no"));
+        println!(
+            "Software verified; initial geometry: {:?}",
+            windows::display_geometry(owner(&m))
+        );
+        for renderer in ["gpu-next", "gpu"] {
+            m.set("vo", renderer).unwrap();
+            for _ in 0..2 {
+                m.set("fullscreen", "yes").unwrap();
+                wait_for(&mut m, |m| {
+                    windows::display_geometry(owner(m))
+                        .is_some_and(|g| g["client"] == g["monitor"] && g["borderStyle"] == 0)
+                });
+                let geometry = windows::display_geometry(owner(&m)).unwrap();
+                assert_eq!(geometry["perMonitorV2"], true, "{geometry}");
+                println!("Fullscreen {renderer}: {geometry}");
+                m.set("fullscreen", "no").unwrap();
+                wait_for(&mut m, |m| {
+                    windows::display_geometry(owner(m)).is_some_and(|g| g["borderStyle"] != 0)
+                });
+            }
+        }
+    }
+    #[test]
+    fn live_glasses_inversion_2d_and_full_sbs_change_rendered_pixels() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let samples = fixture_dir();
+        for (sample, layout, has_ass) in [
+            ("fullsbs.mkv", Layout::FullSbs, false),
+            ("ass3d-hsbs.mkv", Layout::HalfSbs, true),
+            ("ass3d-hou.mkv", Layout::HalfOu, true),
+        ] {
+            let temp = tempfile::tempdir().unwrap();
+            let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+            configure(&m, true, root).unwrap();
+            m.init().unwrap();
+            for (i, p) in ["sid", "sub-ass-extradata", "sub-text/ass-full"]
+                .iter()
+                .enumerate()
+            {
+                m.observe_string(p, 100 + i as u64).unwrap();
+            }
+            let mut s = State::new(temp.path(), true);
+            s.prefs.layout = layout;
+            s.prefs.output = Output::Anaglyph;
+            player::load(&m, &mut s, samples.join(sample).to_str().unwrap(), None).unwrap();
+            pump(&mut m, &mut s, |m, s| {
+                !s.pending_load
+                    && m.get("time-pos").is_some()
+                    && (!has_ass
+                        || s.subtitles
+                            .active(s.prefs.ass_mode, s.effective(m))
+                            .is_some())
+            });
+            let mut previous = None;
+            for id in 1200..=1204 {
+                player::action(&m, &mut s, id).unwrap();
+                settle(&mut m, &mut s);
+                let shot = m.screenshot_pixels().unwrap();
+                if let Some(old) = previous {
+                    assert!(
+                        changed_pixels(&old, &shot) > 30,
+                        "Gafas {id}: no cambian los píxeles de {sample}"
+                    );
+                }
+                previous = Some(shot);
+            }
+            player::action(&m, &mut s, 1200).unwrap();
+            settle(&mut m, &mut s);
+            let before = m.screenshot_pixels().unwrap();
+            player::action(&m, &mut s, 1024).unwrap();
+            settle(&mut m, &mut s);
+            let swapped = m.screenshot_pixels().unwrap();
+            assert!(
+                changed_pixels(&before, &swapped) > 30,
+                "Invertir no cambia {sample}"
+            );
+            player::action(&m, &mut s, 1210).unwrap();
+            settle(&mut m, &mut s);
+            assert_eq!(s.prefs.output, Output::Left);
+            assert!(!s.prefs.swap);
+            let left = m.screenshot_pixels().unwrap();
+            assert!(
+                changed_pixels(&swapped, &left) > 30,
+                "2D no cambia {sample}"
+            );
+            for (id, w, h) in [(1221, 16, 9), (1222, 1920, 2205)] {
+                player::action(&m, &mut s, id).unwrap();
+                settle(&mut m, &mut s);
+                let shot = m.screenshot_pixels().unwrap();
+                // Legacy gpu screenshots use the source display size (video.c:
+                // gl_video_screenshot), independently of MAIN texture dimensions.
+                // Verify the declared target texture, executed pass and final aspect.
+                if id == 1222 {
+                    let source = std::fs::read_to_string(m.get("glsl-shaders").unwrap()).unwrap();
+                    assert!(source.contains(&format!("//!WIDTH {w}\n//!HEIGHT {h}")));
+                    assert!(
+                        m.get("vo-passes")
+                            .unwrap()
+                            .contains("Enigmax Frame Packing")
+                    );
+                } else {
+                    assert!(!m.get("glsl-shaders").unwrap_or_default().contains("3840"));
+                }
+                assert!(
+                    (shot.0 as f64 / shot.1 as f64 - w as f64 / h as f64).abs() < 0.01,
+                    "Aspecto Full SBS {sample}"
+                );
+                if id == 1222 {
+                    let gap = ((shot.1 as f64 * 0.5) as usize).min(shot.1 - 1);
+                    assert!(
+                        shot.2[gap * shot.0 * 4..(gap + 1) * shot.0 * 4]
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .all(|p| p[..3].iter().all(|v| *v < 5)),
+                        "Separación FramePack no negra"
+                    );
+                    if !has_ass {
+                        let pixel = |s: &(usize, usize, Vec<u8>), y: f64| {
+                            let i =
+                                ((s.1 as f64 * y) as usize * s.0 + (s.0 as f64 * 0.2) as usize) * 4;
+                            s.2[i..i + 3].to_vec()
+                        };
+                        let upper = pixel(&shot, 0.25);
+                        let lower = pixel(&shot, 0.75);
+                        assert!(upper.iter().zip(&lower).any(|(a, b)| a.abs_diff(*b) > 80));
+                        player::action(&m, &mut s, 1024).unwrap();
+                        settle(&mut m, &mut s);
+                        let swapped = m.screenshot_pixels().unwrap();
+                        assert!(
+                            upper
+                                .iter()
+                                .zip(pixel(&swapped, 0.75))
+                                .all(|(a, b)| a.abs_diff(b) < 5)
+                        );
+                        assert!(
+                            lower
+                                .iter()
+                                .zip(pixel(&swapped, 0.25))
+                                .all(|(a, b)| a.abs_diff(b) < 5)
+                        );
+                        player::action(&m, &mut s, 1024).unwrap();
+                        settle(&mut m, &mut s);
+                    }
+                }
+            }
+            player::action(&m, &mut s, 1020).unwrap();
+            settle(&mut m, &mut s);
+            assert_eq!(s.prefs.delivery, cineplayer_core::stereo::Delivery::Native);
+            assert!(
+                m.get("glsl-shaders").unwrap_or_default().is_empty(),
+                "Original debe evitar la textura de resolución fija"
+            );
+            println!(
+                "{sample}: cinco gafas, inversión, 2D y ambos tamaños Full SBS verificados por píxeles"
+            );
+        }
+    }
     #[test]
     fn each_user_open_resets_view_but_keeps_glasses() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -1035,14 +2119,22 @@ mod tests {
             if id == 8 || id == 17 || changed {
                 apply(m, s).unwrap();
             }
+            s.restore_tracks(m).unwrap();
+            s.capture_tracks(m);
+            s.restore_position(m).unwrap();
+            s.remember_ready(m).unwrap();
             if condition(m, s) {
                 return;
             }
         }
         panic!(
-            "No se alcanzó el estado esperado: {} · VO {:?}",
+            "No se alcanzó el estado esperado: {} · VO {:?} · posición {:?} · pausa {:?} · archivo {:?} · geometría {:?}",
             s.subtitles.status(s.prefs.ass_mode, s.effective(m)),
-            m.get("current-vo")
+            m.get("current-vo"),
+            m.get("time-pos"),
+            m.get("pause"),
+            m.get("path"),
+            windows::display_geometry(owner(m)),
         );
     }
     #[test]
@@ -1054,14 +2146,20 @@ mod tests {
         let mut s = State::new(root, true);
         m.seek(10.0, false).unwrap(); // no file: no command and no error dialog
         assert!(m.seek(f64::NAN, true).is_err());
-        let file = root.join("verificacion/muestras/pistas-qa.mkv");
+        let file = fixture_dir().join("pistas-qa.mkv");
         for round in 0..3 {
             player::load(&m, &mut s, file.to_str().unwrap(), None).unwrap();
             pump(&mut m, &mut s, |m, s| {
                 !s.pending_load && m.get("track-list/count").as_deref() == Some("5")
             });
             let (_, _, tracks) = track_menus(&m).unwrap();
-            assert_eq!(tracks.len(), 5); // two audio, two subtitles, subtitles off
+            assert_eq!(
+                tracks
+                    .iter()
+                    .filter(|(_, a)| matches!(a, Action::Track(..)))
+                    .count(),
+                5
+            ); // two audio, two subtitles, subtitles off
             action(&m, &mut s, Action::Track("aid".into(), "2".into())).unwrap();
             action(&m, &mut s, Action::Track("sid".into(), "2".into())).unwrap();
             pump(&mut m, &mut s, |m, _| {
@@ -1134,6 +2232,11 @@ mod tests {
         pump(&mut m, &mut s, |m, s| {
             !s.pending_load && s.raw.is_some() && m.get("time-pos").is_some()
         });
+        assert!(
+            !chapter_entries(&m).is_empty(),
+            "La ISO MVC pierde los capítulos del título"
+        );
+        println!("Capítulos MVC importados: {}", chapter_entries(&m).len());
         let start = Instant::now();
         for i in 0..100 {
             m.seek((i % 60 + 1) as f64, true).unwrap();
@@ -1181,9 +2284,7 @@ mod tests {
         player::load(
             &m,
             &mut s,
-            root.join("verificacion/muestras/ass3d-hsbs.mkv")
-                .to_str()
-                .unwrap(),
+            fixture_dir().join("ass3d-hsbs.mkv").to_str().unwrap(),
             None,
         )
         .unwrap();
@@ -1215,9 +2316,11 @@ mod tests {
         );
         m.set("sid", "2").unwrap();
         pump(&mut m, &mut s, |m, s| {
-            s.subtitles.header.is_none() && m.get("current-vo").as_deref() == Some("gpu-next")
+            s.subtitles.header.is_none() && m.get("current-vo").as_deref() == Some("gpu")
         });
-        assert_eq!(m.get("blend-subtitles").as_deref(), Some("no"));
+        assert_eq!(m.get("blend-subtitles").as_deref(), Some("video"));
+        assert_eq!(m.get("cine-sub-packed").as_deref(), Some("no"));
+        assert_eq!(m.get("cine-sub-layout").as_deref(), Some("1"));
         m.set("sid", "1").unwrap();
         pump(&mut m, &mut s, active);
         m.command(&["seek", "1", "absolute+exact"]).unwrap();
@@ -1233,20 +2336,16 @@ mod tests {
         player::load(
             &m,
             &mut s,
-            root.join("verificacion/muestras/ass3d-black.mkv")
-                .to_str()
-                .unwrap(),
+            fixture_dir().join("ass3d-black.mkv").to_str().unwrap(),
             None,
         )
         .unwrap();
-        pump(&mut m, &mut s, |m, _| {
-            m.get("track-list/count").as_deref() == Some("1")
+        pump(&mut m, &mut s, |m, s| {
+            !s.pending_load && m.get("track-list/count").as_deref() == Some("1")
         });
         m.command(&[
             "sub-add",
-            root.join("verificacion/muestras/ass3d-sbs.ass")
-                .to_str()
-                .unwrap(),
+            fixture_dir().join("ass3d-sbs.ass").to_str().unwrap(),
             "select",
         ])
         .unwrap();
@@ -1267,10 +2366,7 @@ mod tests {
             player::load(
                 &m,
                 &mut s,
-                root.join("verificacion/muestras")
-                    .join(sample)
-                    .to_str()
-                    .unwrap(),
+                fixture_dir().join(sample).to_str().unwrap(),
                 None,
             )
             .unwrap();
@@ -1278,6 +2374,7 @@ mod tests {
                 !s.pending_load
                     && m.get("video-out-params/dw").as_deref() == Some(expected_dw)
                     && m.get("video-out-params/dh").as_deref() == Some(expected_dh)
+                    && m.get("video-out-params/stereo-in").as_deref() == Some("mono")
             });
             assert_eq!(m.get("video-out-params/stereo-in").as_deref(), Some("mono"));
         }

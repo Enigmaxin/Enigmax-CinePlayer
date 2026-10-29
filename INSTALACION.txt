@@ -1,4 +1,4 @@
-ENIGMAX CINEPLAYER 0.2.8 — PORTÁTIL PARA WINDOWS 11 X64
+ENIGMAX CINEPLAYER 0.2.18 — PORTÁTIL PARA WINDOWS 11 X64
 
 Descomprime el ZIP completo en una carpeta donde tengas permisos de escritura.
 Ejecuta EnigmaxCinePlayer.exe. Conserva junto a él libmpv-2.dll y las carpetas
@@ -26,3 +26,5 @@ El ejecutable no está firmado digitalmente. El soporte de HDR, audio HDMI,
 Blu-ray y MVC y los límites de las pruebas se detallan en README.md.
 Las fuentes correspondientes y sus instrucciones se ofrecen por separado en
 la misma release: FUENTES.md y DEPENDENCIAS.md.
+Un clic sobre el vídeo pausa/reanuda; el doble clic conserva pantalla completa.
+La posición se guarda en config/resume.json y se ofrece al reabrir el archivo.

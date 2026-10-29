@@ -3,8 +3,8 @@
   "modules": [
     {
       "path": "libmpv-2.dll",
-      "bytes": 3745303,
-      "sha256": "98174dcb985c2095080f91ac1058db265e9f65c148d28d2caae42681d93dbd80",
+      "bytes": 3768692,
+      "sha256": "29b1f799b626388751233c84acfca5f939777e6146745f9c9f502a4d3fd3bb36",
       "imports": [
         "avcodec-63.dll",
         "avdevice-63.dll",
@@ -63,8 +63,8 @@
     },
     {
       "path": "runtime/cine_mvc.dll",
-      "bytes": 1384712,
-      "sha256": "706e69b89ae676e43c7743175290c3f4fbf77bc8d6507ca8cc2b5e70ad25f793",
+      "bytes": 1392416,
+      "sha256": "0fbeba4dcd5778c1d408232657b7ebe2fe3fa6f6d4cfe28bf51c776445eb6808",
       "imports": [
         "avcodec-63.dll",
         "avformat-63.dll",
@@ -3429,6 +3429,13 @@
     "wsock32.dll",
     "xmllite.dll"
   ],
-  "mpvCommit": "e471496c56f0f49c133bd88b50aed62b845f1909",
-  "ffmpegCommit": "6882969ce9fd2aa6aa1d0008b2bfe1c838aac11d"
+  "mpvCommit": "dc4b285c93043d99492c3664a24f4ae08cdfdf0d",
+  "ffmpegCommit": "6882969ce9fd2aa6aa1d0008b2bfe1c838aac11d",
+  "mpvLocalPatches": [
+    {
+      "path": "native/mpv-subtitle-stereo.patch",
+      "sha256": "740d43348b76698d787f89894647db5a5cbeec730efecf7dda73aa3b104dade4",
+      "description": "Per-eye subtitle geometry and depth; application bitmap overlays are not stereo-duplicated a second time"
+    }
+  ]
 }

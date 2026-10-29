@@ -55,7 +55,59 @@ fn powershell(script: &Path) -> Result<Command, String> {
     .stdin(Stdio::null());
     Ok(cmd)
 }
+fn save_cache(
+    dir: &Path,
+    path: &Path,
+    cache: &cineplayer_core::update_cache::Cache,
+) -> Result<(), String> {
+    use std::io::Write;
+    let mut file = tempfile::NamedTempFile::new_in(dir).map_err(|e| e.to_string())?;
+    file.write_all(&cache.encode()).map_err(|e| e.to_string())?;
+    file.as_file().sync_all().map_err(|e| e.to_string())?;
+    crate::windows::replace_file(file.path(), path)
+}
 fn check(manual: bool) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let config = exe
+        .parent()
+        .ok_or("Falta la carpeta del programa")?
+        .join("config");
+    std::fs::create_dir_all(&config).map_err(|e| e.to_string())?;
+    let cache_path = config.join("updater-cache.json");
+    let mut cache = cache_path
+        .metadata()
+        .ok()
+        .filter(|m| m.len() <= 8192)
+        .and_then(|_| std::fs::read(&cache_path).ok())
+        .map(|b| cineplayer_core::update_cache::Cache::decode(&b))
+        .unwrap_or_default();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let wait = cache.wait(now, manual);
+    if wait > 0 {
+        if manual {
+            show(
+                &format!(
+                    "La comprobación está en espera. Próximo intento dentro de {} minutos.\nÚltimo estado: {}\n\nDescargas: https://github.com/Enigmaxin/Enigmax-CinePlayer/releases",
+                    wait.div_ceil(60),
+                    match cache.status.as_str() {
+                        "ok" => "Comprobación correcta",
+                        "no-release" => "No hay una versión con manifiesto publicado",
+                        "limited" => "Límite temporal de peticiones",
+                        "http-error" => "Error del servidor",
+                        other => other,
+                    }
+                ),
+                0x40,
+            );
+        }
+        return Ok(());
+    }
+    // Record before connecting too, so crashes/offline attempts cannot flood GitHub.
+    cache.record(now, "Comprobación iniciada o conexión interrumpida", 0);
+    save_cache(&config, &cache_path, &cache)?;
     let temp = tempfile::Builder::new()
         .prefix("Enigmax-CinePlayer-update-")
         .tempdir()
@@ -81,8 +133,39 @@ fn check(manual: bool) -> Result<(), String> {
     }
     let root: serde_json::Value = serde_json::from_slice(&result.stdout)
         .map_err(|e| format!("Respuesta de actualización no válida: {e}"))?;
+    let status = root["status"].as_str().unwrap_or("invalid");
+    let retry = root["retry"].as_u64().unwrap_or(0);
+    if status != "ok" {
+        let message = match status {
+            "no-release" => "No hay una versión publicada con manifiesto de actualización.",
+            "limited" => {
+                "GitHub ha limitado las peticiones. Se respetará el plazo de espera indicado por el servidor."
+            }
+            _ => "El servidor no pudo completar la comprobación de actualizaciones.",
+        };
+        cache.record(now, status, retry);
+        save_cache(&config, &cache_path, &cache)?;
+        let info = format!(
+            "{message}\nHTTP: {}. Próximo intento dentro de {} minutos.\nDescargas: https://github.com/Enigmaxin/Enigmax-CinePlayer/releases",
+            root["http"],
+            cache.wait(now, true).div_ceil(60)
+        );
+        std::fs::write(config.join("updater-status.log"), &info).map_err(|e| e.to_string())?;
+        if manual {
+            show(&info, 0x40);
+        }
+        return Ok(());
+    }
     let json = serde_json::to_vec(&root["release"]).map_err(|e| e.to_string())?;
-    let Some(release) = update_policy::latest(&json, APP_VERSION)? else {
+    let available = update_policy::manifest(&json, APP_VERSION)?;
+    cache.record(now, "ok", 0);
+    save_cache(&config, &cache_path, &cache)?;
+    std::fs::write(
+        config.join("updater-status.log"),
+        "Comprobación completada correctamente.",
+    )
+    .map_err(|e| e.to_string())?;
+    let Some(release) = available else {
         if manual {
             show(
                 &format!(
@@ -181,9 +264,9 @@ fn launch(manual: bool) {
                     && let Some(dir) = exe.parent()
                 {
                     let _ = std::fs::create_dir_all(dir.join("config"));
-                    let _ = std::fs::write(dir.join("config/updater-status.log"), error);
+                    let _ = std::fs::write(dir.join("config/updater-status.log"), &error);
                 }
-                if manual {dialog("No se pudo completar la comprobación. Revisa la conexión o el registro config/updater-status.log. GitHub puede limitar temporalmente las peticiones.",false);}
+                if manual {dialog(&format!("No se pudo completar la comprobación: {error}\n\nSe reintentará automáticamente más tarde.\nDescargas: https://github.com/Enigmaxin/Enigmax-CinePlayer/releases"),false);}
             }
             unsafe {
                 CloseHandle(mutex);

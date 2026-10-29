@@ -44,6 +44,14 @@ union NodeValue {
     string: *mut c_char,
     list: *mut NodeList,
     number: i64,
+    #[cfg(test)]
+    bytes: *mut ByteArray,
+}
+#[cfg(test)]
+#[repr(C)]
+struct ByteArray {
+    data: *mut u8,
+    size: usize,
 }
 #[repr(C)]
 struct Node {
@@ -80,6 +88,95 @@ fn c(s: &str) -> Result<CString, String> {
 }
 
 impl Mpv {
+    pub fn popup_client(&self) -> Result<PopupClient<'_>, String> {
+        type CreateClient = unsafe extern "C" fn(Handle, *const c_char) -> Handle;
+        let create: CreateClient =
+            unsafe { std::mem::transmute(self.library.symbol(c"mpv_create_client")?) };
+        let destroy: Destroy = unsafe { std::mem::transmute(self.library.symbol(c"mpv_destroy")?) };
+        let handle = unsafe { create(self.handle, c"enigmax_popup".as_ptr()) };
+        if handle.is_null() {
+            return Err("No se pudo crear el canal de entrada del menú".into());
+        }
+        Ok(PopupClient {
+            handle,
+            destroy,
+            parent: self,
+        })
+    }
+    #[cfg(test)]
+    pub fn screenshot_pixels(&self) -> Result<(usize, usize, Vec<u8>), String> {
+        self.screenshot_pixels_kind("subtitles")
+    }
+    #[cfg(test)]
+    pub fn screenshot_pixels_kind(&self, kind: &str) -> Result<(usize, usize, Vec<u8>), String> {
+        let kind = c(kind)?;
+        type Execute = unsafe extern "C" fn(Handle, *const *const c_char, *mut Node) -> c_int;
+        type Release = unsafe extern "C" fn(*mut Node);
+        let call: Execute =
+            unsafe { std::mem::transmute(self.library.symbol(c"mpv_command_ret")?) };
+        let release: Release =
+            unsafe { std::mem::transmute(self.library.symbol(c"mpv_free_node_contents")?) };
+        let args = [
+            c"screenshot-raw".as_ptr(),
+            kind.as_ptr(),
+            c"rgba".as_ptr(),
+            ptr::null(),
+        ];
+        let mut output = Node {
+            value: NodeValue { number: 0 },
+            format: 0,
+        };
+        let status = unsafe { call(self.handle, args.as_ptr(), &mut output) };
+        let result = (|| {
+            self.check(status)?;
+            if output.format != 8 {
+                return Err("Captura sin mapa".into());
+            }
+            // mpv owns and validates the node graph until free_node_contents below.
+            let list = unsafe { output.value.list.as_ref() }.ok_or("Captura vacía")?;
+            if !(1..=16).contains(&list.count) || list.keys.is_null() || list.values.is_null() {
+                return Err("Mapa de captura inválido".into());
+            }
+            let mut w = 0;
+            let mut h = 0;
+            let mut stride = 0;
+            let mut data = None;
+            for i in 0..list.count as usize {
+                let key = unsafe { CStr::from_ptr(*list.keys.add(i)) }.to_bytes();
+                let value = unsafe { &*list.values.add(i) };
+                if value.format == 4 {
+                    let n = unsafe { value.value.number };
+                    match key {
+                        b"w" => w = n,
+                        b"h" => h = n,
+                        b"stride" => stride = n,
+                        _ => {}
+                    }
+                } else if key == b"data" && value.format == 9 {
+                    data = unsafe { value.value.bytes.as_ref() };
+                }
+            }
+            let data = data.ok_or("Faltan píxeles")?;
+            if !(1..=8192).contains(&w)
+                || !(1..=8192).contains(&h)
+                || stride < w * 4
+                || stride > 131072
+                || data.data.is_null()
+                || data.size != (stride * h) as usize
+                || data.size > 256 * 1024 * 1024
+            {
+                return Err("Tamaño de captura inválido".into());
+            }
+            let raw = unsafe { std::slice::from_raw_parts(data.data, data.size) };
+            let pixels = raw
+                .chunks_exact(stride as usize)
+                .flat_map(|row| row[..w as usize * 4].iter().copied())
+                .collect();
+            Ok((w as usize, h as usize, pixels))
+        })();
+        unsafe { release(&mut output) };
+        result
+    }
     pub fn new(path: &Path) -> Result<Self, String> {
         let library = windows::Library::load(path)?;
         // SAFETY: names and signatures match the libmpv client.h ABI; library stays alive.
@@ -162,6 +259,16 @@ impl Mpv {
             register(
                 self.handle,
                 c"cine-mvc".as_ptr(),
+                (&*registry as *const crate::mvc::Registry)
+                    .cast_mut()
+                    .cast(),
+                crate::mvc::open,
+            )
+        })?;
+        self.check(unsafe {
+            register(
+                self.handle,
+                c"cine-disc".as_ptr(),
                 (&*registry as *const crate::mvc::Registry)
                     .cast_mut()
                     .cast(),
@@ -316,9 +423,58 @@ impl Mpv {
             .to_string_lossy()
             .into_owned()
     }
+    /// user-data's string conversion is JSON, including quotes around strings.
+    pub fn user_data(&self, key: &str) -> Option<String> {
+        let raw = self.get(key)?;
+        Some(serde_json::from_str::<String>(&raw).unwrap_or(raw))
+    }
     /// The event is borrowed from libmpv and valid only until the next wait call.
     pub fn wait(&mut self, timeout: f64) -> &Event {
         unsafe { &*(self.wait)(self.handle, timeout) }
+    }
+}
+
+pub struct PopupClient<'a> {
+    handle: Handle,
+    destroy: Destroy,
+    parent: &'a Mpv,
+}
+impl PopupClient<'_> {
+    pub fn name(&self) -> String {
+        unsafe { CStr::from_ptr((self.parent.name)(self.handle)) }
+            .to_string_lossy()
+            .into_owned()
+    }
+    pub fn next(&mut self) -> Result<Option<Vec<String>>, String> {
+        let event = unsafe { &*(self.parent.wait)(self.handle, 0.25) };
+        if event.id == 1 {
+            return Err("El reproductor se está cerrando".into());
+        }
+        if event.id != 16 || event.data.is_null() {
+            return Ok(None);
+        }
+        let data = unsafe { &*event.data.cast::<ClientMessage>() };
+        if !(1..=8).contains(&data.count) || data.args.is_null() {
+            return Ok(None);
+        }
+        let mut result = Vec::new();
+        for i in 0..data.count as usize {
+            let value = unsafe { *data.args.add(i) };
+            if value.is_null() {
+                return Ok(None);
+            }
+            let text = unsafe { CStr::from_ptr(value) }.to_string_lossy();
+            if text.len() > 2048 {
+                return Ok(None);
+            }
+            result.push(text.into_owned());
+        }
+        Ok(Some(result))
+    }
+}
+impl Drop for PopupClient<'_> {
+    fn drop(&mut self) {
+        unsafe { (self.destroy)(self.handle) };
     }
 }
 

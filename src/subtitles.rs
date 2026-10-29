@@ -55,6 +55,7 @@ impl Subtitles {
 /// Runs on actual property changes. It never scans the movie or extracts a
 /// subtitle track; libass remains responsible for all rendering and animation.
 pub fn refresh(m: &Mpv, s: &mut State) -> bool {
+    let old_track = s.subtitles.track.clone();
     let old = s.subtitles.requested(s.prefs.ass_mode);
     let old_canvas = s.subtitles.header.as_ref().map(|h| h.canvas);
     let sid = m.get("sid").unwrap_or_default();
@@ -73,7 +74,8 @@ pub fn refresh(m: &Mpv, s: &mut State) -> bool {
     {
         s.subtitles.detected = header.detect(&m.get("sub-text/ass-full").unwrap_or_default());
     }
-    let changed = old != s.subtitles.requested(s.prefs.ass_mode)
+    let changed = old_track != s.subtitles.track
+        || old != s.subtitles.requested(s.prefs.ass_mode)
         || old_canvas != s.subtitles.header.as_ref().map(|h| h.canvas);
     if changed {
         s.applied = None;
