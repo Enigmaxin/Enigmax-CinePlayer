@@ -6,13 +6,14 @@ local function test()
     local enabled,bindings,messages,observers,events,sent={},{},{},{},{},{}
     local clock,idle=0,true
     local volume=50
+    local startup="no"
     local mouse_areas={}
     local single_timer
     local timer
     local fake={}
     function fake.get_osd_size() return 1280,720 end
     function fake.get_mouse_pos() return 1094,710 end
-    function fake.get_property(_,default) return default end
+    function fake.get_property(key,default) if key=="user-data/enigmax-startup" then return startup end;return default end
     function fake.add_timeout(_,fn) single_timer={alive=true,tick=fn,kill=function(self)self.alive=false end};return single_timer end
     function fake.get_time() return clock end
     function fake.get_property_number(key,default) return ({['time-pos']=1,duration=60,volume=volume})[key] or default end
@@ -88,6 +89,14 @@ local function test()
     assert(sent[#sent][2]=='qa-popup-client' and sent[#sent][3]=='popup-input' and sent[#sent][4]=='up','Stereo popup must receive pointer events')
     messages['stereo-popup']('')
     assert(not enabled.enigmax_popup and enabled.enigmax_show and enabled.enigmax_bottom,'Stereo popup close must restore the bar')
+    startup='yes';observers['user-data/enigmax-startup']('user-data/enigmax-startup',startup)
+    assert(enabled.enigmax_startup and not enabled.enigmax_bottom and not timer.alive,'Startup must wait without bar polling')
+    bindings.enigmax_show[1][2]()
+    assert(sent[#sent][3]=='startup-click','Startup clicks must not toggle pause')
+    bindings.enigmax_startup[1][2]()
+    assert(sent[#sent][3]=='startup-choice' and sent[#sent][4]=='continue','Space must explicitly choose continue')
+    startup='no';observers['user-data/enigmax-startup']('user-data/enigmax-startup',startup)
+    assert(not enabled.enigmax_startup and enabled.enigmax_bottom,'Finishing startup must restore normal controls')
     idle=true;observers['idle-active']('idle-active',true)
     assert(not enabled.enigmax_top and not enabled.enigmax_bottom,'Unloaded video must release controls')
 end

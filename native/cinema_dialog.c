@@ -13,7 +13,7 @@
 
 typedef struct { int id; const wchar_t *title, *description; int image; } CineChoice;
 typedef struct {
-    HWND window, owner, buttons[5], close, back;
+    HWND window, owner, buttons[5], close, back, options;
     const wchar_t *heading, *subtitle;
     const CineChoice *choices;
     int count, result, width, height, glasses, hover;
@@ -131,11 +131,12 @@ static void layout(CineDialog *d) {
     }
     SetWindowPos(d->close,NULL,d->width-px(d,76),px(d,10),px(d,56),px(d,44),SWP_NOZORDER|SWP_NOACTIVATE);
     if(d->back)SetWindowPos(d->back,NULL,margin,px(d,63),px(d,104),px(d,42),SWP_NOZORDER|SWP_NOACTIVATE);
+    if(d->options)SetWindowPos(d->options,NULL,d->width-px(d,280),d->height-px(d,79),px(d,256),px(d,38),SWP_NOZORDER|SWP_NOACTIVATE);
     background(d); InvalidateRect(d->window,NULL,FALSE);
     for(int i=0;i<d->count;i++)InvalidateRect(d->buttons[i],NULL,FALSE);
 }
 static void paint_card(CineDialog *d,DRAWITEMSTRUCT *di) {
-    if(di->CtlID==9001 || di->CtlID==9002) {
+    if(di->CtlID==9001 || di->CtlID==9002 || di->CtlID==9003) {
         HDC bg=CreateCompatibleDC(di->hDC);HGDIOBJ old=SelectObject(bg,d->background);
         RECT screen;GetWindowRect(di->hwndItem,&screen);POINT p={screen.left,screen.top};ScreenToClient(d->window,&p);
         BitBlt(di->hDC,0,0,di->rcItem.right,di->rcItem.bottom,bg,p.x,p.y,SRCCOPY);
@@ -152,7 +153,7 @@ static void paint_card(CineDialog *d,DRAWITEMSTRUCT *di) {
             pen=CreatePen(PS_SOLID,max(2,px(d,2)),RGB(255,255,255));SelectObject(di->hDC,pen);
             int cx=r.right/2,cy=r.bottom/2,a=max(6,px(d,9));
             line(di->hDC,cx-a,cy-a,cx+a,cy+a);line(di->hDC,cx+a,cy-a,cx-a,cy+a);
-        } else text(di->hDC,d->body_font,r,L"← Volver",RGB(243,250,249),DT_SINGLELINE|DT_CENTER|DT_VCENTER);
+        } else text(di->hDC,d->body_font,r,di->CtlID==9003?L"Todas las opciones 3D":L"← Volver",RGB(243,250,249),DT_SINGLELINE|DT_CENTER|DT_VCENTER);
         SelectObject(di->hDC,op);SelectObject(di->hDC,ob);DeleteObject(pen);DeleteObject(brush);
         if(di->itemState&ODS_FOCUS){InflateRect(&r,-3,-3);DrawFocusRect(di->hDC,&r);}
         return;
@@ -211,6 +212,7 @@ static LRESULT CALLBACK procedure(HWND window,UINT msg,WPARAM wp,LPARAM lp) {
         int id=LOWORD(wp);
         if(id>=200 && id<200+d->count) { d->result=d->choices[id-200].id;DestroyWindow(window); }
         else if(id==9001)DestroyWindow(window);
+        else if(id==9003){d->result=1233;DestroyWindow(window);}
         else if(id==9002) {d->result=1231;DestroyWindow(window);}
         return 0; }
     case WM_CLOSE:DestroyWindow(window);return 0;
@@ -259,6 +261,7 @@ int cine_choose(HWND owner,const wchar_t *heading,const wchar_t *subtitle,const 
         WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)(INT_PTR)(200+i),instance,NULL);
     d.close=CreateWindowExW(0,L"BUTTON",L"Cerrar",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)9001,instance,NULL);
     if(glasses)d.back=CreateWindowExW(0,L"BUTTON",L"← Volver",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)9002,instance,NULL);
+    if(!glasses)d.options=CreateWindowExW(0,L"BUTTON",L"Todas las opciones 3D",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)9003,instance,NULL);
     layout(&d);if(d.owner)EnableWindow(d.owner,FALSE);
     ShowWindow(d.window,SW_SHOW);SetForegroundWindow(d.window);SetFocus(d.buttons[0]);
     MSG msg;while(IsWindow(d.window)) {

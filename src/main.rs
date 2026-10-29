@@ -315,30 +315,8 @@ fn track_menus(m: &Mpv) -> Result<TrackMenus, String> {
         else {
             continue;
         };
-        let clean = |key: &str| {
-            entry[key]
-                .as_str()
-                .unwrap_or_default()
-                .chars()
-                .filter(|c| !c.is_control())
-                .take(160)
-                .collect::<String>()
-        };
-        let title = clean("title");
-        let lang = clean("lang");
-        let codec = clean("codec");
         let id = 400 + i as u32;
-        let heading = match (lang.as_str(), title.as_str()) {
-            ("", "") => format!("Pista {track}"),
-            ("", _) => title,
-            (_, "") => lang,
-            _ => format!("{lang} · {title}"),
-        };
-        let channels = entry["audio-channels"]
-            .as_i64()
-            .map(|n| format!(" · {n} canales"))
-            .unwrap_or_default();
-        let label = format!("{heading}\n{}{channels}", codec.to_uppercase());
+        let label = cineplayer_core::track_info::label(entry, &track);
         let selected = entry["selected"].as_bool().unwrap_or(false);
         if kind == "audio" {
             tracks.item(id, &label, selected)?;
@@ -397,6 +375,7 @@ fn build_menu(m: &Mpv, s: &State, remaining: bool) -> Result<(windows::Menu, Men
     )?;
     hdr.item(31, "Convertir siempre a SDR", s.hdr_sdr)?;
     root.submenu("Color / HDR", hdr)?;
+    root.submenu("Calidad / consumo", player::quality_menu(s)?)?;
     let audio = windows::Menu::new()?;
     for (id, label, value) in [
         (40, "TV / altavoces: decodificar a PCM", 0),
@@ -475,10 +454,17 @@ fn open(m: &Mpv, s: &mut State, sub: bool) -> Result<(), String> {
         if sub {
             m.command(&["sub-add", value, "select"])?;
         } else {
+            s.cancel_startup(m)?;
             s.capture_position(m);
             s.new_open();
             player::load(m, s, value, None)?;
         }
+    }
+    Ok(())
+}
+fn finish_startup(m: &Mpv, s: &mut State, restart: bool) -> Result<(), String> {
+    if s.choose_startup(m, restart)? {
+        player::ask_view(m, s)?;
     }
     Ok(())
 }
@@ -795,7 +781,16 @@ fn run() -> Result<(), String> {
         &dir.join("runtime/cine_mvc.dll"),
     )))?;
     bind(&m)?;
-    let mut state = State::new(dir, probe);
+    let startup_probe = if probe {
+        std::env::var_os("ENIGMAX_PROBE_STARTUP_CONFIG").map(PathBuf::from)
+    } else {
+        None
+    };
+    let mut state = if let Some(config) = &startup_probe {
+        State::new(config, false)
+    } else {
+        State::new(dir, probe)
+    };
     if !probe {
         updater::start();
     }
@@ -871,9 +866,15 @@ fn run() -> Result<(), String> {
                 cineplayer_core::ass3d::Mode::Ou
             };
         }
-        if parts.contains(&"cpu") {
-            state.prefs.quality = cineplayer_core::stereo::Quality::Compatibility;
-        }
+        state.prefs.quality = if parts.contains(&"low") {
+            cineplayer_core::stereo::Quality::Low
+        } else if parts.contains(&"high") {
+            cineplayer_core::stereo::Quality::High
+        } else if parts.contains(&"cpu") {
+            cineplayer_core::stereo::Quality::Compatibility
+        } else {
+            cineplayer_core::stereo::Quality::Balanced
+        };
         state.hdr_sdr = parts.contains(&"sdr");
         output = Some(PathBuf::from(&args[3]));
         Some(&args[1])
@@ -883,7 +884,9 @@ fn run() -> Result<(), String> {
         }
         args.first()
     };
-    if let Some(file) = file {
+    if startup_probe.is_some() {
+        state.begin_startup(&m)?;
+    } else if let Some(file) = file {
         let path = std::path::absolute(file).map_err(|e| e.to_string())?;
         if !path.is_file() {
             return Err(format!("No existe el archivo: {}", path.display()));
@@ -894,6 +897,10 @@ fn run() -> Result<(), String> {
         } else {
             player::load(&m, &mut state, path, None)?;
         }
+    } else if !probe && let Err(error) = state.begin_startup(&m) {
+        let _ = state.cancel_startup(&m);
+        let _ = m.set("pause", "no");
+        let _ = std::fs::write(dir.join("config/startup-error.txt"), error);
     }
     let started = Instant::now();
     let play_seconds = std::env::var("ENIGMAX_PROBE_PLAY_SECONDS")
@@ -989,6 +996,7 @@ fn run() -> Result<(), String> {
                 runtime_error(&m, dir, "Controles", &e);
             }
             if !state.pending_load {
+                state.cancel_startup(&m)?;
                 state.new_open();
             }
             state.pending_load = true;
@@ -1046,6 +1054,9 @@ fn run() -> Result<(), String> {
             let msg = format!("No se pudo reproducir el archivo (libmpv {err}). {detail}");
             if probe {
                 return Err(msg);
+            } else if state.startup_choice {
+                state.cancel_startup(&m)?;
+                let _ = std::fs::write(dir.join("config/startup-error.txt"), &msg);
             } else {
                 runtime_error(&m, dir, "Archivo", &msg);
             }
@@ -1252,19 +1263,21 @@ fn run() -> Result<(), String> {
                     Ok(())
                 }
                 "open" => open(&m, &mut state, false),
-                "idle-draw" => controls.idle_draw(&m, state.last_video().is_some()),
-                "idle-click" => {
-                    let x = client_args.get(1).and_then(|s| s.parse::<i32>().ok());
-                    let y = client_args.get(2).and_then(|s| s.parse::<i32>().ok());
-                    if let (Some(x), Some(y)) = (x, y) {
-                        match controls.idle_hit(&m, x, y) {
-                            Some(false) => open(&m, &mut state, false),
-                            Some(true) if state.last_video().is_some() => {
-                                player::resume_last(&m, &mut state)
-                            }
-                            Some(true) => Ok(()),
-                            None => Ok(()),
-                        }
+                "idle-draw" => controls.idle_draw(&m),
+                "idle-click" => Ok(()),
+                "startup-draw" => controls.startup_draw(&m, &state),
+                "startup-choice" => finish_startup(
+                    &m,
+                    &mut state,
+                    client_args.get(1).is_some_and(|v| v == "restart"),
+                ),
+                "startup-click" => {
+                    let point = client_args
+                        .get(1)
+                        .and_then(|x| x.parse::<i32>().ok())
+                        .zip(client_args.get(2).and_then(|y| y.parse::<i32>().ok()));
+                    if let Some(restart) = point.and_then(|(x, y)| controls.startup_hit(&m, x, y)) {
+                        finish_startup(&m, &mut state, restart)
                     } else {
                         Ok(())
                     }
@@ -1331,10 +1344,21 @@ fn run() -> Result<(), String> {
                 m.command(&[
                     "screenshot-to-file",
                     path.to_str().ok_or("Ruta de captura inválida")?,
-                    if ui { "window" } else { "subtitles" },
+                    if ui || startup_probe.is_some() {
+                        "window"
+                    } else {
+                        "subtitles"
+                    },
                 ])?;
                 let report = [
                     "title",
+                    "pause",
+                    "user-data/enigmax-startup",
+                    "scale",
+                    "dscale",
+                    "hdr-compute-peak",
+                    "demuxer-max-bytes",
+                    "demuxer-max-back-bytes",
                     "current-ao",
                     "sub-delay",
                     "sub-start",
@@ -1871,6 +1895,138 @@ mod tests {
                 .prepare_disc(temp.path().to_str().unwrap(), 0, "cine-disc://bad")
                 .is_err()
         );
+    }
+    #[test]
+    fn all_context_actions_are_reachable_from_the_four_toolbar_menus() {
+        fn leaves(entries: &[popup::Entry], out: &mut std::collections::BTreeMap<u32, String>) {
+            for e in entries {
+                if !e.children.is_empty() {
+                    leaves(&e.children, out);
+                } else if e.enabled && e.id > 0 {
+                    out.insert(e.id, e.label.clone());
+                }
+            }
+        }
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.init().unwrap();
+        let mut s = State::new(root, true);
+        player::load(
+            &m,
+            &mut s,
+            fixture_dir().join("metadata-qa.mkv").to_str().unwrap(),
+            None,
+        )
+        .unwrap();
+        pump(&mut m, &mut s, |m, s| {
+            !s.pending_load && m.get("track-list/count").as_deref() == Some("5")
+        });
+        s.titles.push(mvc::Title::default());
+        let full = build_menu(&m, &s, false).unwrap().0;
+        let remaining = build_menu(&m, &s, true).unwrap().0;
+        let (audio, subs, _) = track_menus(&m).unwrap();
+        let mut all = std::collections::BTreeMap::new();
+        let mut toolbar = std::collections::BTreeMap::new();
+        leaves(&full.entries().unwrap(), &mut all);
+        for menu in [remaining, player::stereo_menu(&m, &s).unwrap(), audio, subs] {
+            leaves(&menu.entries().unwrap(), &mut toolbar);
+        }
+        assert_eq!(
+            all, toolbar,
+            "An action was omitted or renamed in one access path"
+        );
+        let labels = full.labels();
+        let hdr = labels.iter().position(|l| l == "Color / HDR").unwrap();
+        assert_eq!(labels[hdr + 1], "Calidad / consumo");
+        assert!(
+            !player::stereo_menu(&m, &s)
+                .unwrap()
+                .labels()
+                .iter()
+                .any(|l| l == "Calidad / consumo")
+        );
+        assert!(
+            all.values()
+                .any(|l| l.starts_with("Español") && l.contains("AAC"))
+        );
+        assert!(all.values().any(|l| l.contains("SRT")));
+    }
+    #[test]
+    fn low_consumption_limits_resources_and_restores_every_existing_profile() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.option("pause", "yes").unwrap();
+        m.option("autofit", "640x360").unwrap();
+        m.init().unwrap();
+        let mut s = State::new(root, true);
+        player::load(
+            &m,
+            &mut s,
+            fixture_dir().join("ass3d-hsbs.mkv").to_str().unwrap(),
+            None,
+        )
+        .unwrap();
+        pump(&mut m, &mut s, |m, s| {
+            !s.pending_load && m.get("video-params/w").is_some()
+        });
+        s.prefs.layout = Layout::HalfSbs;
+        s.prefs.output = Output::Anaglyph;
+        s.prefs.ass_mode = cineplayer_core::ass3d::Mode::Off;
+        let keys = [
+            "demuxer-max-bytes",
+            "demuxer-max-back-bytes",
+            "scale",
+            "dscale",
+            "hdr-compute-peak",
+            "hwdec",
+            "tone-mapping",
+        ];
+        for old in [
+            cineplayer_core::stereo::Quality::Balanced,
+            cineplayer_core::stereo::Quality::High,
+            cineplayer_core::stereo::Quality::Compatibility,
+        ] {
+            s.prefs.quality = old;
+            s.applied = None;
+            apply(&m, &mut s).unwrap();
+            settle(&mut m, &mut s);
+            let original = keys.map(|k| m.get(k));
+            let before = m.screenshot_pixels_kind("window").unwrap();
+            player::action(&m, &mut s, 1053).unwrap();
+            settle(&mut m, &mut s);
+            assert_eq!(m.get("scale").as_deref(), Some("bilinear"));
+            assert_eq!(m.get("hdr-compute-peak").as_deref(), Some("no"));
+            assert!(
+                m.get("demuxer-max-bytes").unwrap().parse::<u64>().unwrap() <= 16 * 1024 * 1024
+            );
+            assert_eq!(m.get("demuxer-max-back-bytes").as_deref(), Some("0"));
+            assert_eq!(m.get("video-dec-params/w").as_deref(), Some("1920"));
+            s.prefs.quality = old;
+            s.applied = None;
+            apply(&m, &mut s).unwrap();
+            settle(&mut m, &mut s);
+            assert_eq!(
+                keys.map(|k| m.get(k)),
+                original,
+                "Low settings leaked into {old:?}"
+            );
+            let after = m.screenshot_pixels_kind("window").unwrap();
+            assert_eq!((before.0, before.1), (after.0, after.1));
+            let changed = before
+                .2
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(after.2.as_chunks::<4>().0.iter())
+                .filter(|(a, b)| a != b)
+                .count();
+            assert!(
+                changed <= (before.0 * before.1 / 100).max(30),
+                "Rendered output was not restored: {old:?}, changed {changed}"
+            );
+        }
     }
     #[test]
     fn toolbar_menu_keeps_all_other_context_options_including_disc_titles() {

@@ -219,6 +219,19 @@ impl Canvas {
         let s = text.encode_utf16().collect::<Vec<_>>();
         unsafe { TextOutW(self.dc, x, y, s.as_ptr(), s.len() as i32) };
     }
+    fn centered(&self, r: Rect, text: &str) {
+        let value = text.encode_utf16().collect::<Vec<_>>();
+        let mut rect = [r.x, r.y, r.x + r.w, r.y + r.h];
+        unsafe {
+            DrawTextW(
+                self.dc,
+                value.as_ptr(),
+                value.len() as i32,
+                &mut rect,
+                0x1 | 0x4 | 0x20 | 0x800 | 0x8000,
+            );
+        }
+    }
     pub(crate) fn text_clipped(&self, x: i32, y: i32, w: i32, h: i32, text: &str) {
         if w <= 0 || h <= 0 || text.is_empty() {
             return;
@@ -326,111 +339,164 @@ pub struct Controls {
     fraction: Option<f64>,
     rendered: bool,
     title: String,
+    startup_key: String,
 }
 impl Controls {
-    fn idle_rects(m: &Mpv) -> Option<[Rect; 2]> {
-        let w = m.get("osd-width")?.parse::<i32>().ok()?;
-        let h = m.get("osd-height")?.parse::<i32>().ok()?;
-        Layout::new(w, h)?;
-        let bw = (w - 32).clamp(100, 360);
-        let bh = (h / 10).clamp(32, 64);
-        Some([
-            Rect {
-                x: (w - bw) / 2,
-                y: (h - 2 * bh - 16) / 2,
-                w: bw,
-                h: bh,
-            },
-            Rect {
-                x: (w - bw) / 2,
-                y: (h - 2 * bh - 16) / 2 + bh + 16,
-                w: bw,
-                h: bh,
-            },
-        ])
-    }
-    pub fn idle_hit(&self, m: &Mpv, x: i32, y: i32) -> Option<bool> {
-        if m.get("idle-active").as_deref() != Some("yes") {
-            return None;
-        }
-        let rects = Self::idle_rects(m)?;
-        if rects[0].contains(x as f64, y as f64) {
-            Some(false)
-        } else if rects[1].contains(x as f64, y as f64) {
-            Some(true)
-        } else {
-            None
-        }
-    }
-    pub fn idle_draw(&mut self, m: &Mpv, last: bool) -> Result<(), String> {
+    pub fn idle_draw(&mut self, m: &Mpv) -> Result<(), String> {
         if m.get("idle-active").as_deref() != Some("yes") {
             return Ok(());
         }
-        let Some(rects) = Self::idle_rects(m) else {
-            return Ok(());
-        };
         let w = m
             .get("osd-width")
-            .and_then(|s| s.parse::<i32>().ok())
-            .unwrap_or(640);
-        let mut c = Canvas::with_font(
-            w,
-            rects[1].y + rects[1].h - rects[0].y + 8,
-            (rects[0].h / 3).clamp(14, 22),
-        )?;
-        let pixels =
-            unsafe { std::slice::from_raw_parts_mut(c.bits, (c.width * c.height * 4) as usize) };
-        pixels.fill(0);
-        for (i, r) in rects.iter().enumerate() {
-            let local = Rect {
-                y: r.y - rects[0].y,
-                ..*r
-            };
-            c.rounded(
-                local,
-                10,
-                if i == 0 {
-                    [51, 62, 57, 255]
-                } else {
-                    [33, 33, 33, 255]
-                },
-            );
-            if i == 0 || last {
-                c.text_clipped(
-                    local.x + 16,
-                    local.y + local.h / 4,
-                    local.w - 32,
-                    local.h * 3 / 4,
-                    if i == 0 {
-                        "Abrir vídeo"
-                    } else {
-                        "Continuar último vídeo"
-                    },
-                );
-            } else {
-                c.text_clipped(
-                    local.x + 16,
-                    local.y + local.h / 4,
-                    local.w - 32,
-                    local.h * 3 / 4,
-                    "Sin vídeo anterior disponible",
-                );
-            }
-        }
+            .and_then(|v| v.parse::<i32>().ok())
+            .unwrap_or(640)
+            .clamp(160, 8192);
+        let h = m
+            .get("osd-height")
+            .and_then(|v| v.parse::<i32>().ok())
+            .unwrap_or(360)
+            .clamp(100, 8192);
+        let mut c = Canvas::with_font(w, 64, (w / 30).clamp(16, 28))?;
+        unsafe { std::slice::from_raw_parts_mut(c.bits, (c.width * c.height * 4) as usize) }
+            .fill(0);
+        c.centered(
+            Rect {
+                x: 16,
+                y: 0,
+                w: w - 32,
+                h: 64,
+            },
+            "Arrastra tu vídeo aquí",
+        );
+        self.upload(m, 63, 0, (h - 64) / 2, &mut c)?;
+        m.command(&["overlay-remove", "64"])
+    }
+    fn upload(&self, m: &Mpv, id: u32, x: i32, y: i32, c: &mut Canvas) -> Result<(), String> {
+        let (w, h) = (c.width, c.height);
+        let pixels = c.pixels();
         m.command_named(
             "overlay-add",
             &[
-                ("id", "63".into()),
-                ("x", "0".into()),
-                ("y", rects[0].y.to_string()),
-                ("file", format!("&{}", c.pixels().as_ptr() as usize)),
+                ("id", id.to_string()),
+                ("x", x.to_string()),
+                ("y", y.to_string()),
+                ("file", format!("&{}", pixels.as_ptr() as usize)),
                 ("offset", "0".into()),
                 ("fmt", "bgra".into()),
-                ("w", c.width.to_string()),
-                ("h", c.height.to_string()),
-                ("stride", (c.width * 4).to_string()),
+                ("w", w.to_string()),
+                ("h", h.to_string()),
+                ("stride", (w * 4).to_string()),
             ],
         )
+    }
+    pub fn startup_hit(&self, m: &Mpv, x: i32, y: i32) -> Option<bool> {
+        let w = m.get("osd-width")?.parse().ok()?;
+        let h = m.get("osd-height")?.parse().ok()?;
+        let view = cineplayer_core::popup_geometry::Viewport::new(w, h, self.mode)?;
+        let (x, y) = view.point(x as f64, y as f64)?;
+        cineplayer_core::startup::Layout::new(w, h)?.hit(x, y)
+    }
+    pub fn startup_draw(&mut self, m: &Mpv, s: &State) -> Result<(), String> {
+        if !s.startup_choice {
+            if !self.startup_key.is_empty() {
+                m.command(&["overlay-remove", "63"])?;
+                m.command(&["overlay-remove", "64"])?;
+                self.startup_key.clear();
+            }
+            return Ok(());
+        }
+        if !s.startup_ready(m) {
+            return Ok(());
+        }
+        let w = m
+            .get("osd-width")
+            .and_then(|v| v.parse::<i32>().ok())
+            .unwrap_or(0);
+        let h = m
+            .get("osd-height")
+            .and_then(|v| v.parse::<i32>().ok())
+            .unwrap_or(0);
+        let Some(l) = cineplayer_core::startup::Layout::new(w, h) else {
+            return Ok(());
+        };
+        let key = format!(
+            "{w}/{h}/{:?}/{}/{}",
+            self.mode, s.generation, s.display_title
+        );
+        if self.startup_key == key {
+            return Ok(());
+        }
+        let mut c = Canvas::with_font(l.panel.w, l.panel.h, (l.buttons[0].h / 3).clamp(12, 22))?;
+        unsafe { std::slice::from_raw_parts_mut(c.bits, (c.width * c.height * 4) as usize) }
+            .fill(0);
+        c.rounded(
+            Rect {
+                x: 0,
+                y: 0,
+                w: l.panel.w,
+                h: l.panel.h,
+            },
+            12,
+            [23, 26, 29, 235],
+        );
+        let local = |r: Rect| Rect {
+            x: r.x - l.panel.x,
+            y: r.y - l.panel.y,
+            ..r
+        };
+        let title = local(l.title);
+        c.centered(title, &s.display_title);
+        for (i, r) in l.buttons.iter().enumerate() {
+            let r = local(*r);
+            c.rounded(
+                r,
+                8,
+                if i == 0 {
+                    [51, 68, 57, 255]
+                } else {
+                    [43, 43, 43, 255]
+                },
+            );
+            c.centered(
+                r,
+                if i == 0 {
+                    "Continuar reproducción"
+                } else {
+                    "Empezar de nuevo"
+                },
+            );
+        }
+        let view = cineplayer_core::popup_geometry::Viewport::new(w, h, self.mode)
+            .ok_or("Superficie de inicio no válida")?;
+        let (cw, ch) = (c.width, c.height);
+        let source = c.pixels();
+        let ana = if self.mode == Projection::Anaglyph {
+            Some(control_layout::anaglyph_hud(source, cw, ch, self.glasses))
+        } else {
+            None
+        };
+        let planes = view.project(l.panel, ana.as_deref().unwrap_or(source));
+        for (i, p) in planes.iter().enumerate() {
+            m.command_named(
+                "overlay-add",
+                &[
+                    ("id", (63 + i).to_string()),
+                    ("x", p.x.to_string()),
+                    ("y", p.y.to_string()),
+                    ("file", format!("&{}", p.pixels.as_ptr() as usize)),
+                    ("offset", "0".into()),
+                    ("fmt", "bgra".into()),
+                    ("w", p.width.to_string()),
+                    ("h", p.height.to_string()),
+                    ("stride", (p.width * 4).to_string()),
+                ],
+            )?;
+        }
+        if planes.len() < 2 {
+            m.command(&["overlay-remove", "64"])?;
+        }
+        self.startup_key = key;
+        Ok(())
     }
     pub fn rendered(&self) -> bool {
         self.rendered
@@ -486,7 +552,7 @@ impl Controls {
             self.fraction = None;
             self.last.clear();
         }
-        Ok(())
+        self.startup_draw(m, s)
     }
     pub fn hide(&mut self, m: &Mpv) -> Result<(), String> {
         self.rendered = false;

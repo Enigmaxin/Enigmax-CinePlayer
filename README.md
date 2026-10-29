@@ -1,6 +1,6 @@
-# Enigmax CinePlayer 0.2.18 — Windows 11 x64
+# Enigmax CinePlayer 0.2.19 — Windows 11 x64
 
-Cambios y límites de la versión vigente: **[VERIFICACION_0.2.18.md](VERIFICACION_0.2.18.md)**. Historial protegido entre instancias, recuperación de pistas por archivo y actualizaciones con caché y manifiesto público.
+Cambios y límites de la versión vigente: **[VERIFICACION_0.2.19.md](VERIFICACION_0.2.19.md)**. Perfil adicional de mínimo consumo, menús coherentes, metadatos legibles y arranque automático en pausa con elección de continuación.
 
 HDR 2D utiliza libplacebo y ST2094-40, con metadatos dinámicos disponibles y alternativa sin ellos. El renderizador compatible usa BT.2390. SDR conserva su tratamiento de origen; no se activa conversión inversa a HDR. La salida real depende de Windows y de la pantalla: no existe una calibración universal para TV, monitores, proyectores y Quest. Véanse las pruebas y excepciones en el informe.
 
@@ -20,7 +20,7 @@ La versión aparece en el título, en **Ayuda / F1** y en **Acerca de** dentro d
 
 Al abrir cada vídeo reconocido como 3D se pausa temporalmente y se pregunta cómo verlo: **2D sin gafas**, **anaglifo** con las gafas elegidas o **dos vistas originales** para una pantalla 3D. Se pregunta de nuevo al abrir otro archivo o reabrir el mismo; un cambio interno de transporte MVC conserva la elección. Al cerrar la pregunta sin elegir se utiliza 2D izquierdo.
 
-**Vídeo 3D / Ctrl+3** reúne las opciones habituales: **Ver en 2D**, **Ver con gafas de colores**, **Mostrar las dos vistas originales** e **Invertir profundidad**. Elegir las gafas activa directamente el anaglifo. Hay cinco parejas: rojo/cian, verde/magenta, ámbar/azul, rojo/azul y rojo/verde; estas dos últimas son monocromas. **Formato 3D** corrige la detección. **Avanzado** agrupa el ojo 2D, método de color, calidad, calibración y ASS 3D.
+**Vídeo 3D / Ctrl+3** reúne las opciones habituales: **Ver en 2D**, **Ver con gafas de colores**, **Mostrar las dos vistas originales** e **Invertir profundidad**. Elegir las gafas activa directamente el anaglifo. Hay cinco parejas: rojo/cian, verde/magenta, ámbar/azul, rojo/azul y rojo/verde; estas dos últimas son monocromas. **Formato 3D** corrige la detección. **Avanzado** agrupa el ojo 2D, método de color, calibración y ASS 3D. **Calidad / consumo** está en el menú principal, bajo **Color / HDR**.
 
 El modo automático reconoce etiquetas explícitas del nombre como Full-SBS, HSBS, Full-OU, HOU y MVC, metadatos inequívocos y títulos Blu-ray con vista dependiente. Un nombre genérico «SBS», «3D» o unos metadatos sin información suficiente sobre Full/Half abren primero la confirmación del formato. No se deduce Full/Half por la resolución ni se analiza toda la imagen; un archivo sin etiquetas ni metadatos puede requerir selección manual. Las preferencias de formato y presentación de la película anterior se reinician para evitar aplicarlas al siguiente vídeo 2D. El menú permite corregir el aspecto final de fuentes anamórficas o recortadas.
 
@@ -30,7 +30,7 @@ La composición GPU separa los ojos antes del escalado, trabaja en RGB lineal y 
 
 **Equilibrado:** GPU y escalado spline36. **Máxima calidad:** GPU y EWA Lanczos. **Compatibilidad:** filtro FFmpeg stereo3d por CPU en RGB de 8 bits; no aplica la calibración GPU y no ofrece equivalencia de color exacta con ella. El modo anaglifo utiliza salida SDR. Para fuentes HDR se realiza primero conversión tonal a SDR mediante CPU; aumenta el consumo y puede limitar la fluidez en equipos modestos.
 
-La opción **Continuar último vídeo** guarda la ruta original de la ISO y recupera la playlist y la posición del historial. Si se recarga el transporte para mostrar MVC, la posición pendiente se conserva hasta confirmar la búsqueda.
+Al iniciar sin un archivo indicado, se carga el último vídeo en pausa, con su playlist, posición y pistas guardadas. Bajo el título aparecen **Continuar reproducción** y **Empezar de nuevo**. La reproducción espera esa elección; Espacio o Intro eligen continuar. Si no existe un último archivo disponible, se muestra **Arrastra tu vídeo aquí**. Ctrl+O y arrastrar archivos siguen disponibles. La posición pendiente se conserva durante las recargas MVC.
 
 ## Blu-ray e ISO
 
@@ -163,3 +163,9 @@ Se eliminan los menús, el botón y los ajustes de convergencia del vídeo y pro
 ## Cambios de 0.2.18
 
 Se recuerda el último vídeo al confirmar sus pistas, sin esperar necesariamente a la primera imagen. Las escrituras tardías de otras instancias no sustituyen una apertura más reciente y el historial se combina bajo bloqueo. Se guardan las pistas de audio y subtítulos por archivo, incluidos subtítulos desactivados y SRT/ASS externos. Las elecciones se restauran también al recargar el transporte. El actualizador usa un manifiesto público con SHA-256, conserva una caché de 12 horas para consultas automáticas y respeta las esperas del servidor también al consultar manualmente. Ver VERIFICACION_0.2.18.md.
+
+## Cambios de 0.2.19
+
+Calidad / consumo está en el menú principal, inmediatamente debajo de Color / HDR. Los tres perfiles existentes conservan sus índices y ajustes. Se añade Mínimo consumo · equipos modestos: escalado bilineal, análisis de pico HDR desactivado y límites de búfer de hasta 16 MiB delante y cero detrás (8 MiB delante en MVC). No cambia la resolución, los FPS, la salida 3D ni la selección de audio. Conserva la aceleración automática y el tone mapping. El escalado es más suave y el HDR depende más de los metadatos; el menor búfer trasero puede requerir volver a leer al retroceder. No equivale a un límite de memoria total ni garantiza fluidez en cualquier ordenador.
+
+Al salir del perfil se restauran los límites reales anteriores del transporte. El botón 3D conserva su selector y ofrece Todas las opciones 3D; la etiqueta SBS se muestra como Reproducir en SBS Anamórfico. Audio y Subs muestran idioma y códec/formato de cada pista con nombres legibles; los datos ausentes no se inventan. El menú contextual y los cuatro accesos de la barra comparten sus constructores y acciones.

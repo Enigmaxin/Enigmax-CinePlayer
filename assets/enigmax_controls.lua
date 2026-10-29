@@ -25,9 +25,16 @@ local single_click
 local function cancel_click()
     if single_click then single_click:kill();single_click=nil end
 end
+local startup_choice=false
+local function choosing() return startup_choice end
 local function screen_click()
     cancel_click()
     if popup_open then return end
+    if choosing() then
+        local x,y=mp.get_mouse_pos()
+        mp.commandv('script-message-to',target,'startup-click',tostring(math.floor(x or -1)),tostring(math.floor(y or -1)))
+        return
+    end
     if mp.get_property_bool('idle-active',true) then
         local x,y=mp.get_mouse_pos()
         mp.commandv('script-message-to',target,'idle-click',tostring(math.floor(x or -1)),tostring(math.floor(y or -1)))
@@ -69,7 +76,7 @@ local function areas()
     mp.enable_key_bindings('enigmax_show','allow-vo-dragging+allow-hide-cursor')
     -- Hidden does not mean unclickable: otherwise a fast first press can
     -- become a VO window drag before Lua has enabled the bottom section.
-    if mp.get_property_bool('idle-active',true) then
+    if choosing() or mp.get_property_bool('idle-active',true) then
         mp.disable_key_bindings('enigmax_bottom');mp.disable_key_bindings('enigmax_top');return
     end
     local ph = math.min(h, math.max(88, math.min(160, math.floor(h*0.1+0.5))))
@@ -97,7 +104,7 @@ local function areas()
     mp.enable_key_bindings('enigmax_bottom')
 end
 local function paint(force)
-    if not visible or popup_open then return end
+    if not visible or popup_open or choosing() then return end
     local now=mp.get_time()
     if not force and now-last_paint<0.09 then return end
     local data=payload()
@@ -113,7 +120,7 @@ local function hide()
 end
 local function show()
     if popup_open then return end
-    if mp.get_property_bool('idle-active',true) then return end
+    if choosing() or mp.get_property_bool('idle-active',true) then return end
     last_activity=mp.get_time()
     if not visible then visible=true;previous='';areas();timer:resume();paint(true) end
 end
@@ -223,8 +230,20 @@ for _,key in ipairs({'pause','duration'}) do
     mp.observe_property(key,'native',function() paint(false) end)
 end
 mp.observe_property('idle-active','bool',function(_,idle) if idle then hide();mp.commandv('script-message-to',target,'idle-draw') else mp.commandv('overlay-remove',63);areas() end end)
+mp.observe_property('osd-dimensions','native',function()if choosing()then mp.commandv('script-message-to',target,'startup-draw')end end)
 mp.register_event('start-file',function() volume_until=0;volume_feedback=0;cancel_click();hide();mp.commandv('overlay-remove',63) end)
 mp.register_event('file-loaded',function() areas();if pinned then show();paint(true) end end)
+mp.set_key_bindings({
+    {'SPACE',function()mp.commandv('script-message-to',target,'startup-choice','continue')end},
+    {'ENTER',function()mp.commandv('script-message-to',target,'startup-choice','continue')end},
+},'enigmax_startup','force')
+mp.disable_key_bindings('enigmax_startup')
+mp.observe_property('user-data/enigmax-startup','native',function(_,value)
+    startup_choice=value=='yes'
+    if startup_choice then hide();mp.enable_key_bindings('enigmax_startup');mp.commandv('script-message-to',target,'startup-draw')
+    else mp.disable_key_bindings('enigmax_startup') end
+    areas()
+end)
 mp.register_event('shutdown',function() hide() end)
 areas()
 mp.commandv('script-message-to',target,'controls-ready')

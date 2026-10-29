@@ -6,7 +6,7 @@ local last
 mp.observe_property('user-data/enigmax-popup-test','native',function(_,value)
     if value and value~='' then cfg=json.parse_json(value);last=nil end
 end)
-mp.observe_property('user-data/enigmax-popup-state','native',function(_,value)
+local function on_state(_,value)
     if not cfg or not value or value=='' or value==last then return end
     local state=json.parse_json(value);if not state then return end
     last=value
@@ -25,8 +25,19 @@ mp.observe_property('user-data/enigmax-popup-state','native',function(_,value)
         if cfg.close_button then body=cfg.close_button
         else
             local index
-            for i,id in ipairs(state.ids)do if id==wanted then index=i-1;break end end
-            if not index then mp.commandv('script-message-to',state.client,'popup-input','close');cfg=nil;return end
+            for i,id in ipairs(state.ids)do if id==wanted or (type(wanted)=="string" and state.labels[i]==wanted) then index=i-1;break end end
+            if not index then
+                -- A resize can publish the old page after the previous click.
+                -- Wait for the expected page instead of closing a valid transition.
+                cfg.retries=(cfg.retries or 0)+1
+                if cfg.retries<=20 then
+                    mp.add_timeout(0.05,function()if cfg then last=nil;on_state(nil,mp.get_property_native('user-data/enigmax-popup-state'))end end)
+                    return
+                end
+                mp.set_property('user-data/enigmax-popup-test-error',json.format_json({wanted=wanted,labels=state.labels,step=cfg.step}))
+                mp.commandv('script-message-to',state.client,'popup-input','close');cfg=nil;return
+            end
+            cfg.retries=0
             if index<state.offset or index>=state.offset+state.visible then
                 mp.commandv('script-message-to',state.client,'popup-input',index<state.offset and 'wheelup'or'wheeldown')
                 return
@@ -58,5 +69,6 @@ mp.observe_property('user-data/enigmax-popup-state','native',function(_,value)
         mp.commandv('script-message-to',state.client,'popup-input','down',body)
         mp.commandv('script-message-to',state.client,'popup-input','up',body)
     end)
-end)
+end
+mp.observe_property('user-data/enigmax-popup-state','native',on_state)
 mp.commandv('script-message','popup-qa-ready')

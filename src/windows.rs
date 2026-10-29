@@ -622,7 +622,7 @@ impl Menu {
         let _ = m.command(&["script-message-to", "enigmax_controls", "popup", "no"]);
         result
     }
-    fn entries(&self) -> Result<Vec<crate::popup::Entry>, String> {
+    pub(crate) fn entries(&self) -> Result<Vec<crate::popup::Entry>, String> {
         fn read(menu: Handle, depth: usize) -> Result<Vec<crate::popup::Entry>, String> {
             if depth > 16 {
                 return Err("El menú supera el límite de profundidad".into());

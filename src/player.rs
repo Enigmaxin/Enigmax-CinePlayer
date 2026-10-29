@@ -56,6 +56,9 @@ pub struct State {
     track_choice: Option<cineplayer_core::playback::Tracks>,
     tracks_restore: bool,
     tracks_updated: u64,
+    resource_restore: Option<Vec<(String, String)>>,
+    pub startup_choice: bool,
+    startup_play: bool,
 }
 impl State {
     pub fn last_video(&self) -> Option<String> {
@@ -141,7 +144,7 @@ impl State {
             return Ok(());
         }
         let Some(target) = self.resume.as_deref().and_then(|v| v.parse::<f64>().ok()) else {
-            return Ok(());
+            return self.start_after_resume(m);
         };
         if !target.is_finite() || target < 0.0 {
             self.resume = None;
@@ -157,7 +160,7 @@ impl State {
             m.seek(target, true)?;
             self.resume_requested = true;
         }
-        Ok(())
+        self.start_after_resume(m)
     }
     pub fn new(dir: &Path, probe: bool) -> Self {
         let prefs = if probe {
@@ -208,6 +211,9 @@ impl State {
             track_choice: None,
             tracks_restore: false,
             tracks_updated: 0,
+            resource_restore: None,
+            startup_choice: false,
+            startup_play: false,
         }
     }
     fn profile_path(&self) -> PathBuf {
@@ -223,6 +229,8 @@ impl State {
     pub fn new_open(&mut self) {
         self.flush_history();
         self.last_remembered = false;
+        self.startup_choice = false;
+        self.startup_play = false;
         self.opened = now_stamp();
         self.track_choice = None;
         self.tracks_restore = false;
@@ -322,6 +330,7 @@ pub fn load(m: &Mpv, s: &mut State, path: &str, title: Option<i32>) -> Result<()
     if !absolute.exists() {
         return Err(format!("No existe: {}", absolute.display()));
     }
+    s.restore_resources(m)?;
     let path = absolute.to_str().ok_or("Ruta Unicode inválida")?.to_owned();
     let same_source = path == s.source;
     let disc = absolute.is_dir()
@@ -329,6 +338,7 @@ pub fn load(m: &Mpv, s: &mut State, path: &str, title: Option<i32>) -> Result<()
             .extension()
             .is_some_and(|e| e.eq_ignore_ascii_case("iso"));
     if path != s.source {
+        s.cancel_startup(m)?;
         s.capture_position(m);
         s.new_open();
         s.subtitles = crate::subtitles::Subtitles::default();
@@ -665,6 +675,8 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         "scale",
         if p.quality == Quality::High {
             "ewa_lanczossharp"
+        } else if p.quality == Quality::Low {
+            "bilinear"
         } else {
             "spline36"
         },
@@ -694,7 +706,15 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         },
     )?;
     m.set("gamut-mapping-mode", "auto")?;
-    m.set("hdr-compute-peak", "auto")?;
+    m.set(
+        "hdr-compute-peak",
+        if p.quality == Quality::Low {
+            "no"
+        } else {
+            "auto"
+        },
+    )?;
+    s.apply_resources(m)?;
     m.set("inverse-tone-mapping", "no")?;
     m.set("target-peak", "auto")?;
     m.set(
@@ -888,7 +908,7 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
                 match s.prefs.delivery {
                     stereo::Delivery::FullSbs => "Compatibilidad: Full SBS 3840×1080",
                     stereo::Delivery::FramePack => "Frame Packing 1920×2205 (composición)",
-                    _ => "SBS Anamórfico",
+                    _ => "Reproducir en SBS Anamórfico",
                 }
                 .into()
             } else {
@@ -907,7 +927,7 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
         ),
         (
             1221,
-            "SBS Anamórfico",
+            "Reproducir en SBS Anamórfico",
             s.prefs.output == Output::Original && s.prefs.delivery == stereo::Delivery::Anamorphic,
         ),
         (
@@ -940,11 +960,7 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
         algorithm.item(1040 + i as u32, v.label(), s.prefs.algorithm == *v)?;
     }
     advanced.submenu("Método de color", algorithm)?;
-    let quality = windows::Menu::new()?;
-    for (i, v) in Quality::ALL.iter().enumerate() {
-        quality.item(1050 + i as u32, v.label(), s.prefs.quality == *v)?;
-    }
-    advanced.submenu("Calidad / consumo", quality)?;
+
     let cal = windows::Menu::new()?;
     for (id, label) in [
         (1062, "Ganancia izquierda −5 %"),
@@ -980,6 +996,13 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
     }
     root.submenu("Ajustes guardados", profiles)?;
     Ok(root)
+}
+pub fn quality_menu(s: &State) -> Result<windows::Menu, String> {
+    let menu = windows::Menu::new()?;
+    for (i, v) in Quality::ALL.iter().enumerate() {
+        menu.item(1050 + i as u32, v.label(), s.prefs.quality == *v)?;
+    }
+    Ok(menu)
 }
 pub fn menu(root: &windows::Menu, m: &Mpv, s: &State, include_stereo: bool) -> Result<(), String> {
     if include_stereo {
@@ -1036,6 +1059,7 @@ pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
 pub fn ask_view(m: &Mpv, s: &mut State) -> Result<(), String> {
     if !s.automatic
         || s.view_choice_made
+        || s.startup_choice
         || s.pending_load
         || s.source.is_empty()
         || m.get("video-params/w").is_none()
@@ -1088,6 +1112,13 @@ pub fn ask_view(m: &Mpv, s: &mut State) -> Result<(), String> {
                 }
                 continue;
             }
+            if id == 1233 {
+                let option = stereo_menu(m, s)?.show(m)?;
+                if option == 0 {
+                    continue;
+                }
+                return action(m, s, option);
+            }
             let id = if id == 1230 { choose_glasses(m)? } else { id };
             if id == 1231 {
                 continue;
@@ -1116,7 +1147,7 @@ fn view_dialog(m: &Mpv, s: &State) -> Result<u32, String> {
             },
             Choice {
                 id: 1221,
-                title: "SBS Anamórfico",
+                title: "Reproducir en SBS Anamórfico",
                 description: "",
                 image: 3,
             },
@@ -1197,6 +1228,13 @@ pub fn choose_view(m: &Mpv, s: &mut State) -> Result<(), String> {
                     action(m, s, format)?;
                 }
                 continue;
+            }
+            if id == 1233 {
+                let option = stereo_menu(m, s)?.show(m)?;
+                if option == 0 {
+                    continue;
+                }
+                return action(m, s, option);
             }
             let id = if id == 1230 { choose_glasses(m)? } else { id };
             if id == 1231 {
@@ -1292,7 +1330,7 @@ fn action_impl(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
         }
         1030..=1034 => s.prefs.glasses = Glasses::ALL[(id - 1030) as usize],
         1040..=1043 => s.prefs.algorithm = Algorithm::ALL[(id - 1040) as usize],
-        1050..=1052 => {
+        1050..=1053 => {
             s.prefs.quality = Quality::ALL[(id - 1050) as usize];
             if id == 1052
                 && s.subtitles
@@ -1380,7 +1418,11 @@ fn action_impl(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
                 .playlist as i32;
             let source = s.source.clone();
             if title != s.title {
+                let waiting = s.startup_choice;
+                let play = s.startup_play;
                 s.new_open();
+                s.startup_choice = waiting;
+                s.startup_play = play;
             }
             // An explicit title selection is not a reopening of the ISO:
             // do not offer a saved title that would undo the user's selection.
@@ -1398,8 +1440,61 @@ fn action_impl(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
 }
 
 impl State {
+    pub fn begin_startup(&mut self, m: &Mpv) -> Result<bool, String> {
+        if self.last_video().is_none() {
+            return Ok(false);
+        }
+        m.set("pause", "yes")?;
+        resume_last(m, self)?;
+        self.startup_choice = true;
+        m.set("pause", "yes")?;
+        m.set("user-data/enigmax-startup", "yes")?;
+        Ok(true)
+    }
+    pub fn startup_ready(&self, m: &Mpv) -> bool {
+        self.startup_choice
+            && !self.pending_load
+            && self.resume.is_none()
+            && m.get("video-params/w").is_some()
+            && m.get("time-pos").is_some()
+    }
+    pub fn choose_startup(&mut self, m: &Mpv, restart: bool) -> Result<bool, String> {
+        if !self.startup_ready(m) {
+            return Ok(false);
+        }
+        self.startup_choice = false;
+        self.startup_play = true;
+        if restart {
+            self.resume = Some("0".into());
+            self.resume_requested = false;
+        }
+        m.set("user-data/enigmax-startup", "no")?;
+        Ok(true)
+    }
+    fn start_after_resume(&mut self, m: &Mpv) -> Result<(), String> {
+        if self.startup_play && self.resume.is_none() && !self.pending_load {
+            m.set("pause", "no")?;
+            self.startup_play = false;
+        }
+        Ok(())
+    }
+    pub fn cancel_startup(&mut self, m: &Mpv) -> Result<(), String> {
+        if self.startup_choice || self.startup_play {
+            self.startup_choice = false;
+            self.startup_play = false;
+            m.set("user-data/enigmax-startup", "no")?;
+            m.set("pause", "no")?;
+        }
+        Ok(())
+    }
     pub fn checkpoint(&mut self, seconds: &str, duration: &str) {
-        if !self.automatic || self.pending_load || !self.history_asked || self.resume.is_some() {
+        if !self.automatic
+            || self.pending_load
+            || self.startup_choice
+            || self.startup_play
+            || !self.history_asked
+            || self.resume.is_some()
+        {
             return;
         }
         if let (Ok(seconds), Ok(duration)) = (seconds.parse::<f64>(), duration.parse::<f64>())
@@ -1417,6 +1512,49 @@ impl State {
                 self.flush_history();
             }
         }
+    }
+    fn restore_resources(&mut self, m: &Mpv) -> Result<(), String> {
+        if let Some(saved) = self.resource_restore.take() {
+            for (key, value) in &saved {
+                if let Err(error) = m.set(key, value) {
+                    self.resource_restore = Some(saved);
+                    return Err(error);
+                }
+            }
+        }
+        Ok(())
+    }
+    fn apply_resources(&mut self, m: &Mpv) -> Result<(), String> {
+        if self.prefs.quality != Quality::Low {
+            return self.restore_resources(m);
+        }
+        if self.resource_restore.is_none() {
+            let mut saved = Vec::new();
+            for key in ["demuxer-max-bytes", "demuxer-max-back-bytes"] {
+                saved.push((
+                    key.into(),
+                    m.get(key)
+                        .ok_or_else(|| format!("No se pudo consultar {key}"))?,
+                ));
+            }
+            self.resource_restore = Some(saved);
+        }
+        let saved = self
+            .resource_restore
+            .as_ref()
+            .ok_or("Falta el perfil de recursos")?;
+        let original = saved[0]
+            .1
+            .parse::<u64>()
+            .map_err(|_| "Límite de búfer no válido")?;
+        // Never grow an existing smaller buffer; MVC already uses a smaller queue.
+        let cap = if self.raw.is_some() {
+            8 * 1024 * 1024
+        } else {
+            16 * 1024 * 1024
+        };
+        m.set("demuxer-max-bytes", &original.min(cap).to_string())?;
+        m.set("demuxer-max-back-bytes", "0")
     }
     pub fn restore_tracks(&mut self, m: &Mpv) -> Result<(), String> {
         if self.pending_load || !self.tracks_restore {
@@ -1622,11 +1760,11 @@ mod state_tests {
                 );
                 s.pending_load = false;
             }
+            s.restore_tracks(m).unwrap();
             if id == 8 || id == 17 {
                 apply(m, s).unwrap();
             }
             s.restore_position(m).unwrap();
-            s.restore_tracks(m).unwrap();
             s.capture_tracks(m);
             s.remember_ready(m).unwrap();
             if done(m, s) {
@@ -1634,12 +1772,15 @@ mod state_tests {
             }
         }
         panic!(
-            "ISO timeout path={:?} time={:?} resume={:?} pending={} title={}",
+            "ISO timeout path={:?} time={:?} resume={:?} pending={} title={} seekable={:?} requested={} pause={:?}",
             m.get("path"),
             m.get("time-pos"),
             s.resume,
             s.pending_load,
-            s.title
+            s.title,
+            m.get("seekable"),
+            s.resume_requested,
+            m.get("pause")
         );
     }
     fn iso_engine(root: &Path) -> Mpv {
@@ -1713,7 +1854,7 @@ mod state_tests {
         for mvc_view in [false, true] {
             let mut m = iso_engine(root);
             let mut s = State::new(temp.path(), false);
-            resume_last(&m, &mut s).unwrap();
+            assert!(s.begin_startup(&m).unwrap());
             assert_eq!(s.source, path);
             assert_eq!(s.title, title);
             let target = s.resume.clone();
@@ -1731,6 +1872,18 @@ mod state_tests {
                         .and_then(|x| x.parse::<f64>().ok())
                         .is_some_and(|x| (x - 123.5).abs() < 0.15)
             });
+            assert!(s.startup_ready(&m));
+            assert_eq!(m.get("pause").as_deref(), Some("yes"));
+            if mvc_view {
+                s.prefs.quality = Quality::Low;
+                s.applied = None;
+                apply(&m, &mut s).unwrap();
+                assert_eq!(m.get("demuxer-max-bytes").as_deref(), Some("8388608"));
+                s.prefs.quality = Quality::Balanced;
+                s.applied = None;
+                apply(&m, &mut s).unwrap();
+                assert_eq!(m.get("demuxer-max-bytes").as_deref(), Some("16777216"));
+            }
             assert_eq!(s.last_video().as_deref(), Some(path.as_str()));
             let list: serde_json::Value =
                 serde_json::from_str(&m.get("track-list").unwrap()).unwrap();
@@ -1754,10 +1907,127 @@ mod state_tests {
                 m.get("time-pos"),
                 s.source
             );
+            assert!(s.choose_startup(&m, false).unwrap());
+            iso_pump(&mut m, &mut s, |_, s| !s.startup_play);
             let bad = temp.path().join("missing.iso");
             assert!(load(&m, &mut s, bad.to_str().unwrap(), None).is_err());
             assert_eq!(s.last_video().as_deref(), Some(path.as_str()));
         }
+    }
+    #[test]
+    fn startup_waits_at_saved_position_and_honors_both_choices() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let dir = tempfile::tempdir().unwrap();
+        let path = root.join("verificacion/muestras/pistas-qa.mkv");
+        let key = cineplayer_core::history::History::identity(&path).unwrap();
+        let mut seed = State::new(dir.path(), false);
+        seed.source = path.to_str().unwrap().into();
+        seed.remember_last().unwrap();
+        let mut history = cineplayer_core::history::History::default();
+        history.remember(
+            key.clone(),
+            cineplayer_core::history::Position {
+                seconds: 12.0,
+                duration: 30.0,
+                title: -1,
+            },
+            1,
+        );
+        std::fs::write(dir.path().join("config/resume.json"), history.encode()).unwrap();
+        drop(seed);
+        for restart in [false, true] {
+            let mut m = iso_engine(root);
+            let mut s = State::new(dir.path(), false);
+            assert!(s.begin_startup(&m).unwrap());
+            iso_pump(&mut m, &mut s, |m, s| s.startup_ready(m));
+            assert_eq!(m.get("pause").as_deref(), Some("yes"));
+            assert!((m.get("time-pos").unwrap().parse::<f64>().unwrap() - 12.0).abs() < 0.2);
+            s.checkpoint("0", "30");
+            s.flush_history();
+            assert_eq!(
+                cineplayer_core::history::History::read(&dir.path().join("config/resume.json"))
+                    .get(&key)
+                    .unwrap()
+                    .seconds,
+                12.0
+            );
+            let mut controls = crate::controls::Controls::default();
+            controls.ready();
+            controls.sync(&m, &s).unwrap();
+            reload_transport(&m, &mut s).unwrap();
+            iso_pump(&mut m, &mut s, |m, s| s.startup_ready(m));
+            controls.sync(&m, &s).unwrap();
+            let (w, h, pixels) = m.screenshot_pixels_kind("window").unwrap();
+            let layout = cineplayer_core::startup::Layout::new(w as i32, h as i32).unwrap();
+            let r = layout.buttons[0];
+            let index = ((r.y + 10) as usize * w + (r.x + 10) as usize) * 4;
+            assert!(
+                pixels[index..index + 3].iter().any(|v| *v > 20),
+                "Startup choices disappeared after the reload"
+            );
+            m.command(&["keypress", "SPACE"]).unwrap();
+            let until = Instant::now() + Duration::from_secs(3);
+            let mut explicit_choice = false;
+            while Instant::now() < until {
+                let e = m.wait(0.03);
+                if e.id == 5 && e.userdata & (1_u64 << 63) != 0 {
+                    let cookie = e.userdata;
+                    m.seek_reply(cookie).unwrap();
+                    continue;
+                }
+                if e.id == 16 && !e.data.is_null() {
+                    let message = unsafe { &*e.data.cast::<crate::mpv::ClientMessage>() };
+                    if message.count >= 2 && !message.args.is_null() {
+                        let args = unsafe { std::slice::from_raw_parts(message.args, 2) };
+                        if !args[0].is_null()
+                            && !args[1].is_null()
+                            && unsafe { std::ffi::CStr::from_ptr(args[0]) }.to_bytes()
+                                == b"startup-choice"
+                            && unsafe { std::ffi::CStr::from_ptr(args[1]) }.to_bytes()
+                                == b"continue"
+                        {
+                            explicit_choice = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            assert!(
+                explicit_choice,
+                "The actual Lua binding did not forward the startup choice"
+            );
+            assert_eq!(
+                m.get("pause").as_deref(),
+                Some("yes"),
+                "Space must not bypass the startup choice"
+            );
+            assert!(s.choose_startup(&m, restart).unwrap());
+            iso_pump(&mut m, &mut s, |m, s| {
+                !s.startup_play && m.get("pause").as_deref() == Some("no")
+            });
+            let pos = m.get("time-pos").unwrap().parse::<f64>().unwrap();
+            if restart {
+                assert!(pos < 1.0);
+            } else {
+                assert!((12.0..13.0).contains(&pos));
+            }
+            assert!(!s.startup_choice);
+            assert_eq!(
+                m.user_data("user-data/enigmax-startup").as_deref(),
+                Some("no")
+            );
+        }
+        let empty = tempfile::tempdir().unwrap();
+        let m = iso_engine(root);
+        let mut s = State::new(empty.path(), false);
+        assert!(!s.begin_startup(&m).unwrap());
+        std::fs::create_dir_all(empty.path().join("config")).unwrap();
+        std::fs::write(
+            empty.path().join("config/last-video.json"),
+            "{\"path\":\"Z:/missing/movie.mkv\"}",
+        )
+        .unwrap();
+        assert!(!s.begin_startup(&m).unwrap());
     }
     #[test]
     fn late_old_instance_cannot_replace_newest_video_or_other_history() {

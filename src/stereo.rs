@@ -157,14 +157,16 @@ pub enum Quality {
     Balanced,
     High,
     Compatibility,
+    Low,
 }
 impl Quality {
-    pub const ALL: [Self; 3] = [Self::Balanced, Self::High, Self::Compatibility];
+    pub const ALL: [Self; 4] = [Self::Balanced, Self::High, Self::Compatibility, Self::Low];
     pub fn label(self) -> &'static str {
         match self {
             Self::Balanced => "Equilibrado · GPU",
             Self::High => "Máxima calidad · GPU",
             Self::Compatibility => "Compatibilidad · filtro CPU",
+            Self::Low => "Mínimo consumo · equipos modestos",
         }
     }
 }
@@ -511,6 +513,22 @@ pub fn shader(s: &Settings, layout: Layout, srgb: bool) -> Result<String, String
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn existing_quality_profiles_keep_their_saved_numbers() {
+        for (i, q) in [
+            Quality::Balanced,
+            Quality::High,
+            Quality::Compatibility,
+            Quality::Low,
+        ]
+        .iter()
+        .enumerate()
+        {
+            let p = Settings::decode(&format!("version=1\nquality={i}\n")).unwrap();
+            assert_eq!(p.quality, *q);
+            assert!(p.encode().contains(&format!("quality={i}\n")));
+        }
+    }
     #[test]
     fn layouts_and_cropped_aspect() {
         for l in [

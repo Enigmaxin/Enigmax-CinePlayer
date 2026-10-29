@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][string]$Ffmpeg,
     [string]$Destination=([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../muestras')))
 )
@@ -60,4 +60,10 @@ if(!(Test-Path -LiteralPath $chapters)) {
     $meta=Write-NewText 'chapters-qa.ffmeta' ";FFMETADATA1`n[CHAPTER]`nTIMEBASE=1/1000`nSTART=0`nEND=8000`ntitle=Inicio`n[CHAPTER]`nTIMEBASE=1/1000`nSTART=8000`nEND=16000`ntitle=Segundo capítulo`n[CHAPTER]`nTIMEBASE=1/1000`nSTART=16000`nEND=30000`ntitle=Final`n"
     & $ff -hide_banner -loglevel error -nostdin -n -i $tracks -i $meta -map 0 -map_metadata 1 -map_chapters 1 -c copy $chapters
     if($LASTEXITCODE -ne 0){throw 'No se pudo generar la muestra con capítulos'}
+}
+
+$metadata=Join-Path $dest 'metadata-qa.mkv'
+if(!(Test-Path -LiteralPath $metadata)) {
+    & $ff -hide_banner -loglevel error -nostdin -n -i $tracks -map 0 -c copy -metadata 'title=Prueba de arranque' -metadata:s:a:0 language=eng -metadata:s:a:0 title=Original -metadata:s:a:1 language=spa -metadata:s:a:1 'title=Doblaje castellano' -metadata:s:s:0 language=spa -metadata:s:s:1 language=eng $metadata
+    if($LASTEXITCODE -ne 0){throw 'No se pudo generar metadata-qa.mkv'}
 }

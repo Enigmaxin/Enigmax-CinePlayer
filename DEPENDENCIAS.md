@@ -1,4 +1,4 @@
-# Dependencias de 0.2.18
+# Dependencias de 0.2.19
 
 Código propio GPL-3.0-or-later. Rust 1.99.1 GNU x64 y w64devkit 2.10.1/GCC 16.2.0 para el ejecutable y puente; MSYS2 UCRT64/GCC 16.2.0, Meson 1.12.1 y Ninja 1.13.2 para el motor. No se requieren para ejecutar.
 
@@ -33,3 +33,5 @@ Los coeficientes Dubois siguen la referencia stereo3d de FFmpeg. ASS 3D utiliza 
 0.2.17 conserva el motor y sus dependencias. La aplicación fija la profundidad añadida de subtítulos a cero y retira sus controles; la propiedad interna del motor no se expone al usuario.
 
 0.2.18 conserva las mismas DLL y dependencias de reproducción; modifica únicamente la aplicación y el auxiliar de actualización.
+
+0.2.19 mantiene las dependencias de reproducción de 0.2.18. Se recompilan la aplicación y sus diálogos nativos; no se incorpora un motor ni un paquete de códecs adicional.

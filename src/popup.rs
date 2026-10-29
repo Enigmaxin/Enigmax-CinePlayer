@@ -181,7 +181,11 @@ fn show_sized(
     loop {
         #[cfg(test)]
         if std::time::Instant::now() > deadline {
-            return Err("Timeout del test de menú".into());
+            return Err(format!(
+                "Timeout del test de menú: {:?}; state {:?}",
+                m.user_data("user-data/enigmax-popup-test-error"),
+                m.user_data("user-data/enigmax-popup-state")
+            ));
         }
         let view = Viewport::new(w, h, mode).ok_or("La superficie del menú no está disponible")?;
         let depth = pages.len();
@@ -752,7 +756,18 @@ mod tests {
             m.user_data("user-data/enigmax-glasses").as_deref(),
             Some("1")
         );
-        println!("Scroll, glasses, Back, 2D and reopening from 2D: OK");
+        m.set(
+            "user-data/enigmax-popup-test",
+            &serde_json::json!({"sequence":[1233,"Avanzado","Método de color",1042],"eye":0})
+                .to_string(),
+        )
+        .unwrap();
+        player::choose_view(&m, &mut state).unwrap();
+        assert_eq!(
+            state.prefs.algorithm,
+            cineplayer_core::stereo::Algorithm::Mono
+        );
+        println!("Scroll, glasses, Back, full 3D options, 2D and reopening from 2D: OK");
         m.command(&[
             "loadfile",
             root.join("verificacion/muestras/pistas-qa.mkv")
