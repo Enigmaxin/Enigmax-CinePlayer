@@ -8,6 +8,11 @@ $tools=[IO.Path]::GetFullPath($ToolsPath)
 $env:PATH="$tools\w64devkit\bin;$env:PATH"
 $nativeTests=[IO.Path]::GetFullPath((Join-Path $tools '..\build'))
 New-Item -ItemType Directory -Force $nativeTests | Out-Null
+$ioTest=Join-Path $nativeTests 'test_cancellable_io.exe'
+& gcc -std=c11 -O2 -Wall -Wextra -Werror (Join-Path $PSScriptRoot 'native/test_cancellable_io.c') -o $ioTest
+if($LASTEXITCODE -ne 0){throw 'Error al compilar la prueba de IO cancelable'}
+& $ioTest
+if($LASTEXITCODE -ne 0){throw 'Error de IO cancelable'}
 $annexbTest=Join-Path $nativeTests 'test_annexb.exe'
 & gcc -std=c11 -O2 -Wall -Wextra -Werror (Join-Path $PSScriptRoot 'native/test_annexb.c') -o $annexbTest
 if($LASTEXITCODE -ne 0){throw 'Error al compilar la prueba Annex B'}

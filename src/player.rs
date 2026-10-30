@@ -20,7 +20,22 @@ use crate::{mpv::Mpv, mvc, windows};
 use cineplayer_core::stereo::{self, Algorithm, Glasses, Layout, Output, Quality, Settings};
 use std::path::{Path, PathBuf};
 
+struct Opening {
+    id: u64,
+    kind: mvc::Kind,
+    path: String,
+    title: Option<i32>,
+    saved_resume: Option<String>,
+    startup: bool,
+    history_asked: bool,
+}
 pub struct State {
+    loader: Option<mvc::Loader>,
+    opening: Option<Opening>,
+    prepared_titles: Option<(String, Vec<mvc::Title>)>,
+    prepared_stream: Option<(String, i32, mvc::Prepared)>,
+    loading_rollback: Option<Settings>,
+    resume_started: Option<std::time::Instant>,
     pub detection: Option<crate::detection::Worker>,
     detection_dirty: bool,
     pub prefs: Settings,
@@ -28,6 +43,7 @@ pub struct State {
     pub passthrough: u8,
     pub device: String,
     pub applied: Option<String>,
+    applied_quality: Option<(Quality, String)>,
     pub source: String,
     pub display_title: String,
     pub titles: Vec<mvc::Title>,
@@ -146,6 +162,22 @@ impl State {
         let Some(target) = self.resume.as_deref().and_then(|v| v.parse::<f64>().ok()) else {
             return self.start_after_resume(m);
         };
+        self.resume_started
+            .get_or_insert_with(std::time::Instant::now);
+        if self
+            .resume_started
+            .is_some_and(|t| t.elapsed().as_secs() >= 12)
+        {
+            self.resume = None;
+            self.resume_requested = false;
+            self.resume_started = None;
+            m.command(&[
+                "show-text",
+                "No se pudo recuperar la posición. Puedes continuar desde aquí.",
+                "5000",
+            ])?;
+            return self.start_after_resume(m);
+        }
         if !target.is_finite() || target < 0.0 {
             self.resume = None;
             return Ok(());
@@ -156,14 +188,16 @@ impl State {
         {
             self.resume = None;
             self.resume_requested = false;
+            self.resume_started = None;
         } else if !self.resume_requested && m.get("seekable").as_deref() == Some("yes") {
             m.seek(target, true)?;
             self.resume_requested = true;
+            self.resume_started = Some(std::time::Instant::now());
         }
         self.start_after_resume(m)
     }
     pub fn new(dir: &Path, probe: bool) -> Self {
-        let prefs = if probe {
+        let mut prefs = if probe {
             Settings::default()
         } else {
             std::fs::read_to_string(dir.join("config/default.ini"))
@@ -171,7 +205,27 @@ impl State {
                 .and_then(|t| Settings::decode(&t).ok())
                 .unwrap_or_default()
         };
+        if !probe {
+            let path = dir.join("config/quality.json");
+            if std::fs::metadata(&path).is_ok_and(|f| f.is_file() && f.len() <= 1024)
+                && let Ok(text) = std::fs::read_to_string(path)
+                && let Ok(value) = serde_json::from_str::<serde_json::Value>(&text)
+                && value["version"].as_u64() == Some(1)
+                && let Some(index) = value["quality"]
+                    .as_u64()
+                    .and_then(|v| usize::try_from(v).ok())
+                && let Some(quality) = Quality::ALL.get(index)
+            {
+                prefs.quality = *quality;
+            }
+        }
         Self {
+            loader: None,
+            opening: None,
+            prepared_titles: None,
+            prepared_stream: None,
+            loading_rollback: None,
+            resume_started: None,
             detection: crate::detection::Worker::new(dir),
             detection_dirty: false,
             prefs,
@@ -179,6 +233,7 @@ impl State {
             passthrough: 0,
             device: String::new(),
             applied: None,
+            applied_quality: None,
             source: String::new(),
             display_title: String::new(),
             titles: Vec::new(),
@@ -287,6 +342,22 @@ impl State {
             input
         }
     }
+    fn save_quality(&self) -> Result<(), String> {
+        use std::io::Write;
+        let directory = self.dir.join("config");
+        std::fs::create_dir_all(&directory)
+            .map_err(|e| format!("No se pudo guardar la calidad: {e}"))?;
+        let mut temp = tempfile::NamedTempFile::new_in(&directory)
+            .map_err(|e| format!("No se pudo guardar la calidad: {e}"))?;
+        let content =
+            serde_json::json!({"version":1,"quality":self.prefs.quality as u8}).to_string();
+        temp.write_all(content.as_bytes())
+            .and_then(|()| temp.as_file().sync_all())
+            .map_err(|e| format!("No se pudo guardar la calidad: {e}"))?;
+        temp.persist(directory.join("quality.json"))
+            .map(|_| ())
+            .map_err(|e| format!("No se pudo guardar la calidad: {e}"))
+    }
     fn save(&self, path: &Path) -> Result<(), String> {
         self.prefs.validate()?;
         std::fs::create_dir_all(path.parent().ok_or("Ruta de perfil inválida")?)
@@ -323,31 +394,108 @@ fn wants_mvc(m: &Mpv, s: &State) -> bool {
             })
 }
 pub fn load(m: &Mpv, s: &mut State, path: &str, title: Option<i32>) -> Result<(), String> {
-    s.capture_tracks(m);
-    m.reset_seeks();
-    s.resume_requested = false;
     let absolute = std::path::absolute(path).map_err(|e| e.to_string())?;
     if !absolute.exists() {
         return Err(format!("No existe: {}", absolute.display()));
     }
-    s.restore_resources(m)?;
     let path = absolute.to_str().ok_or("Ruta Unicode inválida")?.to_owned();
     let same_source = path == s.source;
     let disc = absolute.is_dir()
         || absolute
             .extension()
             .is_some_and(|e| e.eq_ignore_ascii_case("iso"));
+    let titles = if same_source {
+        s.titles.clone()
+    } else if disc {
+        if s.prepared_titles.as_ref().is_some_and(|(p, _)| p == &path) {
+            s.prepared_titles.take().unwrap().1
+        } else if s.automatic {
+            begin_loading(m, s, mvc::Kind::Titles, &path, title)?;
+            return Ok(());
+        } else {
+            m.mvc()?.titles(&path)?
+        }
+    } else {
+        Vec::new()
+    };
+    let saved = if same_source {
+        None
+    } else {
+        cineplayer_core::history::History::identity(&absolute).and_then(|k| {
+            cineplayer_core::history::History::read(&s.dir.join("config/resume.json"))
+                .get_tracks(&k)
+        })
+    };
+    let selected = if disc {
+        title
+            .or_else(|| (same_source && s.title >= 0).then_some(s.title))
+            .or_else(|| saved.as_ref().map(|t| t.title).filter(|t| *t >= 0))
+            .or_else(|| {
+                titles
+                    .iter()
+                    .find(|t| t.repeated == 0 && t.stereo != 0)
+                    .or_else(|| titles.iter().find(|t| t.repeated == 0))
+                    .map(|t| t.playlist as i32)
+            })
+            .ok_or("No se encontró un título Blu-ray reproducible")?
+    } else {
+        -1
+    };
+    let use_mvc = if same_source {
+        wants_mvc(m, s)
+    } else if s.automatic {
+        false
+    } else {
+        (if disc {
+            titles
+                .iter()
+                .any(|t| t.playlist as i32 == selected && t.stereo != 0)
+        } else {
+            s.prefs.layout == Layout::Mvc
+                || s.prefs.layout == Layout::Auto
+                    && stereo::detect_stream("", &path, "") == Layout::Mvc
+        }) && s.prefs.layout != Layout::Mono
+            && match s.prefs.output {
+                Output::Left => s.prefs.swap,
+                Output::Right => !s.prefs.swap,
+                _ => true,
+            }
+    };
+    let info = if use_mvc {
+        if s.prepared_stream
+            .as_ref()
+            .is_some_and(|(p, t, _)| p == &path && *t == selected)
+        {
+            let (_, _, prepared) = s.prepared_stream.take().unwrap();
+            Some(
+                m.mvc()?
+                    .adopt(&format!("cine-mvc://{}", s.generation + 1), prepared)?,
+            )
+        } else if s.automatic {
+            begin_loading(m, s, mvc::Kind::Mvc, &path, Some(selected))?;
+            return Ok(());
+        } else {
+            Some(
+                m.mvc()?
+                    .prepare(&path, selected, &format!("cine-mvc://{}", s.generation + 1))?,
+            )
+        }
+    } else {
+        None
+    };
+    cancel_loading(s);
+    s.capture_tracks(m);
+    m.reset_seeks();
+    s.resume_requested = false;
+    s.resume_started = None;
+    s.restore_resources(m)?;
     if path != s.source {
         s.cancel_startup(m)?;
         s.capture_position(m);
         s.new_open();
         s.subtitles = crate::subtitles::Subtitles::default();
         s.external_subs.clear();
-        s.titles = if disc {
-            m.mvc()?.titles(&path)?
-        } else {
-            Vec::new()
-        };
+        s.titles = titles;
         s.source = path.clone();
         s.display_title = cineplayer_core::media::title(&path, "");
         s.title = -1;
@@ -374,22 +522,11 @@ pub fn load(m: &Mpv, s: &mut State, path: &str, title: Option<i32>) -> Result<()
     }
     s.tracks_restore = s.track_choice.is_some();
     if disc {
-        s.title = title
-            .or_else(|| (s.title >= 0).then_some(s.title))
-            .or_else(|| s.track_choice.as_ref().map(|t| t.title).filter(|t| *t >= 0))
-            .or_else(|| {
-                s.titles
-                    .iter()
-                    .find(|t| t.repeated == 0 && t.stereo != 0)
-                    .or_else(|| s.titles.iter().find(|t| t.repeated == 0))
-                    .map(|t| t.playlist as i32)
-            })
-            .ok_or("No se encontró un título Blu-ray reproducible")?;
+        s.title = selected;
     }
     if let Some(probe) = &mut s.detection {
         probe.request(if disc { "" } else { &path });
     }
-    let use_mvc = wants_mvc(m, s);
     // Preserve explicitly added subtitle files across a transport reload.
     let count = if same_source {
         m.get("track-list/count")
@@ -411,10 +548,11 @@ pub fn load(m: &Mpv, s: &mut State, path: &str, title: Option<i32>) -> Result<()
             s.external_subs.push(file);
         }
     }
-    let subs = if s.external_subs.is_empty() {
+    let sub_files = s.external_subs.clone();
+    let subs = if sub_files.is_empty() {
         String::new()
     } else {
-        format!(",sub-files={}", value(&s.external_subs.join(";")))
+        format!(",sub-files={}", value(&sub_files.join(";")))
     };
     m.set("glsl-shaders", "")?;
     m.set("vf", "")?;
@@ -429,28 +567,14 @@ pub fn load(m: &Mpv, s: &mut State, path: &str, title: Option<i32>) -> Result<()
     }
     if use_mvc {
         let uri = format!("cine-mvc://{}", s.generation);
-        let info = m
-            .mvc()?
-            .prepare(&path, if disc { s.title } else { -1 }, &uri)?;
+        let info = info.ok_or("Falta la preparación MVC")?;
         let audio = if disc {
             format!("bd://mpls/{:05}", s.title)
         } else {
             path.clone()
         };
-        let opts = format!(
-            "demuxer=rawvideo,demuxer-rawvideo-w={},demuxer-rawvideo-h={},demuxer-rawvideo-mp-format={},demuxer-rawvideo-fps={:.12},audio-files={},chapters-file={},demuxer-max-bytes=16MiB,demuxer-max-back-bytes=0,demuxer-readahead-secs=0.25",
-            info.width,
-            info.height,
-            if info.format == 0 {
-                "yuv420p"
-            } else {
-                "yuv420p10"
-            },
-            info.fps_num as f64 / info.fps_den as f64,
-            value(&audio),
-            value(&audio)
-        );
-        m.command(&["loadfile", &uri, "replace", "-1", &(opts + &subs)])?;
+        let opts = mvc_options(info, &audio, &s.external_subs);
+        m.command(&["loadfile", &uri, "replace", "-1", &opts])?;
         s.raw = Some(info);
     } else {
         let uri = if disc {
@@ -473,6 +597,160 @@ pub fn load(m: &Mpv, s: &mut State, path: &str, title: Option<i32>) -> Result<()
     s.pending_load = true;
     Ok(())
 }
+fn mvc_options(info: mvc::Info, original: &str, external: &[String]) -> String {
+    let mut opts = format!(
+        "demuxer=rawvideo,demuxer-rawvideo-w={},demuxer-rawvideo-h={},demuxer-rawvideo-mp-format={},demuxer-rawvideo-fps={:.12},chapters-file={},demuxer-max-bytes=16MiB,demuxer-max-back-bytes=0,demuxer-readahead-secs=0.25",
+        info.width,
+        info.height,
+        if info.format == 0 {
+            "yuv420p"
+        } else {
+            "yuv420p10"
+        },
+        info.fps_num as f64 / info.fps_den as f64,
+        value(original)
+    );
+    let mut subs = external.to_vec();
+    if info.metadata.has_audio != 0 {
+        opts.push_str(&format!(",audio-files={}", value(original)));
+    } else if info.metadata.has_sub != 0 {
+        subs.insert(0, original.into());
+    }
+    if !subs.is_empty() {
+        opts.push_str(&format!(",sub-files={}", value(&subs.join(";"))));
+    }
+    let color = info.metadata.filter();
+    if !color.is_empty() {
+        opts.push_str(&format!(",vf={}", value(&color)));
+    }
+    opts
+}
+fn begin_loading(
+    m: &Mpv,
+    s: &mut State,
+    kind: mvc::Kind,
+    path: &str,
+    title: Option<i32>,
+) -> Result<(), String> {
+    if s.opening
+        .as_ref()
+        .is_some_and(|o| o.kind == kind && o.path == path && o.title == title)
+    {
+        return Ok(());
+    }
+    if s.loader.is_none() {
+        s.loader = Some(m.mvc()?.loader()?);
+    }
+    let id = s
+        .loader
+        .as_mut()
+        .unwrap()
+        .request(kind, path, title.unwrap_or(-1))?;
+    s.opening = Some(Opening {
+        id,
+        kind,
+        path: path.into(),
+        title,
+        saved_resume: None,
+        startup: false,
+        history_asked: false,
+    });
+    m.command(&[
+        "show-text",
+        "Preparando vídeo… Puedes abrir otro archivo o cerrar.",
+        "2000",
+    ])?;
+    Ok(())
+}
+pub fn loading(s: &State) -> bool {
+    s.opening.is_some()
+}
+pub fn cancel_loading(s: &mut State) {
+    if let Some(loader) = &mut s.loader {
+        loader.cancel();
+    }
+    s.opening = None;
+    s.loading_rollback = None;
+}
+pub fn poll_loading(m: &Mpv, s: &mut State) -> Result<(), String> {
+    loop {
+        let result = s.loader.as_mut().and_then(|l| l.poll());
+        let Some((id, result)) = result else {
+            return Ok(());
+        };
+        if !s.opening.as_ref().is_some_and(|o| o.id == id) {
+            continue;
+        }
+        let task = s.opening.take().unwrap();
+        if let Some(loader) = &mut s.loader {
+            loader.completed();
+        }
+        let rollback = s.loading_rollback.take();
+        let result = match result {
+            Ok(mvc::Completion::Titles(titles)) => {
+                s.prepared_titles = Some((task.path.clone(), titles));
+                load(m, s, &task.path, task.title)
+            }
+            Ok(mvc::Completion::Stream(prepared)) => {
+                if task.kind == mvc::Kind::Disc {
+                    commit_disc(m, s, prepared)
+                } else {
+                    let same = task.path == s.source;
+                    let position = if same {
+                        s.resume.clone().or_else(|| m.get("time-pos"))
+                    } else {
+                        None
+                    };
+                    let paused = m.get("pause");
+                    s.prepared_stream =
+                        Some((task.path.clone(), task.title.unwrap_or(-1), prepared));
+                    let result = load(m, s, &task.path, task.title);
+                    if result.is_ok() {
+                        s.resume = position;
+                        s.resume_requested = false;
+                        if let Some(p) = paused {
+                            m.set("pause", &p)?;
+                        }
+                    }
+                    result
+                }
+            }
+            Err(e) => Err(e),
+        };
+        if let Err(e) = result {
+            if let Some(old) = rollback {
+                s.prefs = old;
+                s.applied = None;
+                let _ = apply(m, s);
+            }
+            return Err(format!("No se pudo preparar {}: {e}", task.path));
+        }
+        if loading(s) && s.loading_rollback.is_none() {
+            s.loading_rollback = rollback;
+        }
+        if let Some(next) = &mut s.opening {
+            next.saved_resume = task.saved_resume;
+            next.startup = task.startup;
+            next.history_asked = task.history_asked;
+        } else {
+            if let Some(position) = task.saved_resume {
+                s.resume = Some(position);
+                s.resume_requested = false;
+                s.resume_started = None;
+            }
+            if task.history_asked {
+                s.history_asked = true;
+            }
+            if task.startup {
+                s.startup_choice = true;
+                s.startup_play = false;
+                m.set("pause", "yes")?;
+                m.set("user-data/enigmax-startup", "yes")?;
+            }
+        }
+        return Ok(());
+    }
+}
 pub fn resume_last(m: &Mpv, s: &mut State) -> Result<(), String> {
     if s.automatic {
         s.history = cineplayer_core::history::History::read(&s.dir.join("config/resume.json"));
@@ -490,6 +768,10 @@ pub fn resume_last(m: &Mpv, s: &mut State) -> Result<(), String> {
     )?;
     s.history_asked = true;
     s.resume = record.map(|r| r.seconds.to_string());
+    if let Some(opening) = &mut s.opening {
+        opening.saved_resume = s.resume.clone();
+        opening.history_asked = true;
+    }
     Ok(())
 }
 fn reload_transport(m: &Mpv, s: &mut State) -> Result<(), String> {
@@ -548,6 +830,45 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     let l = s.effective(m);
     let ass = s.subtitles.active(s.prefs.ass_mode, l);
     let canvas = s.subtitles.header.as_ref().map(|h| h.canvas);
+    s.prefs.validate()?;
+    let mut settings = s.prefs.clone();
+    // Input order is distinct from the user's relative left/right inversion.
+    if l.packed()
+        && matches!(
+            m.get("video-dec-params/stereo-in").as_deref(),
+            Some("sbs2r" | "sbsr" | "ab2r" | "abr")
+        )
+    {
+        settings.swap = !settings.swap;
+    }
+    let p = &settings;
+    let anaglyph = l.packed() && p.output == Output::Anaglyph;
+    let (ew, eh, ar) = l.eye(w, h)?;
+    let aspect = p
+        .aspect
+        .unwrap_or(ar * s.raw.map_or(1.0, |i| i.metadata.pixel_aspect()));
+    let subtitle_track = m
+        .get("sid")
+        .is_some_and(|id| id != "no" && id != "auto" && !id.is_empty());
+    let stereo_subs = l.packed() && subtitle_track;
+    // Ordinary subtitles can be projected after video presentation in native
+    // SBS/OU, anamorphic and 2D. Keep gpu-next's HDR color management and avoid
+    // a full-video intermediate. Only eye selection of authored ASS, anaglyph
+    // mixing and the frame-packing gap require fusion before the video shader.
+    let preblend = stereo_subs
+        && (ass.is_some()
+            || p.output == Output::Anaglyph
+            || (p.output == Output::Original && p.delivery == stereo::Delivery::FramePack));
+    let calibrated = p.left_gain != 1.0 || p.right_gain != 1.0 || p.crosstalk != 0.0;
+    let cpu_compatibility =
+        anaglyph && p.quality == Quality::Compatibility && !preblend && !calibrated;
+    let mut graph_prefs = s.prefs.clone();
+    graph_prefs.quality = if cpu_compatibility {
+        Quality::Compatibility
+    } else {
+        Quality::Balanced
+    };
+    s.apply_quality_options(m)?;
     // Dynamic mastering/scene luminance is consumed per frame by libplacebo;
     // it must not rebuild the filter/shader graph on every HDR scene change.
     let decoded: serde_json::Value =
@@ -566,7 +887,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     .map(|key| decoded[key].clone());
     let key = format!(
         "{w}/{h}/{l:?}/{}/{}/{ass:?}/{canvas:?}/{}/{}/{}/{}/{}",
-        s.prefs.encode(),
+        graph_prefs.encode(),
         s.hdr_sdr,
         s.generation,
         serde_json::to_string(&color_key).unwrap_or_default(),
@@ -576,35 +897,9 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         m.get("current-vo").unwrap_or_default()
     );
     if s.applied.as_ref() == Some(&key) {
+        s.quality_status(anaglyph, preblend, calibrated);
         return Ok(());
     }
-    s.prefs.validate()?;
-    let mut settings = s.prefs.clone();
-    // Input order is distinct from the user's relative left/right inversion.
-    if l.packed()
-        && matches!(
-            m.get("video-dec-params/stereo-in").as_deref(),
-            Some("sbs2r" | "sbsr" | "ab2r" | "abr")
-        )
-    {
-        settings.swap = !settings.swap;
-    }
-    let p = &settings;
-    let anaglyph = l.packed() && p.output == Output::Anaglyph;
-    let (ew, eh, ar) = l.eye(w, h)?;
-    let aspect = p.aspect.unwrap_or(ar);
-    let subtitle_track = m
-        .get("sid")
-        .is_some_and(|id| id != "no" && id != "auto" && !id.is_empty());
-    let stereo_subs = l.packed() && subtitle_track;
-    // Ordinary subtitles can be projected after video presentation in native
-    // SBS/OU, anamorphic and 2D. Keep gpu-next's HDR color management and avoid
-    // a full-video intermediate. Only eye selection of authored ASS, anaglyph
-    // mixing and the frame-packing gap require fusion before the video shader.
-    let preblend = stereo_subs
-        && (ass.is_some()
-            || p.output == Output::Anaglyph
-            || (p.output == Output::Original && p.delivery == stereo::Delivery::FramePack));
     let sub_horizontal = if preblend || p.delivery == stereo::Delivery::Native {
         l.horizontal()
     } else {
@@ -632,7 +927,8 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         .to_string(),
     )?;
     m.set("glsl-shaders", "")?;
-    m.set("vf", "")?;
+    let raw_vf = s.raw.map(|i| i.metadata.filter()).unwrap_or_default();
+    m.set("vf", &raw_vf)?;
     m.set("video-crop", "")?;
     let renderer = if preblend { "gpu" } else { "gpu-next" };
     m.set("blend-subtitles", if preblend { "video" } else { "no" })?;
@@ -671,28 +967,14 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     };
     m.set("sub-ass-video-aspect-override", &format!("{sub_par:.12}"))?;
     m.set("sub-pos", &p.sub_pos.to_string())?;
-    m.set(
-        "scale",
-        if p.quality == Quality::High {
-            "ewa_lanczossharp"
-        } else if p.quality == Quality::Low {
-            "bilinear"
-        } else {
-            "spline36"
-        },
-    )?;
-    m.set(
-        "dscale",
-        if p.quality == Quality::High {
-            "mitchell"
-        } else {
-            "bilinear"
-        },
-    )?;
-    let source_hdr = matches!(
-        m.get("video-dec-params/gamma").as_deref(),
-        Some("pq" | "hlg")
-    ) || matches!(m.get("video-params/gamma").as_deref(), Some("pq" | "hlg"));
+    let source_hdr = s
+        .raw
+        .is_some_and(|i| matches!(i.metadata.transfer, 16 | 18))
+        || matches!(
+            m.get("video-dec-params/gamma").as_deref(),
+            Some("pq" | "hlg")
+        )
+        || matches!(m.get("video-params/gamma").as_deref(), Some("pq" | "hlg"));
     m.set(
         "tone-mapping",
         if source_hdr {
@@ -706,15 +988,6 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         },
     )?;
     m.set("gamut-mapping-mode", "auto")?;
-    m.set(
-        "hdr-compute-peak",
-        if p.quality == Quality::Low {
-            "no"
-        } else {
-            "auto"
-        },
-    )?;
-    s.apply_resources(m)?;
     m.set("inverse-tone-mapping", "no")?;
     m.set("target-peak", "auto")?;
     m.set(
@@ -748,12 +1021,14 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         ])?;
     }
     if l.packed() && p.output == Output::Anaglyph {
-        let gamma = m.get("video-params/gamma").unwrap_or_default();
+        let gamma = match s.raw.map(|i| i.metadata.transfer) {
+            Some(16) => "pq".into(),
+            Some(18) => "hlg".into(),
+            Some(13) => "srgb".into(),
+            _ => m.get("video-params/gamma").unwrap_or_default(),
+        };
         let hdr = gamma == "pq" || gamma == "hlg";
-        if p.quality == Quality::Compatibility && !preblend {
-            if p.left_gain != 1.0 || p.right_gain != 1.0 || p.crosstalk != 0.0 {
-                return Err("Los ajustes de calibración requieren uno de los perfiles GPU".into());
-            }
+        if cpu_compatibility {
             let cpu_swap =
                 p.swap ^ (p.glasses == Glasses::AmberBlue && p.algorithm != Algorithm::Dubois);
             let input = l.ffmpeg(cpu_swap).ok_or("Formato 3D inválido")?;
@@ -762,11 +1037,24 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
             } else {
                 ""
             };
-            m.set("hwdec", "auto-copy")?;
+            // libmpv inserts the required hardware download before a software
+            // filter. Keep the decoder policy stable across quality changes;
+            // forcing auto-copy here needlessly restarts the decoder mid-GOP.
+            m.set("hwdec", "auto")?;
+            let download = if hdr {
+                "format=fmt=yuv420p10"
+            } else {
+                "format=fmt=rgb24"
+            };
             m.set(
                 "vf",
                 &format!(
-                    "lavfi=[{color}setsar=1,stereo3d={input}:{},setsar={:.12}]",
+                    "{}{download},lavfi=[{color}setsar=1,stereo3d={input}:{},setsar={:.12}]",
+                    if raw_vf.is_empty() {
+                        String::new()
+                    } else {
+                        format!("{raw_vf},")
+                    },
                     stereo::cpu_output(p.glasses, p.algorithm),
                     aspect * eh as f64 / ew as f64
                 ),
@@ -775,7 +1063,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         } else {
             if hdr {
                 m.set("hwdec", "auto-copy")?;
-                m.set("vf","lavfi=[zscale=t=linear:npl=100,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=p=bt709:t=iec61966-2-1:m=bt709:r=limited,format=yuv420p10le]")?;
+                m.set("vf",&format!("{}lavfi=[zscale=t=linear:npl=100,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=p=bt709:t=iec61966-2-1:m=bt709:r=limited,format=yuv420p10le]",if raw_vf.is_empty(){String::new()}else{format!("{raw_vf},")}))?;
                 s.pipeline = "HDR → SDR por CPU; composición anaglifa GPU".into();
             } else {
                 m.set("hwdec", "auto")?;
@@ -857,11 +1145,8 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     if stereo_subs {
         s.pipeline
             .push_str(" · subtítulos por ojo con profundidad GPU");
-        if p.quality == Quality::Compatibility && p.output == Output::Anaglyph {
-            s.pipeline
-                .push_str(" · GPU necesaria para conservar el ASS");
-        }
     }
+    s.quality_status(anaglyph, preblend, calibrated);
     // Clear only the decoded-frame layout tag: the application already
     // performs the actual projection, and mpv must not duplicate its OSD.
     m.command(&["vf", "add", "@enigmax_layout:format=stereo-in=mono"])?;
@@ -1044,12 +1329,21 @@ pub fn menu(root: &windows::Menu, m: &Mpv, s: &State, include_stereo: bool) -> R
 }
 pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
     let old = s.prefs.clone();
-    let result = action_impl(m, s, id);
+    let result = action_impl(m, s, id).and_then(|()| {
+        if s.automatic && (matches!(id, 1050..=1053) || s.prefs.quality != old.quality) {
+            s.save_quality()
+        } else {
+            Ok(())
+        }
+    });
     if result.is_err() {
         s.prefs = old;
         s.applied = None;
         let _ = apply(m, s);
     } else if matches!(id, 1200..=1204 | 1210 | 1220..=1222 | 1020..=1023 | 1082) {
+        if loading(s) && s.loading_rollback.is_none() {
+            s.loading_rollback = Some(old);
+        }
         s.view_choice_made = true;
     }
     result
@@ -1431,7 +1725,9 @@ fn action_impl(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
         }
         _ => return Ok(()),
     }
-    s.applied = None;
+    if !matches!(id, 1050..=1053) {
+        s.applied = None;
+    }
     if reload && !s.source.is_empty() && wants_mvc(m, s) != s.raw.is_some() {
         reload_transport(m, s)
     } else {
@@ -1447,6 +1743,9 @@ impl State {
         m.set("pause", "yes")?;
         resume_last(m, self)?;
         self.startup_choice = true;
+        if let Some(opening) = &mut self.opening {
+            opening.startup = true;
+        }
         m.set("pause", "yes")?;
         m.set("user-data/enigmax-startup", "yes")?;
         Ok(true)
@@ -1513,7 +1812,55 @@ impl State {
             }
         }
     }
+    fn quality_status(&mut self, anaglyph: bool, preblend: bool, calibrated: bool) {
+        if let Some(index) = self.pipeline.find(" · Compatibilidad: ") {
+            self.pipeline.truncate(index);
+        }
+        if self.prefs.quality == Quality::Compatibility && anaglyph && (preblend || calibrated) {
+            self.pipeline.push_str(
+                " · Compatibilidad: GPU necesaria para conservar subtítulos/calibración 3D",
+            );
+        }
+    }
+    fn apply_quality_options(&mut self, m: &Mpv) -> Result<(), String> {
+        let desired = (self.prefs.quality, m.get("current-vo").unwrap_or_default());
+        if self.applied_quality.as_ref() == Some(&desired) {
+            return Ok(());
+        }
+        self.applied_quality = None;
+        let p = &self.prefs;
+        m.set(
+            "scale",
+            if p.quality == Quality::High {
+                "ewa_lanczossharp"
+            } else if p.quality == Quality::Low {
+                "bilinear"
+            } else {
+                "spline36"
+            },
+        )?;
+        m.set(
+            "dscale",
+            if p.quality == Quality::High {
+                "mitchell"
+            } else {
+                "bilinear"
+            },
+        )?;
+        m.set(
+            "hdr-compute-peak",
+            if p.quality == Quality::Low {
+                "no"
+            } else {
+                "auto"
+            },
+        )?;
+        self.apply_resources(m)?;
+        self.applied_quality = Some(desired);
+        Ok(())
+    }
     fn restore_resources(&mut self, m: &Mpv) -> Result<(), String> {
+        self.applied_quality = None;
         if let Some(saved) = self.resource_restore.take() {
             for (key, value) in &saved {
                 if let Err(error) = m.set(key, value) {
@@ -1710,9 +2057,24 @@ pub fn fallback_disc(m: &Mpv, s: &mut State) -> Result<bool, String> {
     if s.disc_direct || s.raw.is_some() || s.titles.is_empty() {
         return Ok(false);
     }
-    s.disc_direct = true;
+    if s.automatic {
+        let path = s.source.clone();
+        begin_loading(m, s, mvc::Kind::Disc, &path, Some(s.title))?;
+        return Ok(true);
+    }
     let uri = format!("cine-disc://{}", s.generation);
     let info = m.mvc()?.prepare_disc(&s.source, s.title, &uri)?;
+    commit_disc_info(m, s, info)?;
+    Ok(true)
+}
+fn commit_disc(m: &Mpv, s: &mut State, prepared: mvc::Prepared) -> Result<(), String> {
+    let info = m
+        .mvc()?
+        .adopt(&format!("cine-disc://{}", s.generation), prepared)?;
+    commit_disc_info(m, s, info)
+}
+fn commit_disc_info(m: &Mpv, s: &mut State, info: mvc::Info) -> Result<(), String> {
+    let uri = format!("cine-disc://{}", s.generation);
     let start = info.audio_delay;
     let end = start + info.duration;
     let title = Path::new(&s.source)
@@ -1723,9 +2085,10 @@ pub fn fallback_disc(m: &Mpv, s: &mut State) -> Result<bool, String> {
         "loadfile", &uri, "replace", "-1",
         &format!("demuxer=lavf,demuxer-lavf-format=mpegts,start={start:.9},end={end:.9},force-media-title={}",value(title)),
     ])?;
+    s.disc_direct = true;
     s.pending_load = true;
     s.applied = None;
-    Ok(true)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1733,6 +2096,45 @@ mod state_tests {
     use super::*;
     use std::time::{Duration, Instant};
 
+    #[test]
+    fn quality_is_persisted_independently_and_survives_restart_and_bad_records() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("config")).unwrap();
+        let defaults = Settings {
+            quality: Quality::High,
+            aspect: Some(2.39),
+            swap: true,
+            ..Settings::default()
+        }
+        .encode();
+        let path = dir.path().join("config/default.ini");
+        std::fs::write(&path, &defaults).unwrap();
+        assert_eq!(State::new(dir.path(), false).prefs.quality, Quality::High);
+        for quality in Quality::ALL {
+            let mut state = State::new(dir.path(), false);
+            state.prefs.quality = quality;
+            state.save_quality().unwrap();
+            drop(state);
+            let next = State::new(dir.path(), false);
+            assert_eq!(next.prefs.quality, quality);
+            assert_eq!(next.prefs.aspect, Some(2.39));
+            assert!(next.prefs.swap);
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), defaults);
+        }
+        for invalid in [
+            "bad".to_owned(),
+            r#"{"version":1,"quality":99}"#.into(),
+            r#"{"version":2,"quality":0}"#.into(),
+            "x".repeat(1025),
+        ] {
+            std::fs::write(dir.path().join("config/quality.json"), invalid).unwrap();
+            assert_eq!(State::new(dir.path(), false).prefs.quality, Quality::High);
+        }
+        assert_eq!(
+            State::new(dir.path(), true).prefs.quality,
+            Quality::Balanced
+        );
+    }
     fn iso_pump(m: &mut Mpv, s: &mut State, done: impl Fn(&Mpv, &State) -> bool) {
         let until = Instant::now() + Duration::from_secs(25);
         while Instant::now() < until {
@@ -1760,6 +2162,7 @@ mod state_tests {
                 );
                 s.pending_load = false;
             }
+            poll_loading(m, s).unwrap();
             s.restore_tracks(m).unwrap();
             if id == 8 || id == 17 {
                 apply(m, s).unwrap();
@@ -1767,7 +2170,7 @@ mod state_tests {
             s.restore_position(m).unwrap();
             s.capture_tracks(m);
             s.remember_ready(m).unwrap();
-            if done(m, s) {
+            if !loading(s) && done(m, s) {
                 return;
             }
         }
@@ -1855,6 +2258,7 @@ mod state_tests {
             let mut m = iso_engine(root);
             let mut s = State::new(temp.path(), false);
             assert!(s.begin_startup(&m).unwrap());
+            iso_pump(&mut m, &mut s, |_, s| s.source == path);
             assert_eq!(s.source, path);
             assert_eq!(s.title, title);
             let target = s.resume.clone();
@@ -2180,3 +2584,7 @@ mod state_tests {
         assert!(s.resume.is_none());
     }
 }
+
+#[cfg(test)]
+#[path = "reliability_audit.rs"]
+mod reliability_audit;

@@ -14,6 +14,16 @@ typedef struct {
     double duration,audio_delay;
 } EC_Info;
 typedef struct {uint32_t playlist,clips;double duration;int32_t stereo,reserved;} EC_Title;
+typedef struct {int32_t sar_num,sar_den,range,matrix,primaries,transfer,chroma,has_audio,has_sub;} EC_Metadata;
+/* The original EC_Info ABI is retained for existing diagnostic clients. */
+EC_API int ec_bridge_abi_version(void);
+EC_API void *ec_cancel_create(void);
+EC_API void ec_cancel_set(void *);
+EC_API void ec_cancel_free(void *);
+EC_API int ec_disc_titles_ex(const char*,EC_Title*,int,char*,int,void*);
+EC_API void *ec_mvc_open_ex(const char*,int,int,EC_Info*,char*,int,void*);
+EC_API void *ec_disc_stream_open_ex(const char*,int,int,EC_Info*,char*,int,void*);
+EC_API int ec_mvc_metadata(void*,EC_Metadata*);
 EC_API int ec_disc_titles(const char *path, EC_Title *titles,int capacity,char *error,int error_size);
 EC_API int ec_disc_read(const char *path,const char *relative,void *buffer,int capacity);
 EC_API void *ec_mvc_open(const char *path,int playlist,int threads,EC_Info *info,char *error,int error_size);

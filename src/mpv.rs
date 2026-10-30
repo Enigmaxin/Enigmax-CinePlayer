@@ -65,7 +65,26 @@ struct NodeList {
     keys: *mut *mut c_char,
 }
 
+#[derive(Clone)]
+pub struct Shutdown(std::sync::Arc<ShutdownInner>);
+struct ShutdownInner {
+    requested: std::sync::atomic::AtomicBool,
+    target: std::sync::Mutex<Option<(usize, unsafe extern "C" fn(Handle))>>,
+}
+impl Shutdown {
+    pub fn request(&self) {
+        self.0
+            .requested
+            .store(true, std::sync::atomic::Ordering::Release);
+        if let Ok(target) = self.0.target.lock()
+            && let Some((handle, wake)) = *target
+        {
+            unsafe { wake(handle as Handle) }
+        }
+    }
+}
 pub struct Mpv {
+    shutdown: Shutdown,
     handle: Handle,
     library: windows::Library,
     destroy: Destroy,
@@ -88,6 +107,15 @@ fn c(s: &str) -> Result<CString, String> {
 }
 
 impl Mpv {
+    pub fn shutdown_signal(&self) -> Shutdown {
+        self.shutdown.clone()
+    }
+    pub fn shutdown_requested(&self) -> bool {
+        self.shutdown
+            .0
+            .requested
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
     pub fn popup_client(&self) -> Result<PopupClient<'_>, String> {
         type CreateClient = unsafe extern "C" fn(Handle, *const c_char) -> Handle;
         let create: CreateClient =
@@ -198,11 +226,17 @@ impl Mpv {
             if version() >> 16 != 2 {
                 return Err("Versión de API libmpv incompatible: se requiere 2.x".into());
             }
+            let wake: unsafe extern "C" fn(Handle) =
+                std::mem::transmute(library.symbol(c"mpv_wakeup")?);
             let handle = create();
             if handle.is_null() {
                 return Err("No se pudo crear libmpv".into());
             }
             Ok(Self {
+                shutdown: Shutdown(std::sync::Arc::new(ShutdownInner {
+                    requested: std::sync::atomic::AtomicBool::new(false),
+                    target: std::sync::Mutex::new(Some((handle as usize, wake))),
+                })),
                 handle,
                 library,
                 destroy,
@@ -255,11 +289,16 @@ impl Mpv {
         ) -> c_int;
         let register: Register =
             unsafe { std::mem::transmute(self.library.symbol(c"mpv_stream_cb_add_ro")?) };
+        if self.registry.is_some() {
+            return Err("Los protocolos ya están registrados".into());
+        }
+        self.registry = Some(registry);
+        let registry = self.registry.as_ref().unwrap();
         self.check(unsafe {
             register(
                 self.handle,
                 c"cine-mvc".as_ptr(),
-                (&*registry as *const crate::mvc::Registry)
+                (&**registry as *const crate::mvc::Registry)
                     .cast_mut()
                     .cast(),
                 crate::mvc::open,
@@ -269,13 +308,12 @@ impl Mpv {
             register(
                 self.handle,
                 c"cine-disc".as_ptr(),
-                (&*registry as *const crate::mvc::Registry)
+                (&**registry as *const crate::mvc::Registry)
                     .cast_mut()
                     .cast(),
                 crate::mvc::open,
             )
         })?;
-        self.registry = Some(registry);
         Ok(())
     }
     pub fn mvc(&self) -> Result<&crate::mvc::Registry, String> {
@@ -450,6 +488,9 @@ impl PopupClient<'_> {
         if event.id == 1 {
             return Err("El reproductor se está cerrando".into());
         }
+        if matches!(event.id, 6..=8) {
+            return Err("El archivo del menú ha cambiado".into());
+        }
         if event.id != 16 || event.data.is_null() {
             return Ok(None);
         }
@@ -480,6 +521,10 @@ impl Drop for PopupClient<'_> {
 
 impl Drop for Mpv {
     fn drop(&mut self) {
+        // Serialize wakeup against teardown: updater requests never touch a freed handle.
+        if let Ok(mut target) = self.shutdown.0.target.lock() {
+            *target = None;
+        }
         // All client resources are released before unloading the DLL.
         unsafe { (self.destroy)(self.handle) };
         let _ = &self.library;

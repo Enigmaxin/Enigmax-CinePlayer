@@ -20,17 +20,24 @@
 #include <math.h>
 #include <limits.h>
 
+#include "cancellable_io.h"
+
+EC_API int ec_bridge_abi_version(void){return 1;}
+EC_API void *ec_cancel_create(void){return ec_stop_new();}
+EC_API void ec_cancel_set(void *p){if(p)atomic_store(&((EC_Cancel*)p)->cancelled,1);}
+EC_API void ec_cancel_free(void *p){free(p);}
+
 #define MAX_CLIPS 1024
 #define IO_BUFFER 65536
 #define MAX_MPLS (2*1024*1024)
 #define DECODE_TIMEOUT 25
 
-typedef struct {udfread_block_input api; AVIOContext *io; SRWLOCK lock;} Blocks;
-typedef struct {char *path;udfread *udf;Blocks *blocks;int iso;} Source;
-typedef struct {Source *source;UDFFILE *udf;AVIOContext *file;int64_t size;} File;
+typedef struct {udfread_block_input api; EC_FileIO io; SRWLOCK lock;} Blocks;
+typedef struct {char *path;udfread *udf;Blocks *blocks;int iso;EC_Cancel *cancel;int own_cancel;} Source;
+typedef struct {Source *source;UDFFILE *udf;EC_FileIO file;int64_t size;} File;
 typedef struct {char id[6];double in,out,begin;} Clip;
 typedef struct {
-    Source source;EC_Info info;Clip *clips;int clip_count,clip;
+    Source source;EC_Info info;EC_Metadata metadata;Clip *clips;int clip_count,clip;
     AVFormatContext *format;AVIOContext *custom;File *file;
     AVFormatContext *dependent_format;AVIOContext *dependent_custom;File *dependent_file;
     AVPacket *base_pending,*dependent_pending;
@@ -54,20 +61,21 @@ static void set_error(char *dst,int cap,const char *message){if(dst&&cap>0){snpr
 static int block_read(udfread_block_input *p,uint32_t lba,void *buf,uint32_t n,int flags){
     (void)flags;Blocks *b=(Blocks*)p;if(n>INT_MAX/2048)return 0;
     AcquireSRWLockExclusive(&b->lock);int got=0;
-    if(avio_seek(b->io,(int64_t)lba*2048,SEEK_SET)>=0){int r=avio_read(b->io,buf,(int)n*2048);if(r>0)got=r/2048;}
+    int r=ec_io_read_at(&b->io,buf,(int)n*2048,(int64_t)lba*2048);if(r>0)got=r/2048;
     ReleaseSRWLockExclusive(&b->lock);return got;
 }
-static uint32_t block_size(udfread_block_input *p){Blocks *b=(Blocks*)p;int64_t s=avio_size(b->io);return s>0&&s/2048<=UINT32_MAX?(uint32_t)(s/2048):0;}
-static int block_close(udfread_block_input *p){Blocks *b=(Blocks*)p;avio_closep(&b->io);free(b);return 0;}
-static void source_close(Source *s){if(s->udf){udfread_close(s->udf);s->udf=NULL;s->blocks=NULL;}else if(s->blocks){block_close(&s->blocks->api);s->blocks=NULL;}free(s->path);s->path=NULL;}
-static int source_open(Source *s,const char *path,char *err,int cap){
+static uint32_t block_size(udfread_block_input *p){Blocks *b=(Blocks*)p;int64_t s=b->io.size;return s>0&&s/2048<=UINT32_MAX?(uint32_t)(s/2048):0;}
+static int block_close(udfread_block_input *p){Blocks *b=(Blocks*)p;ec_io_close(&b->io);free(b);return 0;}
+static void source_close(Source *s){if(s->udf){udfread_close(s->udf);s->udf=NULL;s->blocks=NULL;}else if(s->blocks){block_close(&s->blocks->api);s->blocks=NULL;}free(s->path);s->path=NULL;if(s->own_cancel)ec_cancel_free(s->cancel);s->cancel=NULL;}
+static int source_open_ex(Source *s,const char *path,char *err,int cap,EC_Cancel *cancel){
     memset(s,0,sizeof(*s));if(!path||strlen(path)>32760){set_error(err,cap,"Ruta no válida");return -1;}
-    s->path=strdup(path);if(!s->path)return -1;
+    s->cancel=cancel?cancel:ec_stop_new();s->own_cancel=!cancel;if(!s->cancel)return -1;
+    s->path=strdup(path);if(!s->path){source_close(s);return -1;}
     size_t n=strlen(path);s->iso=n>=4&&!_stricmp(path+n-4,".iso");
     if(!s->iso)return 0;
     s->blocks=calloc(1,sizeof(Blocks));if(!s->blocks)goto fail;
     s->blocks->api.read=block_read;s->blocks->api.size=block_size;s->blocks->api.close=block_close;InitializeSRWLock(&s->blocks->lock);
-    if(avio_open(&s->blocks->io,path,AVIO_FLAG_READ)<0){set_error(err,cap,"No se pudo abrir la ISO en lectura");goto fail;}
+    if(ec_io_open(&s->blocks->io,path,s->cancel)<0){set_error(err,cap,"No se pudo abrir la ISO en lectura");goto fail;}
     s->udf=udfread_init();if(!s->udf)goto fail;udfread_set_log_level(s->udf,UDFREAD_LOG_NONE);
     if(udfread_open_input(s->udf,&s->blocks->api)<0){
         /* udfread_open_input owns the callbacks only on success. */
@@ -76,16 +84,25 @@ static int source_open(Source *s,const char *path,char *err,int cap){
     return 0;
 fail:source_close(s);return -1;
 }
+static int source_open(Source *s,const char *path,char *err,int cap){return source_open_ex(s,path,err,cap,NULL);}
 static File *file_open(Source *s,const char *relative){
     File *f=calloc(1,sizeof(*f));if(!f)return NULL;f->source=s;
-    if(s->iso){f->udf=udfread_file_open(s->udf,relative);if(!f->udf)goto fail;f->size=udfread_file_size(f->udf);}
-    else {size_t n=strlen(s->path)+strlen(relative)+2;char *p=malloc(n);if(!p)goto fail;snprintf(p,n,"%s/%s",s->path,relative);int r=avio_open(&f->file,p,AVIO_FLAG_READ);free(p);if(r<0)goto fail;f->size=avio_size(f->file);}
+    f->file.handle=INVALID_HANDLE_VALUE;if(ec_stopped(s->cancel))goto fail;
+    if(s->iso&&relative){f->udf=udfread_file_open(s->udf,relative);if(!f->udf)goto fail;f->size=udfread_file_size(f->udf);}
+    else {size_t n=strlen(s->path)+(relative?strlen(relative):0)+2;char *p=malloc(n);if(!p)goto fail;if(relative)snprintf(p,n,"%s/%s",s->path,relative);else snprintf(p,n,"%s",s->path);int r=ec_io_open(&f->file,p,s->cancel);free(p);if(r<0)goto fail;f->size=f->file.size;}
     return f;
 fail:free(f);return NULL;
 }
-static void file_close(File *f){if(!f)return;if(f->udf)udfread_file_close(f->udf);if(f->file)avio_closep(&f->file);free(f);}
-static int file_read(File *f,uint8_t *buf,int size){if(f->udf){ssize_t r=udfread_file_read(f->udf,buf,(size_t)size);return r>0?(int)r:AVERROR_EOF;}return avio_read(f->file,buf,size);}
-static int64_t file_seek(File *f,int64_t offset,int whence){if(whence==AVSEEK_SIZE)return f->size;whence&=~AVSEEK_FORCE;if(f->udf)return udfread_file_seek(f->udf,offset,whence);return avio_seek(f->file,offset,whence);}
+static void file_close(File *f){if(!f)return;if(f->udf)udfread_file_close(f->udf);ec_io_close(&f->file);free(f);}
+static int file_read(File *f,uint8_t *buf,int size){
+    if(ec_stopped(f->source->cancel))return AVERROR_EXIT;
+    if(f->udf){ssize_t r=udfread_file_read(f->udf,buf,(size_t)size);if(r>0)return (int)r;
+        if(ec_stopped(f->source->cancel))return AVERROR_EXIT;
+        return r<0||atomic_load(&f->source->cancel->io_error)?AVERROR(EIO):AVERROR_EOF;
+    }
+    int r=ec_io_read(&f->file,buf,size);return r>0?r:r==0?AVERROR_EOF:r==-ECANCELED?AVERROR_EXIT:AVERROR(EIO);
+}
+static int64_t file_seek(File *f,int64_t offset,int whence){if(whence==AVSEEK_SIZE)return f->size;whence&=~AVSEEK_FORCE;if(f->udf)return udfread_file_seek(f->udf,offset,whence);return ec_io_seek(&f->file,offset,whence);}
 static int avio_read_cb(void *o,uint8_t *buf,int n){return file_read(o,buf,n);}
 EC_API int ec_disc_read(const char *path,const char *relative,void *buffer,int capacity){
     if(!relative||strstr(relative,"..")||relative[0]=='/'||relative[0]=='\\'||strchr(relative,':')||!buffer||capacity<1||capacity>16*1024*1024)return -1;
@@ -118,9 +135,9 @@ static int playlist(Source *s,int id,Clip **clips,int *count,EC_Title *info){
     if(clips){*clips=out;out=NULL;}if(count)*count=(int)number;result=0;
 done:free(out);free(buf);return result;
 }
-EC_API int ec_disc_titles(const char *path,EC_Title *titles,int cap,char *error,int error_size){
-    if(!titles||cap<1||cap>10000)return -1;Source s;if(source_open(&s,path,error,error_size)<0)return -1;int count=0;
-    if(s.iso){UDFDIR *dir=udfread_opendir(s.udf,"BDMV/PLAYLIST");if(!dir){set_error(error,error_size,"No existe BDMV/PLAYLIST en la ISO");source_close(&s);return -1;}struct udfread_dirent entry;while(udfread_readdir(dir,&entry)&&count<cap){
+EC_API int ec_disc_titles_ex(const char *path,EC_Title *titles,int cap,char *error,int error_size,void *cancel){
+    if(!titles||cap<1||cap>10000)return -1;Source s;if(source_open_ex(&s,path,error,error_size,cancel)<0)return -1;int count=0;
+    if(s.iso){UDFDIR *dir=udfread_opendir(s.udf,"BDMV/PLAYLIST");if(!dir){set_error(error,error_size,"No existe BDMV/PLAYLIST en la ISO");source_close(&s);return -1;}struct udfread_dirent entry;while(!ec_stopped(s.cancel)&&udfread_readdir(dir,&entry)&&count<cap){
             if(strlen(entry.d_name)!=10||_stricmp(entry.d_name+5,".mpls"))continue;char *end=NULL;long id=strtol(entry.d_name,&end,10);if(end!=entry.d_name+5||id<0||id>99999)continue;
             if(playlist(&s,(int)id,NULL,NULL,&titles[count])==0)count++;
         }udfread_closedir(dir);
@@ -128,11 +145,12 @@ EC_API int ec_disc_titles(const char *path,EC_Title *titles,int cap,char *error,
         /* UTF-8-safe enumeration of a selected folder via FindFirstFileW. */
         size_t bytes=strlen(path)+32;char *p=malloc(bytes);if(!p){source_close(&s);return -1;}snprintf(p,bytes,"%s/BDMV/PLAYLIST/*.mpls",path);
         int len=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,p,-1,NULL,0);wchar_t *wp=len>0?malloc((size_t)len*sizeof(wchar_t)):NULL;free(p);
-        if(wp){p=malloc(bytes);if(!p){free(wp);source_close(&s);return -1;}snprintf(p,bytes,"%s/BDMV/PLAYLIST/*.mpls",path);MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,p,-1,wp,len);free(p);WIN32_FIND_DATAW data;HANDLE h=FindFirstFileW(wp,&data);free(wp);if(h!=INVALID_HANDLE_VALUE){do{wchar_t *end=NULL;long id=wcstol(data.cFileName,&end,10);if(end==data.cFileName+5&&!_wcsicmp(end,L".mpls")&&id>=0&&id<=99999&&playlist(&s,(int)id,NULL,NULL,&titles[count])==0)count++;}while(count<cap&&FindNextFileW(h,&data));FindClose(h);}}
+        if(wp){p=malloc(bytes);if(!p){free(wp);source_close(&s);return -1;}snprintf(p,bytes,"%s/BDMV/PLAYLIST/*.mpls",path);MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,p,-1,wp,len);free(p);WIN32_FIND_DATAW data;HANDLE h=FindFirstFileW(wp,&data);free(wp);if(h!=INVALID_HANDLE_VALUE){do{wchar_t *end=NULL;long id=wcstol(data.cFileName,&end,10);if(end==data.cFileName+5&&!_wcsicmp(end,L".mpls")&&id>=0&&id<=99999&&playlist(&s,(int)id,NULL,NULL,&titles[count])==0)count++;}while(!ec_stopped(s.cancel)&&count<cap&&FindNextFileW(h,&data));FindClose(h);}}
     }
-    source_close(&s);if(!count)set_error(error,error_size,"No hay títulos Blu-ray válidos");return count;
+    int cancelled=ec_stopped(s.cancel);source_close(&s);if(cancelled){set_error(error,error_size,"Lectura de títulos cancelada");return -1;}if(!count)set_error(error,error_size,"No hay títulos Blu-ray válidos");return count;
 }
-static int interrupted(void *p){Engine *e=p;return atomic_load(&e->cancelled)||now()>e->deadline;}
+EC_API int ec_disc_titles(const char *p,EC_Title *t,int n,char *e,int cap){return ec_disc_titles_ex(p,t,n,e,cap,NULL);}
+static int interrupted(void *p){Engine *e=p;return atomic_load(&e->cancelled)||ec_stopped(e->source.cancel)||now()>e->deadline;}
 static void dependent_reset(Engine *e){
     ec_annexb_reset(&e->dependent_annexb);e->dependent_offset=0;e->dependent_eof=0;
     e->dependent_pts=e->dependent_dts=AV_NOPTS_VALUE;
@@ -142,8 +160,9 @@ static void input_close(Engine *e){for(int i=0;i<2;i++)av_bsf_free(&e->bsf[i]);a
 static int open_input(Engine *e){
     dependent_reset(e);
     input_close(e);e->format=avformat_alloc_context();if(!e->format)return -1;e->format->interrupt_callback=(AVIOInterruptCB){interrupted,e};e->format->probesize=8*1024*1024;e->format->max_analyze_duration=5*AV_TIME_BASE;
-    const char *path=e->source.path;char name[96];
-    if(e->clip_count){snprintf(name,sizeof(name),"BDMV/STREAM/%s.m2ts",e->clips[e->clip].id);e->file=file_open(&e->source,name);if(!e->file){snprintf(e->error,sizeof(e->error),"Falta la vista base del clip %s",e->clips[e->clip].id);return -1;}
+    const char *path=NULL;char name[96];
+    if(e->clip_count)snprintf(name,sizeof(name),"BDMV/STREAM/%s.m2ts",e->clips[e->clip].id);
+    {e->file=file_open(&e->source,e->clip_count?name:NULL);if(!e->file){snprintf(e->error,sizeof(e->error),"No se pudo abrir el flujo MVC en lectura");return -1;}
         uint8_t *buf=av_malloc(IO_BUFFER);if(!buf)return -1;e->custom=avio_alloc_context(buf,IO_BUFFER,0,e->file,avio_read_cb,NULL,avio_seek_cb);if(!e->custom){av_free(buf);return -1;}e->format->pb=e->custom;e->format->flags|=AVFMT_FLAG_CUSTOM_IO;path=NULL;
     }
     if(avformat_open_input(&e->format,path,NULL,NULL)<0||avformat_find_stream_info(e->format,NULL)<0){snprintf(e->error,sizeof(e->error),"No se pudo analizar el flujo MVC");return -1;}
@@ -168,7 +187,12 @@ static int open_input(Engine *e){
         av_packet_move_ref(e->dependent_chunk,e->dependent_pending);
         e->dependent_pts=e->dependent_chunk->pts;e->dependent_dts=e->dependent_chunk->dts;
     }
-    AVStream *v=e->format->streams[e->video[0]];AVRational fps=av_guess_frame_rate(e->format,v,NULL);
+    AVStream *v=e->format->streams[e->video[0]];AVCodecParameters *par=v->codecpar;
+    AVRational sar=v->sample_aspect_ratio;if(sar.num<=0||sar.den<=0)sar=par->sample_aspect_ratio;if(sar.num<=0||sar.den<=0)sar=(AVRational){1,1};
+    EC_Metadata metadata={sar.num,sar.den,par->color_range,par->color_space,par->color_primaries,par->color_trc,par->chroma_location,0,0};
+    for(unsigned i=0;i<e->format->nb_streams;i++){metadata.has_audio|=e->format->streams[i]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO;metadata.has_sub|=e->format->streams[i]->codecpar->codec_type==AVMEDIA_TYPE_SUBTITLE;}
+    if(e->info.width&&memcmp(&metadata,&e->metadata,offsetof(EC_Metadata,has_audio))){snprintf(e->error,sizeof(e->error),"MVC cambia de metadatos de vídeo entre clips");return -1;}e->metadata=metadata;
+    AVRational fps=av_guess_frame_rate(e->format,v,NULL);
     if(fps.num<=0||fps.den<=0||av_q2d(fps)<1||av_q2d(fps)>240){snprintf(e->error,sizeof(e->error),"No se conoce la frecuencia fija de este MVC");return -1;}
     if(e->info.fps_num&&(e->info.fps_num!=fps.num||e->info.fps_den!=fps.den)){snprintf(e->error,sizeof(e->error),"El título cambia de frecuencia entre clips");return -1;}
     e->info.fps_num=fps.num;e->info.fps_den=fps.den;
@@ -211,7 +235,7 @@ static int next_packet(Engine *e){
     for(;;){if(interrupted(e)){snprintf(e->error,sizeof(e->error),"Lectura MVC cancelada o agotada");return -1;}
         int r,n=-1;AVFormatContext *packet_format=e->format;
         if(e->dependent_format){
-            if(!e->base_pending->size){while((r=av_read_frame(e->format,e->base_pending))>=0){if(e->base_pending->stream_index==e->video[0])break;av_packet_unref(e->base_pending);}}
+            if(!e->base_pending->size){while((r=av_read_frame(e->format,e->base_pending))>=0){if(e->base_pending->stream_index==e->video[0])break;av_packet_unref(e->base_pending);}if(r<0&&r!=AVERROR_EOF){snprintf(e->error,sizeof(e->error),"Error de lectura de vista base (%d)",r);return -1;}}
             if(!e->dependent_pending->size&&next_dependent_nal(e,e->dependent_pending)<0)return -1;
             if(!e->base_pending->size&&!e->dependent_pending->size){e->eof=1;edge264mvc_send_end(e->decoder);return 0;}
             double base_time=INFINITY,dependent_time=INFINITY;
@@ -219,7 +243,7 @@ static int next_packet(Engine *e){
             if(e->dependent_pending->size){AVPacket *p=e->dependent_pending;int64_t t=p->dts!=AV_NOPTS_VALUE?p->dts:p->pts;dependent_time=t*av_q2d(e->dependent_format->streams[p->stream_index]->time_base);}
             if(base_time<=dependent_time&&e->base_pending->size){n=0;av_packet_move_ref(e->packet,e->base_pending);}else{n=1;packet_format=e->dependent_format;av_packet_move_ref(e->packet,e->dependent_pending);}
         }else{
-            r=av_read_frame(e->format,e->packet);if(r<0){e->eof=1;edge264mvc_send_end(e->decoder);return 0;}
+            r=av_read_frame(e->format,e->packet);if(r<0){if(r!=AVERROR_EOF){snprintf(e->error,sizeof(e->error),"Error al leer MVC (%d)",r);return -1;}e->eof=1;edge264mvc_send_end(e->decoder);return 0;}
             for(int i=0;i<e->video_count;i++)if(e->packet->stream_index==e->video[i]){n=i;break;}
         }
         if(n<0){av_packet_unref(e->packet);continue;}
@@ -277,13 +301,13 @@ static int decode_next(Engine *e,double target){
     snprintf(e->error,sizeof(e->error),"Demasiados paquetes sin obtener un par MVC válido");return -1;
 }
 EC_API void ec_mvc_close(void *context){Engine *e=context;if(!e)return;input_close(e);edge264mvc_close(&e->decoder);av_packet_free(&e->packet);av_packet_free(&e->filtered);av_packet_free(&e->base_pending);av_packet_free(&e->dependent_pending);av_packet_free(&e->dependent_chunk);free(e->dependent_annexb.data);free(e->frame);free(e->clips);source_close(&e->source);free(e);}
-EC_API void *ec_mvc_open(const char *path,int title,int threads,EC_Info *info,char *err,int cap){
+EC_API void *ec_mvc_open_ex(const char *path,int title,int threads,EC_Info *info,char *err,int cap,void *cancel){
     Engine *e=calloc(1,sizeof(*e));if(!e)return NULL;e->first_pts=NAN;e->deadline=now()+DECODE_TIMEOUT;atomic_init(&e->cancelled,0);e->packet=av_packet_alloc();e->filtered=av_packet_alloc();e->base_pending=av_packet_alloc();e->dependent_pending=av_packet_alloc();e->dependent_chunk=av_packet_alloc();
-    if(!e->packet||!e->filtered||!e->base_pending||!e->dependent_pending||!e->dependent_chunk||source_open(&e->source,path,e->error,sizeof(e->error))<0)goto fail;
+    if(!e->packet||!e->filtered||!e->base_pending||!e->dependent_pending||!e->dependent_chunk||source_open_ex(&e->source,path,e->error,sizeof(e->error),cancel)<0)goto fail;
     size_t len=strlen(path);int disc=e->source.iso||(len&&path[len-1]=='/');
     if(!disc){char p[32768];snprintf(p,sizeof(p),"%s/BDMV/index.bdmv",path);AVIOContext *test=NULL;if(avio_open(&test,p,AVIO_FLAG_READ)>=0){disc=1;avio_closep(&test);}}
     if(disc){
-        if(title<0){EC_Title *list=calloc(4096,sizeof(*list));if(!list)goto fail;int n=ec_disc_titles(path,list,4096,e->error,sizeof(e->error));double best=-1;for(int i=0;i<n;i++)if(list[i].stereo&&!list[i].reserved&&list[i].duration>best){title=(int)list[i].playlist;best=list[i].duration;}free(list);}
+        if(title<0){EC_Title *list=calloc(4096,sizeof(*list));if(!list)goto fail;int n=ec_disc_titles_ex(path,list,4096,e->error,sizeof(e->error),e->source.cancel);double best=-1;for(int i=0;i<n;i++)if(list[i].stereo&&!list[i].reserved&&list[i].duration>best){title=(int)list[i].playlist;best=list[i].duration;}free(list);}
         EC_Title t;if(title<0||playlist(&e->source,title,&e->clips,&e->clip_count,&t)<0||!t.stereo){snprintf(e->error,sizeof(e->error),"El título no contiene un SSIF 3D accesible");goto fail;}e->info.duration=t.duration;e->info.playlist=title;e->info.clips=e->clip_count;
     }else{e->info.playlist=-1;}
     Edge264MvcSettings settings;edge264mvc_default_settings(&settings);settings.n_threads=threads>0&&threads<=16?threads:4;
@@ -294,8 +318,10 @@ EC_API void *ec_mvc_open(const char *path,int title,int threads,EC_Info *info,ch
     if(info)*info=e->info;return e;
 fail:if(!e->error[0])snprintf(e->error,sizeof(e->error),"No se pudo iniciar MVC");set_error(err,cap,e->error);ec_mvc_close(e);return NULL;
 }
+EC_API void *ec_mvc_open(const char *p,int t,int n,EC_Info *i,char *e,int cap){return ec_mvc_open_ex(p,t,n,i,e,cap,NULL);}
+EC_API int ec_mvc_metadata(void *p,EC_Metadata *out){if(!p||!out)return -1;*out=((Engine*)p)->metadata;return 0;}
 EC_API int64_t ec_mvc_read(void *context,void *buffer,uint64_t n){Engine *e=context;if(!e||!buffer||atomic_load(&e->cancelled))return -1;if(n>1024*1024)n=1024*1024;if(n==0)return 0;
-    if(e->info.frames>0&&e->position>=e->info.frames*(int64_t)e->frame_size)return 0;
+    if(e->info.frames>0&&e->info.frames<=INT64_MAX/(int64_t)e->frame_size&&e->position>=e->info.frames*(int64_t)e->frame_size)return 0;
     if(!e->frame_ready){double target=(double)(e->position/(int64_t)e->frame_size)*e->info.fps_den/e->info.fps_num;int r=decode_next(e,target);if(r<=0)return r;}
     size_t available=e->frame_size-e->frame_offset,take=(size_t)n<available?(size_t)n:available;memcpy(buffer,e->frame+e->frame_offset,take);e->position+=(int64_t)take;e->frame_offset+=take;if(e->frame_offset==e->frame_size)e->frame_ready=0;return (int64_t)take;
 }
@@ -314,7 +340,7 @@ reset_decoder:
     for(int i=0;i<e->video_count;i++)av_bsf_flush(e->bsf[i]);edge264mvc_flush(e->decoder);av_packet_unref(e->packet);av_packet_unref(e->filtered);e->nal_pos=0;e->eof=0;e->frame_ready=0;e->frame_number=index;
     if(decode_next(e,target)<1)return -20;e->frame_offset=within;e->position=offset;return offset;
 }
-EC_API void ec_mvc_cancel(void *context){Engine *e=context;if(e)atomic_store(&e->cancelled,1);}
+EC_API void ec_mvc_cancel(void *context){Engine *e=context;if(e){atomic_store(&e->cancelled,1);ec_cancel_set(e->source.cancel);}}
 EC_API const char *ec_mvc_error(void *context){Engine *e=context;return e?e->error:"MVC cerrado";}
 
 
@@ -322,11 +348,11 @@ EC_API const char *ec_mvc_error(void *context){Engine *e=context;return e?e->err
  * real software decode, and keep the original libbluray path for other discs. */
 typedef struct {Source source;File *file;atomic_int cancelled;double deadline;char error[512];} DiscStream;
 EC_API void ec_disc_stream_close(void *ptr){DiscStream *d=ptr;if(!d)return;file_close(d->file);source_close(&d->source);free(d);}
-static int disc_interrupted(void *ptr){DiscStream *d=ptr;return atomic_load(&d->cancelled)||now()>d->deadline;}
-EC_API void *ec_disc_stream_open(const char *path,int id,int unused,EC_Info *info,char *err,int cap){
+static int disc_interrupted(void *ptr){DiscStream *d=ptr;return atomic_load(&d->cancelled)||ec_stopped(d->source.cancel)||now()>d->deadline;}
+EC_API void *ec_disc_stream_open_ex(const char *path,int id,int unused,EC_Info *info,char *err,int cap,void *cancel){
     (void)unused;DiscStream *d=calloc(1,sizeof(*d));if(!d)return NULL;atomic_init(&d->cancelled,0);d->deadline=now()+DECODE_TIMEOUT;
     Clip *clips=NULL;int count=0;EC_Title title;AVFormatContext *fmt=NULL;AVIOContext *io=NULL;AVCodecContext *dec=NULL;AVPacket *packet=NULL;AVFrame *frame=NULL;
-    if(source_open(&d->source,path,d->error,sizeof(d->error))<0)goto fail;
+    if(source_open_ex(&d->source,path,d->error,sizeof(d->error),cancel)<0)goto fail;
     File *marker=file_open(&d->source,"AACS/Unit_Key_RO.inf");if(!marker){snprintf(d->error,sizeof(d->error),"No corresponde a un rechazo por metadatos AACS");goto fail;}file_close(marker);
     if(playlist(&d->source,id,&clips,&count,&title)<0||count!=1||title.stereo){snprintf(d->error,sizeof(d->error),"La lectura alternativa requiere un título 2D de un único clip");goto fail;}
     char name[80];snprintf(name,sizeof(name),"BDMV/STREAM/%s.m2ts",clips[0].id);d->file=file_open(&d->source,name);if(!d->file)goto fail;
@@ -349,10 +375,11 @@ EC_API void *ec_disc_stream_open(const char *path,int id,int unused,EC_Info *inf
     if(file_seek(d->file,0,SEEK_SET)<0)goto fail;return d;
 fail:av_frame_free(&frame);av_packet_free(&packet);avcodec_free_context(&dec);avformat_close_input(&fmt);if(io){av_freep(&io->buffer);avio_context_free(&io);}free(clips);if(!d->error[0])snprintf(d->error,sizeof(d->error),"No se pudo verificar el flujo del título seleccionado");set_error(err,cap,d->error);ec_disc_stream_close(d);return NULL;
 }
+EC_API void *ec_disc_stream_open(const char *p,int t,int n,EC_Info *i,char *e,int cap){return ec_disc_stream_open_ex(p,t,n,i,e,cap,NULL);}
 EC_API int64_t ec_disc_stream_read(void *ptr,void *buf,uint64_t n){DiscStream *d=ptr;if(!d||!buf||!n||atomic_load(&d->cancelled))return -1;int r=file_read(d->file,buf,(int)(n>IO_BUFFER?IO_BUFFER:n));return r==AVERROR_EOF?0:r;}
 EC_API int64_t ec_disc_stream_seek(void *ptr,int64_t pos){DiscStream *d=ptr;return d&&pos>=0&&pos<=d->file->size?file_seek(d->file,pos,SEEK_SET):-1;}
 EC_API int64_t ec_disc_stream_size(void *ptr){DiscStream *d=ptr;return d?d->file->size:-1;}
-EC_API void ec_disc_stream_cancel(void *ptr){DiscStream *d=ptr;if(d)atomic_store(&d->cancelled,1);}
+EC_API void ec_disc_stream_cancel(void *ptr){DiscStream *d=ptr;if(d){atomic_store(&d->cancelled,1);ec_cancel_set(d->source.cancel);}}
 EC_API const char *ec_disc_stream_error(void *ptr){DiscStream *d=ptr;return d?d->error:"Disco cerrado";}
 /* Header/NAL-only identification: no decoder, no image analysis. Local files only. */
 static int probe_interrupt(void *p){ return now()>*(double*)p; }

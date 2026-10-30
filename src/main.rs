@@ -9,6 +9,8 @@ mod mvc;
 mod player;
 mod popup;
 #[cfg(test)]
+mod quality_audit;
+#[cfg(test)]
 mod render_audit;
 #[cfg(test)]
 mod stability_audit;
@@ -696,7 +698,7 @@ fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
                 return Ok(());
             }
             57 => {
-                updater::start_manual();
+                updater::start_manual(m.shutdown_signal());
                 return Ok(());
             }
             58 => {
@@ -737,6 +739,7 @@ fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
                 );
             }
             55 => {
+                player::cancel_loading(s);
                 s.capture_position(m);
                 s.flush_history();
                 m.reset_seeks();
@@ -792,7 +795,7 @@ fn run() -> Result<(), String> {
         State::new(dir, probe)
     };
     if !probe {
-        updater::start();
+        updater::start(m.shutdown_signal());
     }
     let mut output = None;
     let file = if probe {
@@ -920,11 +923,18 @@ fn run() -> Result<(), String> {
         None
     };
     loop {
-        // Only a pending bounded background probe needs timed wakeups. Normal
+        if m.shutdown_requested() {
+            action(&m, &mut state, Action::Id(55))?;
+            break;
+        }
+        // Loading, structural probes and position restoration need timed wakeups. Normal
         // playback sleeps until libmpv delivers an event; no resident polling.
         let e = m.wait(if probe {
             0.2
-        } else if state.detection.as_ref().is_some_and(|p| p.waiting()) {
+        } else if player::loading(&state)
+            || state.resume.is_some()
+            || state.detection.as_ref().is_some_and(|p| p.waiting())
+        {
             0.1
         } else {
             -1.0
@@ -1301,6 +1311,12 @@ fn run() -> Result<(), String> {
         // quit. mpv_terminate_destroy performs the complete native teardown.
         if state.closing {
             break;
+        }
+        if let Err(error) = player::poll_loading(&m, &mut state) {
+            if probe {
+                return Err(error);
+            }
+            runtime_error(&m, dir, "Preparación del vídeo", &error);
         }
         if id == 8 || id == 17 || subs_changed || (id == 22 && reply.0 == 103) {
             if !state.pending_load {

@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "version": "0.2.21",
+  "dependencies": {
+    "url": "https://github.com/Enigmaxin/Enigmax-CinePlayer/releases/download/v0.2.19/Enigmax-CinePlayer-Dependency-Sources-0.2.19.zip",
+    "name": "Enigmax-CinePlayer-Dependency-Sources-0.2.19.zip",
+    "size": 1331979803,
+    "sha256": "a9cd98da694cedbd222a6972d53751a5eaf1c2437afccc9ccba26c632565fde1",
+    "local_equivalent": "Enigmax-CinePlayer-Dependency-Sources-0.2.21.zip"
+  }
+}

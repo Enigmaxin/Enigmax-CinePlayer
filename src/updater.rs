@@ -66,7 +66,7 @@ fn save_cache(
     file.as_file().sync_all().map_err(|e| e.to_string())?;
     crate::windows::replace_file(file.path(), path)
 }
-fn check(manual: bool) -> Result<(), String> {
+fn check(manual: bool, shutdown: &crate::mpv::Shutdown) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let config = exe
         .parent()
@@ -215,7 +215,8 @@ fn check(manual: bool) -> Result<(), String> {
             // The helper has verified the download and holds a handle to this
             // process. It exclusively owns the temporary directory from now on.
             let _ = temp.keep();
-            std::process::exit(0);
+            shutdown.request();
+            return Ok(());
         }
         if let Some(status) = helper.try_wait().map_err(|e| e.to_string())? {
             if status.success() {
@@ -240,13 +241,13 @@ fn check(manual: bool) -> Result<(), String> {
         std::thread::sleep(Duration::from_millis(150));
     }
 }
-pub fn start() {
-    launch(false);
+pub fn start(shutdown: crate::mpv::Shutdown) {
+    launch(false, shutdown);
 }
-pub fn start_manual() {
-    launch(true);
+pub fn start_manual(shutdown: crate::mpv::Shutdown) {
+    launch(true, shutdown);
 }
-fn launch(manual: bool) {
+fn launch(manual: bool, shutdown: crate::mpv::Shutdown) {
     let _ = std::thread::Builder::new()
         .name("github-updater".into())
         .spawn(move || {
@@ -258,7 +259,7 @@ fn launch(manual: bool) {
             }
             let existed = unsafe { GetLastError() } == 183;
             if existed && manual {show("Ya hay una comprobación o actualización en curso. Vuelve a intentarlo cuando termine.",0x40);}
-            if !existed && let Err(error) = check(manual) {
+            if !existed && let Err(error) = check(manual,&shutdown) {
                 // Offline/rate-limited/missing-release errors are non-intrusive.
                 if let Ok(exe) = std::env::current_exe()
                     && let Some(dir) = exe.parent()

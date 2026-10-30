@@ -1,4 +1,4 @@
-# Actualizaciones portátiles de Enigmax CinePlayer 0.2.19
+# Actualizaciones portátiles de Enigmax CinePlayer 0.2.21
 
 Al arrancar y desde Acerca de > Buscar actualizaciones, un hilo secundario consulta un manifiesto público alojado como asset de GitHub Releases, sin consumir la cuota de la API REST. La reproducción no espera a la red. APP_VERSION procede de Cargo.toml. Los modos --probe no consultan actualizaciones. Una exclusión entre procesos evita consultas simultáneas.
 
@@ -21,7 +21,7 @@ Los errores de consulta se registran en config/updater-status.log sin diálogos 
 
 1. Ejecutar build.ps1 y revisar las pruebas.
 2. Ejecutar build-portable.ps1. Comprueba que Cargo.toml y el EXE coinciden, prepara el manifiesto, genera el ZIP y verifica de nuevo su contenido extraído. Emite también un archivo .sha256 y Enigmax-CinePlayer-update.json junto al ZIP, con versión, URL exacta, tamaño y SHA-256. Este manifiesto no forma parte del ZIP instalado.
-3. Cuando el usuario autorice publicar, subir el código al repositorio y adjuntar el ZIP y Enigmax-CinePlayer-update.json a una release pública estable v0.2.19. El nombre exacto del ZIP será Enigmax-CinePlayer-Portable-0.2.19-windows-x64.zip. Los archivos automáticos Source code de GitHub no sustituyen este paquete.
+3. Cuando el usuario autorice publicar, subir el código al repositorio y adjuntar el ZIP y Enigmax-CinePlayer-update.json a una release pública estable v0.2.21. El nombre exacto del ZIP será Enigmax-CinePlayer-Portable-0.2.21-windows-x64.zip. Los archivos automáticos Source code de GitHub no sustituyen este paquete.
 4. Comprobar que la URL pública del manifiesto devuelve el documento correcto y que una versión anterior detecta la nueva. Las versiones antiguas consultan la API; 0.2.18 y posteriores consultan el manifiesto. Esta prueba real de distribución queda pendiente hasta publicar un ZIP compatible. No se publican releases automáticamente.
 
 build-installer.ps1 e installer/ permanecen únicamente como fuentes históricas; no intervienen en la compilación portátil ni se han generado instaladores nuevos.

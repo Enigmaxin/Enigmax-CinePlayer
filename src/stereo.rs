@@ -165,7 +165,7 @@ impl Quality {
         match self {
             Self::Balanced => "Equilibrado · GPU",
             Self::High => "Máxima calidad · GPU",
-            Self::Compatibility => "Compatibilidad · filtro CPU",
+            Self::Compatibility => "Compatibilidad · anaglifo por CPU",
             Self::Low => "Mínimo consumo · equipos modestos",
         }
     }

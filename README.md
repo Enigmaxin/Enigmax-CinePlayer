@@ -1,6 +1,6 @@
-# Enigmax CinePlayer 0.2.19 — Windows 11 x64
+# Enigmax CinePlayer 0.2.21 — Windows 11 x64
 
-Cambios y límites de la versión vigente: **[VERIFICACION_0.2.19.md](VERIFICACION_0.2.19.md)**. Perfil adicional de mínimo consumo, menús coherentes, metadatos legibles y arranque automático en pausa con elección de continuación.
+Cambios y límites de la versión vigente: **[VERIFICACION_0.2.21.md](VERIFICACION_0.2.21.md)**. Preparación ISO/MVC en segundo plano, IO cancelable, recuperación de errores, metadatos y subtítulos MVC y cierre normal al actualizar.
 
 HDR 2D utiliza libplacebo y ST2094-40, con metadatos dinámicos disponibles y alternativa sin ellos. El renderizador compatible usa BT.2390. SDR conserva su tratamiento de origen; no se activa conversión inversa a HDR. La salida real depende de Windows y de la pantalla: no existe una calibración universal para TV, monitores, proyectores y Quest. Véanse las pruebas y excepciones en el informe.
 
@@ -28,7 +28,7 @@ Los controles inferiores y los menús propios permanecen en el plano de la panta
 
 La composición GPU separa los ojos antes del escalado, trabaja en RGB lineal y no recodifica el archivo. La calibración permite ajustar las ganancias de cada ojo y compensación de fugas hasta 15 %. Los antiguos ajustes de convergencia del vídeo y profundidad añadida a los subtítulos se han retirado; los perfiles anteriores se admiten, pero esos valores se ignoran.
 
-**Equilibrado:** GPU y escalado spline36. **Máxima calidad:** GPU y EWA Lanczos. **Compatibilidad:** filtro FFmpeg stereo3d por CPU en RGB de 8 bits; no aplica la calibración GPU y no ofrece equivalencia de color exacta con ella. El modo anaglifo utiliza salida SDR. Para fuentes HDR se realiza primero conversión tonal a SDR mediante CPU; aumenta el consumo y puede limitar la fluidez en equipos modestos.
+**Calidad / consumo:** Equilibrado usa spline36; Máxima calidad, EWA Lanczos; Mínimo consumo, bilineal y menor caché, sin cálculo del pico HDR por píxeles. Se conserva resolución, frecuencia y audio. Compatibilidad utiliza CPU/RGB de 8 bits únicamente para anaglifo; con subtítulos fusionados o calibración se conserva la GPU para mantenerlos. No es un modo de ahorro. La selección se guarda automáticamente en `config/quality.json`, independientemente del resto de ajustes, y se recupera al arrancar. Si no puede guardarse se informa del error y se restablece la selección anterior. La carpeta del programa debe permitir escritura para conservar ajustes. Consulta las mediciones y diferencias de calidad del informe vigente.
 
 Al iniciar sin un archivo indicado, se carga el último vídeo en pausa, con su playlist, posición y pistas guardadas. Bajo el título aparecen **Continuar reproducción** y **Empezar de nuevo**. La reproducción espera esa elección; Espacio o Intro eligen continuar. Si no existe un último archivo disponible, se muestra **Arrastra tu vídeo aquí**. Ctrl+O y arrastrar archivos siguen disponibles. La posición pendiente se conserva durante las recargas MVC.
 
@@ -169,3 +169,11 @@ Se recuerda el último vídeo al confirmar sus pistas, sin esperar necesariament
 Calidad / consumo está en el menú principal, inmediatamente debajo de Color / HDR. Los tres perfiles existentes conservan sus índices y ajustes. Se añade Mínimo consumo · equipos modestos: escalado bilineal, análisis de pico HDR desactivado y límites de búfer de hasta 16 MiB delante y cero detrás (8 MiB delante en MVC). No cambia la resolución, los FPS, la salida 3D ni la selección de audio. Conserva la aceleración automática y el tone mapping. El escalado es más suave y el HDR depende más de los metadatos; el menor búfer trasero puede requerir volver a leer al retroceder. No equivale a un límite de memoria total ni garantiza fluidez en cualquier ordenador.
 
 Al salir del perfil se restauran los límites reales anteriores del transporte. El botón 3D conserva su selector y ofrece Todas las opciones 3D; la etiqueta SBS se muestra como Reproducir en SBS Anamórfico. Audio y Subs muestran idioma y códec/formato de cada pista con nombres legibles; los datos ausentes no se inventan. El menú contextual y los cuatro accesos de la barra comparten sus constructores y acciones.
+
+## Cambios de 0.2.20
+
+La elección de calidad se guarda automáticamente. Los perfiles GPU cambian sin reconstruir innecesariamente el filtro; la alternativa CPU de anaglifo recibe las superficies aceleradas mediante una conversión explícita y conserva GPU cuando lo requieren subtítulos o calibración. Mediciones de recursos, transiciones y límites: VERIFICACION_0.2.20.md.
+
+## Cambios de 0.2.21
+
+La preparación pesada se ejecuta en un trabajador acotado y conserva el archivo actual ante fallos. El puente transmite las etiquetas principales de color y SAR; permite subtítulos incrustados aunque no haya audio. Los menús se invalidan al cambiar de archivo y el actualizador solicita el cierre normal. Pruebas y limitaciones: VERIFICACION_0.2.21.md.

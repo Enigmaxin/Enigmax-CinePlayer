@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "tag_name": "v0.2.21",
+  "draft": false,
+  "prerelease": false,
+  "assets": [
+    {
+      "browser_download_url": "https://github.com/Enigmaxin/Enigmax-CinePlayer/releases/download/v0.2.21/Enigmax-CinePlayer-Portable-0.2.21-windows-x64.zip",
+      "size": 73726408,
+      "digest": "sha256:7c568c57c6fdf46598b0a549a8280db8911a07b219c90d34004976c80fe4003c",
+      "name": "Enigmax-CinePlayer-Portable-0.2.21-windows-x64.zip"
+    }
+  ]
+}

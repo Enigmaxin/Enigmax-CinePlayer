@@ -147,6 +147,8 @@ fn show_sized(
     if entries.is_empty() {
         return Ok(0);
     }
+    let source = m.get("path");
+    let tracks = track_identity(m);
     let mut input = m.popup_client()?;
     let name = input.name();
     let _guard = Guard(m);
@@ -179,6 +181,9 @@ fn show_sized(
     #[cfg(test)]
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(12);
     loop {
+        if m.shutdown_requested() {
+            return Ok(0);
+        }
         #[cfg(test)]
         if std::time::Instant::now() > deadline {
             return Err(format!(
@@ -357,6 +362,9 @@ fn show_sized(
             #[cfg(test)]
             m.set("user-data/enigmax-popup-state",&serde_json::json!({"client":name,"w":w,"h":h,"mode":mode.code(),"x":g.rect.x,"y":g.rect.y,"width":g.rect.w,"height":g.rect.h,"header":g.header,"row":g.row,"visible":g.visible,"offset":page.offset,"depth":depth,"selected":page.selected,"ids":page.items.iter().map(|e|e.id).collect::<Vec<_>>(),"labels":page.items.iter().map(|e|&e.label).collect::<Vec<_>>(),"enabled":page.items.iter().map(|e|e.enabled).collect::<Vec<_>>()}).to_string())?;
         }
+        if m.get("path") != source || track_identity(m) != tracks {
+            return Ok(0);
+        }
         let Some(args) = (match input.next() {
             Ok(v) => v,
             Err(_) => return Ok(0),
@@ -503,6 +511,18 @@ fn show_sized(
             }
         }
     }
+}
+fn track_identity(m: &Mpv) -> Vec<(String, u64)> {
+    m.get("track-list")
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| {
+            v.as_array().map(|rows| {
+                rows.iter()
+                    .filter_map(|r| Some((r["type"].as_str()?.to_owned(), r["id"].as_u64()?)))
+                    .collect()
+            })
+        })
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

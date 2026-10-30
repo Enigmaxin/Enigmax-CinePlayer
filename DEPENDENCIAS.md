@@ -1,4 +1,4 @@
-# Dependencias de 0.2.19
+# Dependencias de 0.2.21
 
 Código propio GPL-3.0-or-later. Rust 1.99.1 GNU x64 y w64devkit 2.10.1/GCC 16.2.0 para el ejecutable y puente; MSYS2 UCRT64/GCC 16.2.0, Meson 1.12.1 y Ninja 1.13.2 para el motor. No se requieren para ejecutar.
 
@@ -35,3 +35,7 @@ Los coeficientes Dubois siguen la referencia stereo3d de FFmpeg. ASS 3D utiliza 
 0.2.18 conserva las mismas DLL y dependencias de reproducción; modifica únicamente la aplicación y el auxiliar de actualización.
 
 0.2.19 mantiene las dependencias de reproducción de 0.2.18. Se recompilan la aplicación y sus diálogos nativos; no se incorpora un motor ni un paquete de códecs adicional.
+
+0.2.20 conserva las revisiones del motor y las dependencias Cargo de 0.2.19. Se recompila la aplicación y el puente nativo habitual; no se añade ningún códec ni servicio residente.
+
+0.2.21 mantiene mpv/FFmpeg y dependencias Cargo. Recompila el puente cine_mvc.dll para IO cancelable Windows y consulta explícita de metadatos; conserva la estructura EC_Info histórica. No añade DLL de terceros.

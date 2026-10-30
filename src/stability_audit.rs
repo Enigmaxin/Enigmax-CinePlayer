@@ -38,7 +38,29 @@ fn real_file_repeated_reload_seek_and_shutdown() {
                 assert!(Instant::now() < until, "Load timeout {session}/{repeat}");
             }
             player::apply(&m, &mut s).unwrap();
-            assert_eq!(m.get("video-params/primaries").as_deref(), Some("bt.709"));
+            // Applying a filter can briefly invalidate video-params. Read the
+            // complete new snapshot after reconfiguration, not old width then
+            // a separate absent field while the decoder is being reset.
+            let ready = Instant::now() + Duration::from_secs(5);
+            let params = loop {
+                if let Some(params) = m
+                    .get("video-params")
+                    .and_then(|v| serde_json::from_str::<serde_json::Value>(&v).ok())
+                    && params["primaries"].is_string()
+                {
+                    break params;
+                }
+                let event = m.wait(0.01);
+                if event.id == 5 && event.userdata & (1_u64 << 63) != 0 {
+                    let cookie = event.userdata;
+                    m.seek_reply(cookie).unwrap();
+                }
+                assert!(
+                    Instant::now() < ready,
+                    "Metadata not restored after filter change {session}/{repeat}"
+                );
+            };
+            assert_eq!(params["primaries"], "bt.709");
             assert_eq!(m.get("video-format").as_deref(), Some("hevc"));
             for t in [10.0, 60.0, 5.0] {
                 m.seek(t, true).unwrap();
