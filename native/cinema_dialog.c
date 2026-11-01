@@ -10,6 +10,8 @@
 #include <shlwapi.h>
 #include <dwmapi.h>
 #include <math.h>
+#include <stdint.h>
+#include "display_policy.h"
 
 typedef struct { int id; const wchar_t *title, *description; int image; } CineChoice;
 typedef struct {

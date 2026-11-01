@@ -375,6 +375,12 @@ fn show_sized(
             continue;
         }
         let kind = args.get(1).map(String::as_str).unwrap_or_default();
+        if kind == "move" {
+            crate::controls::Controls::cursor(
+                m,
+                &m.user_data("user-data/enigmax-cursor").unwrap_or_default(),
+            )?;
+        }
         if kind == "close" {
             return Ok(0);
         }

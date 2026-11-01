@@ -342,6 +342,74 @@ pub struct Controls {
     startup_key: String,
 }
 impl Controls {
+    /// A sparse strip covering both eye cursors uses mpv's highest bitmap ID.
+    /// Its height (SBS) or width (OU) is cursor-sized; no video readback.
+    pub fn cursor(m: &Mpv, body: &str) -> Result<(), String> {
+        let values: Option<Vec<f64>> = body.split('|').map(|v| v.parse().ok()).collect();
+        let Some(v) = values.filter(|v| {
+            v.len() == 8
+                && v.iter()
+                    .all(|n| n.is_finite() && *n >= 0.0 && *n <= 32768.0)
+        }) else {
+            // ID 63 belongs to the welcome screen while idle.
+            if m.get("idle-active").as_deref() != Some("yes") {
+                m.command(&["overlay-remove", "63"])?;
+            }
+            return Ok(());
+        };
+        let rects: Vec<[i32; 4]> = v
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|r| {
+                [
+                    r[0] as i32,
+                    r[1] as i32,
+                    (r[2] as i32).clamp(6, 48),
+                    (r[3] as i32).clamp(6, 48),
+                ]
+            })
+            .collect();
+        let x = rects.iter().map(|r| r[0]).min().unwrap();
+        let y = rects.iter().map(|r| r[1]).min().unwrap();
+        let w = rects.iter().map(|r| r[0] + r[2]).max().unwrap() - x;
+        let h = rects.iter().map(|r| r[1] + r[3]).max().unwrap() - y;
+        if w as usize * h as usize > 2 * 1024 * 1024 {
+            return Ok(());
+        }
+        let mut pixels = vec![0u8; (w * h * 4) as usize];
+        for r in rects {
+            for cy in 0..r[3] {
+                for cx in 0..r[2] {
+                    let u = cx as f64 / r[2] as f64;
+                    let v = cy as f64 / r[3] as f64;
+                    if u <= v * 0.75 && (v <= 0.7 || u <= 0.22) {
+                        let border = cx == 0
+                            || cy == r[3] - 1
+                            || u > v * 0.75 - 0.1
+                            || (v > 0.65 && u > 0.13);
+                        let shade = if border { 0 } else { 255 };
+                        let i = (((r[1] - y + cy) * w + r[0] - x + cx) * 4) as usize;
+                        pixels[i..i + 4].copy_from_slice(&[shade, shade, shade, 255]);
+                    }
+                }
+            }
+        }
+        m.command_named(
+            "overlay-add",
+            &[
+                ("id", "63".into()),
+                ("x", x.to_string()),
+                ("y", y.to_string()),
+                ("file", format!("&{}", pixels.as_ptr() as usize)),
+                ("offset", "0".into()),
+                ("fmt", "bgra".into()),
+                ("w", w.to_string()),
+                ("h", h.to_string()),
+                ("stride", (w * 4).to_string()),
+            ],
+        )
+    }
     pub fn idle_draw(&mut self, m: &Mpv) -> Result<(), String> {
         if m.get("idle-active").as_deref() != Some("yes") {
             return Ok(());
@@ -506,8 +574,13 @@ impl Controls {
         self.config.clear();
     }
     pub fn sync(&mut self, m: &Mpv, s: &State) -> Result<(), String> {
-        if self.title != s.display_title {
-            self.title = s.display_title.clone();
+        let title = if s.features.status.starts_with("Esperando datos") {
+            format!("{} · Esperando datos del archivo", s.display_title)
+        } else {
+            s.display_title.clone()
+        };
+        if self.title != title {
+            self.title = title;
             self.last.clear();
         }
         if !self.ready || s.pending_load {

@@ -7,6 +7,7 @@ fn main() {
     println!("cargo:rerun-if-changed=assets/choice-atlas.png");
     println!("cargo:rerun-if-changed=native/cinema_dialog.c");
     println!("cargo:rerun-if-changed=native/cinema_menu.h");
+    println!("cargo:rerun-if-changed=native/display_policy.h");
     println!("cargo:rerun-if-env-changed=WINDRES");
     // The shared geometry library remains buildable on non-Windows hosts.
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {

@@ -911,6 +911,34 @@ struct WindowRect {
     bottom: i32,
 }
 #[repr(C)]
+pub struct WindowPlacement {
+    length: u32,
+    flags: u32,
+    show: u32,
+    min: [i32; 2],
+    max: [i32; 2],
+    normal: [i32; 4],
+}
+#[link(name = "user32")]
+unsafe extern "system" {
+    fn GetWindowPlacement(window: Handle, placement: *mut WindowPlacement) -> i32;
+    fn SetWindowPlacement(window: Handle, placement: *const WindowPlacement) -> i32;
+}
+pub fn capture_placement(window: usize) -> Option<WindowPlacement> {
+    let mut p = WindowPlacement {
+        length: std::mem::size_of::<WindowPlacement>() as u32,
+        flags: 0,
+        show: 0,
+        min: [0; 2],
+        max: [0; 2],
+        normal: [0; 4],
+    };
+    (unsafe { GetWindowPlacement(window as Handle, &mut p) } != 0).then_some(p)
+}
+pub fn restore_placement(window: usize, p: &WindowPlacement) -> bool {
+    unsafe { SetWindowPlacement(window as Handle, p) != 0 }
+}
+#[repr(C)]
 struct MonitorInfo {
     size: u32,
     monitor: WindowRect,

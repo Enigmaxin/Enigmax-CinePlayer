@@ -26,6 +26,7 @@ fn compressed_lossless_and_multichannel_audio_decode_and_track_snapshot() {
         m.option(k, v).unwrap();
     }
     m.init().unwrap();
+    let mut features = crate::playback_features::Features::default();
     for case in matrix.as_array().unwrap() {
         m.reset_seeks();
         m.set("pause", "no").unwrap();
@@ -60,13 +61,42 @@ fn compressed_lossless_and_multichannel_audio_decode_and_track_snapshot() {
             params["channel-count"], case["channels"],
             "{case}: {params}"
         );
-        let (_, _, actions) = track_menus(&m).unwrap();
+        let (_, _, actions) = track_menus(&m, &crate::player::State::new(root, true)).unwrap();
         assert!(
             actions
                 .iter()
                 .any(|(_, a)| matches!(a,crate::Action::Track(k,v) if k=="aid" && v=="1")),
             "Track snapshot lost audio: {case}"
         );
+        for mode in [1, 2, 0] {
+            features.prefs.audio_mode = mode;
+            features.apply(&m, 0).unwrap();
+            m.seek(1.0, true).unwrap();
+            m.set("pause", "no").unwrap();
+            let until = Instant::now() + Duration::from_secs(5);
+            loop {
+                let event = m.wait(0.01);
+                let (id, cookie) = (event.id, event.userdata);
+                if id == 5 && cookie & (1_u64 << 63) != 0 {
+                    m.seek_reply(cookie).unwrap();
+                }
+                let out: serde_json::Value =
+                    serde_json::from_str(&m.get("audio-out-params").unwrap_or_default())
+                        .unwrap_or_default();
+                if out["samplerate"] == 48000
+                    && out["channel-count"] == case["channels"]
+                    && m.get("audio-pts")
+                        .and_then(|v| v.parse::<f64>().ok())
+                        .is_some_and(|v| v > 1.1)
+                {
+                    break;
+                }
+                assert!(
+                    Instant::now() < until,
+                    "Effect {mode} changed/lost output format for {case}: {out}"
+                );
+            }
+        }
         m.set("pause", "yes").unwrap();
         m.seek(2.0, true).unwrap();
         let until = Instant::now() + Duration::from_secs(3);

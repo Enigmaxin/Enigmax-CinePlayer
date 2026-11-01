@@ -9,9 +9,59 @@ mp.add_periodic_timer(5,function()
     if mp.get_property_bool('idle-active',true) then return end
     local pos=mp.get_property_number('time-pos')
     local duration=mp.get_property_number('duration')
-    if pos and duration then mp.commandv('script-message-to',target,'checkpoint',tostring(pos),tostring(duration),mp.get_property('path','')) end
+    if pos and duration then mp.set_property('user-data/enigmax-checkpoint',table.concat({tostring(pos),tostring(duration),mp.get_property('path','')},'|')) end
 end)
 local projection = 'mono'
+local cursor_enabled = true
+local function cursor_remove() mp.set_property('user-data/enigmax-cursor','') end
+local cursor_time, cursor_paint = -10, -10
+local native_cursor
+local function cursor_draw(moved)
+    local stereo = projection == 'sbs' or projection == 'ou' or projection == 'framepack'
+    if not cursor_enabled or not stereo or mp.get_property_bool('idle-active',true) then
+        cursor_remove()
+        if native_cursor then mp.set_property('cursor-autohide',native_cursor);native_cursor=nil end
+        return
+    end
+    if not native_cursor then native_cursor=mp.get_property('cursor-autohide','1000');mp.set_property('cursor-autohide','always') end
+    local now=mp.get_time()
+    if moved then cursor_time=now end
+    if now-cursor_time>2.5 then cursor_remove();return end
+    if moved and now-cursor_paint<0.016 then return end
+    cursor_paint=now
+    local w,h=mp.get_osd_size()
+    local x,y=mp.get_mouse_pos()
+    if not w or not h or not x or not y or x<0 or y<0 or x>w or y>h then cursor_remove();return end
+    local views
+    if projection=='sbs' then views={{0,0,math.floor(w/2),h},{math.floor(w/2),0,w-math.floor(w/2),h}}
+    elseif projection=='ou' then views={{0,0,w,math.floor(h/2)},{0,math.floor(h/2),w,h-math.floor(h/2)}}
+    else
+        local scale=math.min(w/1920,h/2205)
+        local ox,oy=(w-1920*scale)/2,(h-2205*scale)/2
+        views={{ox,oy,1920*scale,1080*scale},{ox,oy+1125*scale,1920*scale,1080*scale}}
+    end
+    local u,v
+    for _,r in ipairs(views) do
+        if x>=r[1] and x<r[1]+r[3] and y>=r[2] and y<r[2]+r[4] then u=(x-r[1])/r[3];v=(y-r[2])/r[4];break end
+    end
+    if not u then cursor_remove();return end
+    local data={}
+    local size=math.max(16,math.min(36,h/45))
+    for _,r in ipairs(views) do
+        local sx,sy=math.max(6,math.floor(size*r[3]/w)),math.max(6,math.floor(size*r[4]/h))
+        data[#data+1]=math.floor(math.min(r[1]+u*r[3],r[1]+r[3]-sx))
+        data[#data+1]=math.floor(math.min(r[2]+v*r[4],r[2]+r[4]-sy))
+        data[#data+1]=sx;data[#data+1]=sy
+    end
+    -- Coalesce mouse moves while the client is occupied by a native menu.
+    mp.set_property('user-data/enigmax-cursor',table.concat(data,'|'))
+end
+mp.register_script_message('stereo-cursor',function(value)cursor_enabled=value=='yes';cursor_draw(false)end)
+local health_timer=mp.add_periodic_timer(2,function()
+    if not mp.get_property_bool('idle-active',true) then mp.set_property_number('user-data/enigmax-health',mp.get_time()) end
+    cursor_draw(false)
+end)
+health_timer:kill()
 local visible, dragging, pinned = false, false, false
 local popup_open = false
 local modal_target
@@ -143,18 +193,24 @@ mp.set_key_bindings({
     {'mbtn_left',screen_click},
     {'mbtn_left_dbl',function() cancel_click();mp.commandv('cycle','fullscreen') end},
     {'mouse_move',function()
+        cursor_draw(true)
         show()
         if dragging and mp.get_time()-last_move>0.05 then last_move=mp.get_time();input('move') end
     end},
-    {'mouse_leave',function() if popup_open then return end;if dragging then input('cancel') end;if not pinned then hide() end end},
+    {'mouse_leave',function() cursor_time=-10;cursor_remove();if popup_open then return end;if dragging then input('cancel') end;if not pinned then hide() end end},
     {'wheel_up',function() input('wheelup') end},
     {'wheel_down',function() input('wheeldown') end},
 },'enigmax_show','force')
 mp.enable_key_bindings('enigmax_show','allow-vo-dragging+allow-hide-cursor')
+local function control_move()
+    cursor_draw(true);show()
+    if dragging and mp.get_time()-last_move>0.05 then last_move=mp.get_time();input('move') end
+end
 for _,name in ipairs({'enigmax_bottom','enigmax_top'}) do
     mp.set_key_bindings({
         {'mbtn_left',function() input('up') end,function() input('down') end},
         {'mbtn_left_dbl','ignore'},
+        {'mouse_move',control_move},
         {'wheel_up',function() input('wheelup') end},
         {'wheel_down',function() input('wheeldown') end},
     },name,'force')
@@ -162,6 +218,7 @@ end
 mp.register_script_message('configure',function(mode)
     if mode~='mono' and mode~='anaglyph' and mode~='sbs' and mode~='ou' and mode~='framepack' then return end
     projection=mode;previous='';areas();paint(true)
+    cursor_draw(false)
 end)
 mp.register_script_message('show',function()
     show();paint(true)
@@ -188,7 +245,7 @@ mp.set_key_bindings({
     {'mbtn_left',function()modal_input('up')end,function()modal_input('down')end},
     {'mbtn_left_dbl','ignore'},
     {'mbtn_right',function()modal_input('close')end},
-    {'mouse_move',function()local now=mp.get_time();if now-modal_move>0.03 then modal_move=now;modal_input('move')end end},
+    {'mouse_move',function()cursor_draw(true);local now=mp.get_time();if now-modal_move>0.03 then modal_move=now;modal_input('move')end end},
     {'wheel_up',function()modal_input('wheelup')end},
     {'wheel_down',function()modal_input('wheeldown')end},
     {'ESC',function()modal_input('close')end},
@@ -229,9 +286,9 @@ end)
 for _,key in ipairs({'pause','duration'}) do
     mp.observe_property(key,'native',function() paint(false) end)
 end
-mp.observe_property('idle-active','bool',function(_,idle) if idle then hide();mp.commandv('script-message-to',target,'idle-draw') else mp.commandv('overlay-remove',63);areas() end end)
+mp.observe_property('idle-active','bool',function(_,idle) if idle then health_timer:kill();cursor_draw(false);hide();mp.commandv('script-message-to',target,'idle-draw') else health_timer:resume();mp.commandv('overlay-remove',63);areas() end end)
 mp.observe_property('osd-dimensions','native',function()if choosing()then mp.commandv('script-message-to',target,'startup-draw')end end)
-mp.register_event('start-file',function() volume_until=0;volume_feedback=0;cancel_click();hide();mp.commandv('overlay-remove',63) end)
+mp.register_event('start-file',function() volume_until=0;volume_feedback=0;cursor_time=-10;cursor_remove();cancel_click();hide();mp.commandv('overlay-remove',63) end)
 mp.register_event('file-loaded',function() areas();if pinned then show();paint(true) end end)
 mp.set_key_bindings({
     {'SPACE',function()mp.commandv('script-message-to',target,'startup-choice','continue')end},

@@ -330,6 +330,14 @@ EC_API int64_t ec_mvc_seek(void *context,int64_t offset){Engine *e=context;if(!e
     int64_t index=offset/(int64_t)e->frame_size;size_t within=(size_t)(offset%(int64_t)e->frame_size);
     if(e->info.frames>0&&index>=e->info.frames){e->position=offset;e->frame_ready=0;e->eof=1;return offset;}
     double target=(double)index*e->info.fps_den/e->info.fps_num;e->deadline=now()+DECODE_TIMEOUT;
+    /* Reuse the current pair for byte-level seeks within it. Small forward
+     * jumps consume the existing decoder instead of seeking/reopening the SSIF
+     * and decoding its five-second preroll again. No additional frame cache. */
+    if(e->frame_ready && index==(e->position-(int64_t)e->frame_offset)/(int64_t)e->frame_size){e->frame_offset=within;e->position=offset;return offset;}
+    int64_t next=e->position/(int64_t)e->frame_size+(e->position%(int64_t)e->frame_size!=0);
+    if(!e->eof && !isnan(e->current_pts) && e->info.fps_num>0 && e->info.fps_den>0 && index>=next && index-next<=(int64_t)e->info.fps_num/e->info.fps_den){
+        if(decode_next(e,target)<1)return -20;e->frame_offset=within;e->position=offset;return offset;
+    }
     if(e->clip_count){int clip=0;while(clip+1<e->clip_count&&e->clips[clip+1].begin<=target)clip++;if(clip!=e->clip){e->clip=clip;if(open_input(e)<0)return -20;}}
     double source_target=e->clip_count?target-e->clips[e->clip].begin+e->clips[e->clip].in:target+(isnan(e->first_pts)?0:e->first_pts); source_target=fmax(e->clip_count?e->clips[e->clip].in:0.0,source_target-5.0);
     if(e->clip_count&&source_target<=e->clips[e->clip].in){if(open_input(e)<0)return -20;goto reset_decoder;}

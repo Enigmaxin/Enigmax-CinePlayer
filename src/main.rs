@@ -4,8 +4,10 @@ mod audio_audit;
 mod cinema_dialog;
 mod controls;
 mod detection;
+mod display;
 mod mpv;
 mod mvc;
+mod playback_features;
 mod player;
 mod popup;
 #[cfg(test)]
@@ -72,6 +74,7 @@ fn configure(m: &Mpv, probe: bool, dir: &std::path::Path) -> Result<(), String> 
         ("demuxer-max-back-bytes", "8MiB"),
         ("autofit-larger", "90%x90%"),
         ("autofit-smaller", "640x360"),
+        ("auto-window-resize", "no"),
         ("keepaspect", "yes"),
         ("drag-and-drop", "replace"),
         ("stop-screensaver", "yes"),
@@ -115,6 +118,19 @@ fn configure(m: &Mpv, probe: bool, dir: &std::path::Path) -> Result<(), String> 
 }
 
 fn bind(m: &Mpv) -> Result<(), String> {
+    for key in [
+        "z",
+        "Z",
+        "x",
+        "Ctrl++",
+        "Ctrl+-",
+        "Ctrl+KP_ADD",
+        "Ctrl+KP_SUBTRACT",
+        "Ctrl+Shift+LEFT",
+        "Ctrl+Shift+RIGHT",
+    ] {
+        m.command(&["keybind", key, "ignore"])?;
+    }
     let name = m.name();
     for (key, action) in [
         ("m", "menu"),
@@ -285,7 +301,7 @@ enum Action {
     Device(String),
 }
 type TrackMenus = (windows::Menu, windows::Menu, Vec<(u32, Action)>);
-fn track_menus(m: &Mpv) -> Result<TrackMenus, String> {
+fn track_menus(m: &Mpv, s: &State) -> Result<TrackMenus, String> {
     let mut actions = Vec::new();
     let tracks = windows::Menu::new()?;
     let subs = windows::Menu::new()?;
@@ -338,15 +354,20 @@ fn track_menus(m: &Mpv) -> Result<TrackMenus, String> {
     }
     subs.separator();
     subs.item(2, "Añadir subtítulos…", false)?;
-    subs.item(58, "Ajustar sincronización…", false)?;
-    actions.extend([(2, Action::Id(2)), (58, Action::Id(58))]);
+
+    tracks.separator();
+    playback_features::audio_menu(&tracks, s)?;
+    playback_features::subtitle_menu(&subs, m)?;
+    actions.push((2, Action::Id(2)));
     Ok((tracks, subs, actions))
 }
 fn choose_track(m: &Mpv, s: &mut State, sub: bool) -> Result<(), String> {
-    let (audio, subs, actions) = track_menus(m)?;
+    let (audio, subs, actions) = track_menus(m, s)?;
     let id = if sub { subs.show(m)? } else { audio.show(m)? };
     if let Some((_, a)) = actions.into_iter().find(|(n, _)| *n == id) {
         action(m, s, a)?;
+    } else if (7100..=7131).contains(&id) || (7020..=7022).contains(&id) {
+        action(m, s, Action::Id(id))?;
     }
     Ok(())
 }
@@ -378,6 +399,7 @@ fn build_menu(m: &Mpv, s: &State, remaining: bool) -> Result<(windows::Menu, Men
     hdr.item(31, "Convertir siempre a SDR", s.hdr_sdr)?;
     root.submenu("Color / HDR", hdr)?;
     root.submenu("Calidad / consumo", player::quality_menu(s)?)?;
+    playback_features::menu(&root, s)?;
     let audio = windows::Menu::new()?;
     for (id, label, value) in [
         (40, "TV / altavoces: decodificar a PCM", 0),
@@ -415,7 +437,7 @@ fn build_menu(m: &Mpv, s: &State, remaining: bool) -> Result<(windows::Menu, Men
     }
     root.submenu("Dispositivo de sonido", devices)?;
     if !remaining {
-        let (tracks, subs, track_actions) = track_menus(m)?;
+        let (tracks, subs, track_actions) = track_menus(m, s)?;
         actions.extend(track_actions);
         root.submenu("Pista de audio", tracks)?;
         root.submenu("Pista de subtítulos", subs)?;
@@ -469,6 +491,20 @@ fn finish_startup(m: &Mpv, s: &mut State, restart: bool) -> Result<(), String> {
         player::ask_view(m, s)?;
     }
     Ok(())
+}
+fn record_checkpoint(m: &Mpv, s: &mut State, pos: &str, duration: &str, path: &str) {
+    if m.get("path").as_deref() == Some(path) {
+        s.checkpoint(pos, duration);
+    }
+}
+fn record_coalesced_checkpoint(m: &Mpv, s: &mut State) {
+    if let Some(body) = m.user_data("user-data/enigmax-checkpoint") {
+        let mut parts = body.splitn(3, '|');
+        if let (Some(pos), Some(duration), Some(path)) = (parts.next(), parts.next(), parts.next())
+        {
+            record_checkpoint(m, s, pos, duration, path);
+        }
+    }
 }
 fn original(m: &Mpv) -> Result<(), String> {
     m.set("fullscreen", "no")?;
@@ -619,6 +655,7 @@ fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
             return Ok(());
         }
         Action::Id(id) => match id {
+            7000..=7131 => return playback_features::action(m, s, id),
             1 => return open(m, s, false),
             2 => return open(m, s, true),
             20..=25 => {
@@ -666,6 +703,8 @@ fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
                     return Err(e);
                 }
                 s.passthrough = mode;
+                s.features.invalidate();
+                s.features.apply(m, mode)?;
                 return text(
                     m,
                     if mode == 0 {
@@ -700,43 +739,6 @@ fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
             57 => {
                 updater::start_manual(m.shutdown_signal());
                 return Ok(());
-            }
-            58 => {
-                let delay = m
-                    .get("sub-delay")
-                    .and_then(|v| v.parse::<f64>().ok())
-                    .filter(|v| v.is_finite())
-                    .unwrap_or(0.0);
-                let chosen = windows::choose(
-                    m,
-                    "Sincronización de subtítulos",
-                    &format!(
-                        "Retraso actual: {delay:+.2} s\nUn valor positivo retrasa los subtítulos."
-                    ),
-                    &[
-                        (101, "Adelantar 0,5 s"),
-                        (102, "Adelantar 0,1 s"),
-                        (103, "Restablecer a 0"),
-                        (104, "Retrasar 0,1 s"),
-                        (105, "Retrasar 0,5 s"),
-                    ],
-                )?;
-                let next = match chosen {
-                    101 => delay - 0.5,
-                    102 => delay - 0.1,
-                    103 => 0.0,
-                    104 => delay + 0.1,
-                    105 => delay + 0.5,
-                    _ => return Ok(()),
-                };
-                return m.command_async(
-                    &[
-                        "set",
-                        "sub-delay",
-                        &next.clamp(-86400.0, 86400.0).to_string(),
-                    ],
-                    3,
-                );
             }
             55 => {
                 player::cancel_loading(s);
@@ -774,6 +776,10 @@ fn run() -> Result<(), String> {
         "video-params/w",
         "aid",
         "track-list",
+        "display-names",
+        "user-data/enigmax-health",
+        "user-data/enigmax-checkpoint",
+        "user-data/enigmax-cursor",
     ]
     .iter()
     .enumerate()
@@ -1076,6 +1082,7 @@ fn run() -> Result<(), String> {
         }
         if id == 7 {
             m.reset_seeks();
+            state.features.display.update(owner(&m), false, 0.0);
             state.pending_load = true;
             let _ = controls.hide(&m);
         }
@@ -1109,6 +1116,7 @@ fn run() -> Result<(), String> {
         }
         if id == 8 {
             state.pending_load = false;
+            state.features.loaded();
             if let Some(path) = m.get("path")
                 && !path.starts_with("bd://")
                 && !path.starts_with("cine-mvc://")
@@ -1135,7 +1143,30 @@ fn run() -> Result<(), String> {
                     .filter(|v| !v.is_empty());
             }
         }
+        if id == 22 && matches!(reply.0, 100 | 101 | 106) {
+            state.features.invalidate();
+        }
+        if id == 22 && reply.0 == 109 {
+            record_coalesced_checkpoint(&m, &mut state);
+        }
+        if id == 17 {
+            state.restore_window(&m);
+        }
+        if id == 22 && reply.0 == 110 {
+            controls::Controls::cursor(
+                &m,
+                &m.user_data("user-data/enigmax-cursor").unwrap_or_default(),
+            )?;
+        }
         state.restore_tracks(&m)?;
+        if (id == 8 || (id == 22 && matches!(reply.0, 107 | 108)))
+            && let Err(error) = playback_features::screen_and_tracks(&m, &mut state, id == 8)
+        {
+            if probe {
+                return Err(error);
+            }
+            runtime_error(&m, dir, "Perfil de pantalla / pistas", &error);
+        }
         if id == 8 || id == 17 || (id == 22 && matches!(reply.0, 100 | 105 | 106)) {
             state.capture_tracks(&m);
         }
@@ -1264,14 +1295,14 @@ fn run() -> Result<(), String> {
                 }
                 "quit" => action(&m, &mut state, Action::Id(55)),
                 "checkpoint" => {
-                    if client_args.get(3) == m.get("path").as_ref()
-                        && let (Some(pos), Some(duration)) =
-                            (client_args.get(1), client_args.get(2))
+                    if let (Some(pos), Some(duration), Some(path)) =
+                        (client_args.get(1), client_args.get(2), client_args.get(3))
                     {
-                        state.checkpoint(pos, duration);
+                        record_checkpoint(&m, &mut state, pos, duration, path);
                     }
                     Ok(())
                 }
+                "playback-health" => playback_features::screen_and_tracks(&m, &mut state, false),
                 "open" => open(&m, &mut state, false),
                 "idle-draw" => controls.idle_draw(&m),
                 "idle-click" => Ok(()),
@@ -1343,6 +1374,26 @@ fn run() -> Result<(), String> {
                 return Err(e);
             }
             runtime_error(&m, dir, "Controles", &e);
+        }
+        if !state.pending_load
+            && let Err(error) = state.features.apply(&m, state.passthrough)
+        {
+            if probe {
+                return Err(error);
+            }
+            runtime_error(&m, dir, "Opciones de reproducción", &error);
+        }
+        if let Err(error) = state.features.poll(
+            &m,
+            state.raw.is_some(),
+            state.prefs.quality == cineplayer_core::stereo::Quality::Low,
+            state.pending_load,
+            state.automatic,
+        ) {
+            if probe {
+                return Err(error);
+            }
+            runtime_error(&m, dir, "Lectura adaptativa", &error);
         }
         if let Some(sync) = &mut sync_probe {
             sync.tick(&m, &mut state)?;
@@ -1827,7 +1878,7 @@ mod tests {
             });
             println!("ISO seek {target}: {:?}", m.get("time-pos"));
         }
-        let (_, _, tracks) = track_menus(&m).unwrap();
+        let (_, _, tracks) = track_menus(&m, &state).unwrap();
         let mut audio = 0;
         let mut sub = 0;
         for (_, track) in tracks {
@@ -1941,7 +1992,26 @@ mod tests {
         s.titles.push(mvc::Title::default());
         let full = build_menu(&m, &s, false).unwrap().0;
         let remaining = build_menu(&m, &s, true).unwrap().0;
-        let (audio, subs, _) = track_menus(&m).unwrap();
+        let (audio, subs, _) = track_menus(&m, &s).unwrap();
+        let items = full.entries().unwrap();
+        let playback = items.iter().find(|e| e.label == "Reproducción").unwrap();
+        assert_eq!(playback.children.iter().filter(|e| e.enabled).count(), 4);
+        let audio_items = audio.entries().unwrap();
+        assert!(
+            audio_items
+                .iter()
+                .any(|e| e.label == "Filtros"
+                    && e.children.iter().filter(|c| c.enabled).count() == 3)
+        );
+        assert!(!audio_items.iter().any(|e| e.id == 7060));
+        assert!(
+            !subs
+                .entries()
+                .unwrap()
+                .iter()
+                .any(|e| e.id == 58 || e.id == 7130)
+        );
+
         let mut all = std::collections::BTreeMap::new();
         let mut toolbar = std::collections::BTreeMap::new();
         leaves(&full.entries().unwrap(), &mut all);
@@ -2324,7 +2394,7 @@ mod tests {
             pump(&mut m, &mut s, |m, s| {
                 !s.pending_load && m.get("track-list/count").as_deref() == Some("5")
             });
-            let (_, _, tracks) = track_menus(&m).unwrap();
+            let (_, _, tracks) = track_menus(&m, &s).unwrap();
             assert_eq!(
                 tracks
                     .iter()

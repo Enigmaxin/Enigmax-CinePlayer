@@ -30,6 +30,8 @@ struct Opening {
     history_asked: bool,
 }
 pub struct State {
+    pub features: crate::playback_features::Features,
+    window_restore: Option<(windows::WindowPlacement, std::time::Instant)>,
     loader: Option<mvc::Loader>,
     opening: Option<Opening>,
     prepared_titles: Option<(String, Vec<mvc::Title>)>,
@@ -77,6 +79,17 @@ pub struct State {
     startup_play: bool,
 }
 impl State {
+    pub fn restore_window(&mut self, m: &Mpv) {
+        if let Some((placement, started)) = self.window_restore.take() {
+            if started.elapsed().as_secs() >= 3 || m.get("fullscreen").as_deref() == Some("yes") {
+                return;
+            }
+            let hwnd = m.get("window-id").and_then(|v| v.parse().ok()).unwrap_or(0);
+            if !windows::restore_placement(hwnd, &placement) {
+                self.window_restore = Some((placement, started));
+            }
+        }
+    }
     pub fn last_video(&self) -> Option<String> {
         let path = self.dir.join("config/last-video.json");
         if path.metadata().ok()?.len() > 65536 {
@@ -220,6 +233,7 @@ impl State {
             }
         }
         Self {
+            features: crate::playback_features::Features::load(dir, probe),
             loader: None,
             opening: None,
             prepared_titles: None,
@@ -248,6 +262,7 @@ impl State {
             external_subs: Vec::new(),
             pending_load: false,
             closing: false,
+            window_restore: None,
             automatic: !probe,
             view_choice_made: false,
             shaders: Default::default(),
@@ -303,6 +318,9 @@ impl State {
             self.prefs.output = Output::Left;
             self.prefs.swap = false;
         }
+    }
+    pub fn has_saved_tracks(&self) -> bool {
+        self.track_choice.is_some()
     }
     pub fn input_layout(&self, m: &Mpv) -> Layout {
         if self.raw.is_some() {
@@ -932,11 +950,13 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     m.set("video-crop", "")?;
     let renderer = if preblend { "gpu" } else { "gpu-next" };
     m.set("blend-subtitles", if preblend { "video" } else { "no" })?;
-    m.set(
-        "sub-ass-override",
-        if ass.is_some() { "no" } else { "scale" },
-    )?;
+
     if m.get("current-vo").as_deref() != Some(renderer) {
+        if m.get("fullscreen").as_deref() != Some("yes") && s.window_restore.is_none() {
+            let hwnd = m.get("window-id").and_then(|v| v.parse().ok()).unwrap_or(0);
+            s.window_restore =
+                windows::capture_placement(hwnd).map(|p| (p, std::time::Instant::now()));
+        }
         m.set("vo", if preblend { "gpu" } else { "gpu-next,gpu" })?;
     }
     let original_aspect = m
@@ -2340,6 +2360,8 @@ mod state_tests {
         std::fs::write(dir.path().join("config/resume.json"), history.encode()).unwrap();
         drop(seed);
         for restart in [false, true] {
+            // Each startup choice starts from the same saved-position fixture.
+            std::fs::write(dir.path().join("config/resume.json"), history.encode()).unwrap();
             let mut m = iso_engine(root);
             let mut s = State::new(dir.path(), false);
             assert!(s.begin_startup(&m).unwrap());
@@ -2419,6 +2441,22 @@ mod state_tests {
             assert_eq!(
                 m.user_data("user-data/enigmax-startup").as_deref(),
                 Some("no")
+            );
+            m.set("pause", "yes").unwrap();
+            let saved = m.get("time-pos").unwrap().parse::<f64>().unwrap();
+            let payload = format!("{saved:.6}|30|{}", m.get("path").unwrap());
+            m.set("user-data/enigmax-checkpoint", &payload).unwrap();
+            crate::record_coalesced_checkpoint(&m, &mut s);
+            assert!(
+                (s.history_last.as_ref().unwrap().seconds - saved).abs() < 0.00001,
+                "Coalesced checkpoint lost JSON-escaped playback state"
+            );
+            m.set("user-data/enigmax-checkpoint", "23|30|Z:/not-playing.mkv")
+                .unwrap();
+            crate::record_coalesced_checkpoint(&m, &mut s);
+            assert!(
+                (s.history_last.as_ref().unwrap().seconds - saved).abs() < 0.00001,
+                "Old-file checkpoint replaced current history"
             );
         }
         let empty = tempfile::tempdir().unwrap();

@@ -8,11 +8,17 @@ local function test()
     local volume=50
     local startup="no"
     local mouse_areas={}
+    local periodic={}
     local single_timer
     local timer
     local fake={}
-    function fake.get_osd_size() return 1280,720 end
-    function fake.get_mouse_pos() return 1094,710 end
+    local cursor,properties={},{}
+    local sw,sh,mx,my=1280,720,1094,710
+    function fake.create_osd_overlay() cursor={remove=function(self)self.removed=true end,update=function(self)self.removed=false end};return cursor end
+    function fake.set_property(k,v) properties[k]=v end
+    function fake.set_property_number(k,v) properties[k]=v end
+    function fake.get_osd_size() return sw,sh end
+    function fake.get_mouse_pos() return mx,my end
     function fake.get_property(key,default) if key=="user-data/enigmax-startup" then return startup end;return default end
     function fake.add_timeout(_,fn) single_timer={alive=true,tick=fn,kill=function(self)self.alive=false end};return single_timer end
     function fake.get_time() return clock end
@@ -26,8 +32,9 @@ local function test()
     function fake.register_script_message(name,fn) messages[name]=fn end
     function fake.observe_property(name,_,fn) observers[name]=fn end
     function fake.register_event(name,fn) events[name]=fn end
-    function fake.add_periodic_timer(_,fn)
+    function fake.add_periodic_timer(interval,fn)
         timer={alive=true,tick=fn,kill=function(self)self.alive=false end,resume=function(self)self.alive=true end}
+        periodic[interval]=timer
         return timer
     end
     package.loaded.mp=fake
@@ -97,6 +104,46 @@ local function test()
     assert(sent[#sent][3]=='startup-choice' and sent[#sent][4]=='continue','Space must explicitly choose continue')
     startup='no';observers['user-data/enigmax-startup']('user-data/enigmax-startup',startup)
     assert(not enabled.enigmax_startup and enabled.enigmax_bottom,'Finishing startup must restore normal controls')
+    for _,case in ipairs({{'sbs',3840,1080},{'sbs',1920,1080},{'ou',1920,2160},{'ou',1920,1080},{'framepack',1920,2205},{'anaglyph',1920,1080}}) do
+        sw,sh=case[2],case[3];mx,my=sw*0.2,sh*0.2;clock=clock+1
+        messages.configure(case[1]);bindings.enigmax_show[3][2]()
+        local payload=properties['user-data/enigmax-cursor']
+        if case[1]=='anaglyph' then
+            assert(payload=='' and properties['cursor-autohide']~='always','Anaglyph must retain the native pointer')
+        else
+            assert(properties['cursor-autohide']=='always','Stereo must replace native cursor')
+            local v={};for n in payload:gmatch('[^|]+') do v[#v+1]=tonumber(n) end
+            assert(#v==8,'Exactly two eye cursors must be supplied')
+            if case[1]=='sbs' then assert(v[5]-v[1]==sw/2 and v[2]==v[6],'SBS cursor disparity must be zero') end
+            assert(v[3]>=6 and v[4]>=6,'Cursor must remain visible')
+            clock=clock+0.02;bindings.enigmax_bottom[3][2]()
+            assert(properties['user-data/enigmax-cursor']~='','Cursor must update over controls')
+        end
+        messages['stereo-cursor']('no');assert(properties['user-data/enigmax-cursor']=='','Disabling must remove stereo cursors')
+        messages['stereo-cursor']('yes')
+    end
+    messages.configure('mono');assert(properties['user-data/enigmax-cursor']=='' and properties['cursor-autohide']~='always','2D must restore native cursor')
+    -- Property-style input generation: dimensions, eye edges and invalid coordinates.
+    for i=1,180 do
+        sw=320+(i*127)%3700;sh=200+(i*83)%2200
+        for _,mode in ipairs({'sbs','ou','framepack'}) do
+            messages.configure(mode)
+            mx,my=sw*0.17,sh*0.21;clock=clock+0.02;bindings.enigmax_show[3][2]()
+            local payload=properties['user-data/enigmax-cursor']
+            if payload~='' then
+                local v={};for n in payload:gmatch('[^|]+') do v[#v+1]=tonumber(n) end
+                assert(#v==8,'Malformed cursor payload')
+                for j=1,8,4 do assert(v[j]>=0 and v[j+1]>=0 and v[j]+v[j+2]<=sw+1 and v[j+1]+v[j+3]<=sh+1,'Cursor escaped output') end
+            end
+            mx,my=-1,-1;clock=clock+0.02;bindings.enigmax_show[3][2]()
+            assert(properties['user-data/enigmax-cursor']=='','Outside pointer must disappear')
+        end
+    end
+    messages.configure('mono')
+    local before=#sent
+    for _=1,2000 do periodic[2].tick();periodic[5].tick() end
+    assert(#sent==before,'Background health/checkpoints must not flood the main client queue during a modal dialog')
+    assert(properties['user-data/enigmax-health']==clock and properties['user-data/enigmax-checkpoint'],'Latest background state must remain available')
     idle=true;observers['idle-active']('idle-active',true)
     assert(not enabled.enigmax_top and not enabled.enigmax_bottom,'Unloaded video must release controls')
 end
