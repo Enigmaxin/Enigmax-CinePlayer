@@ -1,4 +1,4 @@
-# Actualizaciones portátiles de Enigmax CinePlayer 0.2.23
+# Actualizaciones portátiles de Enigmax CinePlayer 1.0.1
 
 Al arrancar y desde Acerca de > Buscar actualizaciones, un hilo secundario consulta un manifiesto público alojado como asset de GitHub Releases, sin consumir la cuota de la API REST. La reproducción no espera a la red. APP_VERSION procede de Cargo.toml. Los modos --probe no consultan actualizaciones. Una exclusión entre procesos evita consultas simultáneas.
 

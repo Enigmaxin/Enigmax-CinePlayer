@@ -25,8 +25,8 @@ verify_source() {
     [[ $(cat "$path/.source-revision") == "$expected" ]]
   fi
 }
-verify_source "$source_root/mpv" dc4b285c93043d99492c3664a24f4ae08cdfdf0d
-verify_source "$source_root/ffmpeg" 6882969ce9fd2aa6aa1d0008b2bfe1c838aac11d
+verify_source "$source_root/mpv" 914a11c30c6a1710fe1f4333654696f2dfb3c3af
+verify_source "$source_root/ffmpeg" 1e65c6cd5d3d2d12cbb374460dbf08bedf54772a
 mkdir -p "$build_root/ffmpeg" "$build_root/prefix"
 prefix="$build_root/prefix"
 export PKG_CONFIG_PATH="$prefix/lib/pkgconfig:/ucrt64/lib/pkgconfig:/ucrt64/share/pkgconfig"

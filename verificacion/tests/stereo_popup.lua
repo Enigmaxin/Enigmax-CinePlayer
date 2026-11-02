@@ -22,7 +22,16 @@ local function on_state(_,value)
         end
         if cfg.capture then mp.commandv('screenshot-to-file',cfg.capture,'window') end
         local body
-        if cfg.close_button then body=cfg.close_button
+        if type(wanted)=='string' and wanted:sub(1,1)=='@' and wanted~='@back' and cfg.expected_label then
+            local found=false;for _,label in ipairs(state.labels)do if label==cfg.expected_label then found=true end end
+            if not found then mp.set_property('user-data/enigmax-popup-test-error','Stale position label');cfg=nil;mp.commandv('script-message-to',state.client,'popup-input','close');return end
+        end
+        if wanted=='@back' then cfg.step=(cfg.step or 1)+1;mp.commandv('keypress','LEFT');return
+        elseif wanted=='@escape' then
+            cfg=nil;mp.commandv('keypress','ESC');return
+        elseif wanted=='@outside' then body=table.concat({state.w,state.h,1,1},'|')
+        elseif wanted=='@subs' then body=cfg.finish_body
+        elseif cfg.close_button then body=cfg.close_button
         else
             local index
             for i,id in ipairs(state.ids)do if id==wanted or (type(wanted)=="string" and state.labels[i]==wanted) then index=i-1;break end end

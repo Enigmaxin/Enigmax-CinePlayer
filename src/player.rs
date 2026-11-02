@@ -20,6 +20,8 @@ use crate::{mpv::Mpv, mvc, windows};
 use cineplayer_core::stereo::{self, Algorithm, Glasses, Layout, Output, Quality, Settings};
 use std::path::{Path, PathBuf};
 
+pub const SUB_POSITION_FIRST: u32 = 1140;
+pub const SUB_POSITIONS: [i32; 13] = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110];
 struct Opening {
     id: u64,
     kind: mvc::Kind,
@@ -565,6 +567,11 @@ pub fn load(m: &Mpv, s: &mut State, path: &str, title: Option<i32>) -> Result<()
         {
             s.external_subs.push(file);
         }
+    }
+    if !same_source && m.get("fullscreen").as_deref() != Some("yes") {
+        // Route sizing through the VO owner thread and keep geometry consistent
+        // when gpu/gpu-next recreates the window. This never resizes video frames.
+        m.set("geometry", &windows::movie_geometry(crate::owner(m))?)?;
     }
     let sub_files = s.external_subs.clone();
     let subs = if sub_files.is_empty() {
@@ -1254,7 +1261,7 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
         root.item(id, label, checked)?;
     }
     root.separator();
-    root.submenu("Formato 3D", layout_menu(s)?)?;
+    root.submenu("Formato 3D de entrada", layout_menu(s)?)?;
     let advanced = windows::Menu::new()?;
     let eye = windows::Menu::new()?;
     eye.item(1021, "Izquierdo (habitual)", s.prefs.output == Output::Left)?;
@@ -1264,7 +1271,7 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
     for (i, v) in Algorithm::ALL.iter().enumerate() {
         algorithm.item(1040 + i as u32, v.label(), s.prefs.algorithm == *v)?;
     }
-    advanced.submenu("Método de color", algorithm)?;
+    advanced.submenu("Algoritmo anaglifo", algorithm)?;
 
     let cal = windows::Menu::new()?;
     for (id, label) in [
@@ -1275,13 +1282,11 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
         (1066, "Compensación de fugas −1 %"),
         (1067, "Compensación de fugas +1 %"),
         (1068, "Restablecer calibración"),
-        (1069, "Subtítulos: subir"),
-        (1070, "Subtítulos: bajar"),
         (1071, "Ver ajustes actuales"),
     ] {
         cal.item(id, label, false)?;
     }
-    advanced.submenu("Ajustar brillo y posición de subtítulos", cal)?;
+    advanced.submenu("Ajuste de brillo por ojo", cal)?;
     let subs = windows::Menu::new()?;
     for (i, mode) in cineplayer_core::ass3d::Mode::ALL.iter().enumerate() {
         subs.item(1100 + i as u32, mode.label(), s.prefs.ass_mode == *mode)?;
@@ -1676,18 +1681,20 @@ fn action_impl(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
             s.prefs.right_gain = 1.0;
             s.prefs.crosstalk = 0.0;
         }
-        1069..=1070 => {
-            s.prefs.sub_pos = (s.prefs.sub_pos + if id == 1069 { -5 } else { 5 }).clamp(50, 110)
+        1140..=1152 => {
+            let position = SUB_POSITIONS[(id - SUB_POSITION_FIRST) as usize];
+            m.set("sub-pos", &position.to_string())?;
+            s.prefs.sub_pos = position;
+            return Ok(());
         }
         1071 => {
             windows::player_message(
                 m,
                 &format!(
-                    "Ganancias: {:.2} / {:.2}\nCompensación de fugas: {:.1} %\nPosición de subtítulos: {}\n{}",
+                    "Ganancias: {:.2} / {:.2}\nCompensación de fugas: {:.1} %\n{}",
                     s.prefs.left_gain,
                     s.prefs.right_gain,
                     s.prefs.crosstalk * 100.0,
-                    s.prefs.sub_pos,
                     s.pipeline
                 ),
                 false,

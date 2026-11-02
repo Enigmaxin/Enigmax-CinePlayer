@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import time
+import tomllib
 
 
 def digest(path):
@@ -18,7 +19,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--player", type=Path, default=app / "EnigmaxCinePlayer.exe")
     player = parser.parse_args().player.resolve(strict=True)
-    out = app / "verificacion/0.2.23"
+    version = tomllib.loads((app / "Cargo.toml").read_text(encoding="utf-8"))["package"]["version"]
+    out = app / f"verificacion/{version}"
     out.mkdir(exist_ok=True)
     config_before = {p.name: digest(p) for p in (app / "config").glob("*") if p.is_file()}
     error = player.parent / "ultimo-error.txt"

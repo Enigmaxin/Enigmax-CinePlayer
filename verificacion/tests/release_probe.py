@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import time
+import tomllib
 
 
 if __name__ == "__main__":
@@ -15,7 +16,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     player = args.player.resolve(strict=True)
     fixtures = app / "verificacion/muestras"
-    out = app / "verificacion/0.2.23/release"
+    version = tomllib.loads((app / "Cargo.toml").read_text(encoding="utf-8"))["package"]["version"]
+    out = app / f"verificacion/{version}/release"
     out.mkdir(parents=True, exist_ok=True)
     config = lambda: {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                       for p in (app / "config").iterdir() if p.is_file()}

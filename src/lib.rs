@@ -1,5 +1,6 @@
 //! Geometry shared with a future Android frontend. No OS or decoder dependencies.
 pub mod ass3d;
+pub mod color_info;
 pub mod control_layout;
 pub mod history;
 pub mod media;

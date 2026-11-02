@@ -1,8 +1,8 @@
 diff --git a/options/options.c b/options/options.c
-index 37d3e1b..8fd5a98 100644
+index 68e121d..15885f1 100644
 --- a/options/options.c
 +++ b/options/options.c
-@@ -422,6 +422,10 @@ const struct m_sub_options mp_subtitle_shared_sub_opts = {
+@@ -421,6 +421,10 @@ const struct m_sub_options mp_subtitle_shared_sub_opts = {
  
  const struct m_sub_options mp_osd_render_sub_opts = {
      .opts = (const struct m_option[]){
@@ -13,7 +13,7 @@ index 37d3e1b..8fd5a98 100644
          {"osd", OPT_SUBSTRUCT(osd_style, osd_style_conf)},
          {"osd-bar", OPT_SUBSTRUCT(osd_bar_style, osd_bar_style_conf)},
          {"osd-scale", OPT_FLOAT(osd_scale), M_RANGE(0, 100)},
-@@ -438,6 +442,7 @@ const struct m_sub_options mp_osd_render_sub_opts = {
+@@ -437,6 +441,7 @@ const struct m_sub_options mp_osd_render_sub_opts = {
      .size = sizeof(OPT_BASE_STRUCT),
      .defaults = &(OPT_BASE_STRUCT){
          .osd_scale = 1,

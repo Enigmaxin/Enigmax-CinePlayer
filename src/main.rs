@@ -68,6 +68,9 @@ fn configure(m: &Mpv, probe: bool, dir: &std::path::Path) -> Result<(), String> 
         ("target-colorspace-hint", "auto"),
         ("ao", "wasapi"),
         ("audio-channels", "auto-safe"),
+        ("video-sync", "audio"),
+        ("speed", "1"),
+        ("interpolation", "no"),
         ("volume-max", "100"),
         ("cache", "auto"),
         ("demuxer-max-bytes", "64MiB"),
@@ -75,6 +78,7 @@ fn configure(m: &Mpv, probe: bool, dir: &std::path::Path) -> Result<(), String> 
         ("autofit-larger", "90%x90%"),
         ("autofit-smaller", "640x360"),
         ("auto-window-resize", "no"),
+        ("keepaspect-window", "no"),
         ("keepaspect", "yes"),
         ("drag-and-drop", "replace"),
         ("stop-screensaver", "yes"),
@@ -359,6 +363,10 @@ fn track_menus(m: &Mpv, s: &State) -> Result<TrackMenus, String> {
     playback_features::audio_menu(&tracks, s)?;
     playback_features::subtitle_menu(&subs, m)?;
     actions.push((2, Action::Id(2)));
+    for i in 0..player::SUB_POSITIONS.len() {
+        let id = player::SUB_POSITION_FIRST + i as u32;
+        actions.push((id, Action::Id(id)));
+    }
     Ok((tracks, subs, actions))
 }
 fn choose_track(m: &Mpv, s: &mut State, sub: bool) -> Result<(), String> {
@@ -555,13 +563,6 @@ fn info(m: &Mpv, s: &State) {
             cineplayer_core::media::bitrate(m.get("video-bitrate"))
         ),
         format!(
-            "Color: {} / {} / {} · {}",
-            get("video-params/primaries"),
-            get("video-params/gamma"),
-            get("video-params/colormatrix"),
-            get("video-params/colorlevels")
-        ),
-        format!(
             "Píxeles: {} · Decodificación: {}",
             pixels,
             get("hwdec-current")
@@ -586,6 +587,24 @@ fn info(m: &Mpv, s: &State) {
     }
     let tracks: serde_json::Value =
         serde_json::from_str(&m.get("track-list").unwrap_or_default()).unwrap_or_default();
+    let decoded: serde_json::Value =
+        serde_json::from_str(&m.get("video-dec-params").unwrap_or_default()).unwrap_or_default();
+    let processed: serde_json::Value =
+        serde_json::from_str(&m.get("video-params").unwrap_or_default()).unwrap_or_default();
+    let mut color = cineplayer_core::color_info::describe(&decoded, &tracks);
+    color.push(if s.hdr_sdr {
+        "Destino solicitado: SDR · conversión HDR → SDR cuando corresponda".into()
+    } else {
+        "Destino automático · depende de Windows y la pantalla".into()
+    });
+    if let Some(transfer) = processed["gamma"].as_str() {
+        color.push(format!("Transferencia tras filtros: {transfer}"));
+    }
+    let insert = lines
+        .iter()
+        .position(|l| l == "VÍDEO")
+        .map_or(lines.len(), |i| i + 2);
+    lines.splice(insert..insert, color);
     for (kind, heading) in [("audio", "AUDIOS"), ("sub", "SUBTÍTULOS")] {
         lines.push(heading.into());
         let mut found = false;
@@ -638,6 +657,7 @@ fn info(m: &Mpv, s: &State) {
         .map(|label| {
             let mut e = popup::Entry::action(0, label);
             e.enabled = false;
+            e.emphasized = e.label.starts_with("COLOR · ");
             e
         })
         .collect();
@@ -2012,6 +2032,55 @@ mod tests {
                 .any(|e| e.id == 58 || e.id == 7130)
         );
 
+        let stereo = player::stereo_menu(&m, &s).unwrap().entries().unwrap();
+        let advanced = stereo.iter().find(|e| e.label == "Avanzado").unwrap();
+        let brightness = advanced
+            .children
+            .iter()
+            .find(|e| e.label == "Ajuste de brillo por ojo")
+            .unwrap();
+        assert!(brightness.children.iter().any(|e| e.id == 1062));
+        assert!(
+            advanced
+                .children
+                .iter()
+                .any(|e| e.label == "Algoritmo anaglifo")
+        );
+        assert!(
+            !advanced
+                .children
+                .iter()
+                .any(|e| e.label == "Método de color")
+        );
+        assert!(
+            !brightness
+                .children
+                .iter()
+                .any(|e| e.id == 1069 || e.id == 1070)
+        );
+        assert!(stereo.iter().any(|e| e.label == "Formato 3D de entrada"));
+        let subtitle_entries = subs.entries().unwrap();
+        let appearance = subtitle_entries
+            .iter()
+            .find(|e| e.label == "Aspecto de subtítulos")
+            .unwrap();
+        assert_eq!(appearance.children.last().unwrap().id, 7131);
+        let position = appearance
+            .children
+            .iter()
+            .find(|e| e.label == "Posición de subtítulos")
+            .unwrap();
+        assert_eq!(
+            position
+                .children
+                .iter()
+                .filter(|e| e.enabled)
+                .map(|e| e.id)
+                .collect::<Vec<_>>(),
+            (player::SUB_POSITION_FIRST
+                ..player::SUB_POSITION_FIRST + player::SUB_POSITIONS.len() as u32)
+                .collect::<Vec<_>>()
+        );
         let mut all = std::collections::BTreeMap::new();
         let mut toolbar = std::collections::BTreeMap::new();
         leaves(&full.entries().unwrap(), &mut all);
@@ -2619,6 +2688,89 @@ mod tests {
                     && m.get("video-out-params/stereo-in").as_deref() == Some("mono")
             });
             assert_eq!(m.get("video-out-params/stereo-in").as_deref(), Some("mono"));
+        }
+    }
+}
+
+#[cfg(test)]
+mod information_audit {
+    use super::*;
+    #[test]
+    fn information_panel_keeps_source_color_visible_across_stereo_and_hdr_changes() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let temp = tempfile::tempdir().unwrap();
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.option("pause", "yes").unwrap();
+        m.option("autofit", "960x540").unwrap();
+        m.init().unwrap();
+        m.command(&[
+            "load-script",
+            root.join("verificacion/tests/information_panel.lua")
+                .to_str()
+                .unwrap(),
+        ])
+        .unwrap();
+        let mut s = State::new(temp.path(), true);
+        let dest = root.join(format!("verificacion/{VERSION}/information"));
+        std::fs::create_dir_all(&dest).unwrap();
+        for (name, file, layout, hdr) in [
+            ("sdr", "color-limited.mkv", Layout::Mono, false),
+            ("hdr", "color-hdr.mkv", Layout::Mono, true),
+            ("sbs", "ass3d-fullsbs.mkv", Layout::FullSbs, false),
+            ("ou", "ass3d-fullou.mkv", Layout::FullOu, false),
+            ("sdr-after-hdr", "color-limited.mkv", Layout::Mono, false),
+        ] {
+            s.prefs.layout = layout;
+            s.prefs.output = Output::Original;
+            player::load(
+                &m,
+                &mut s,
+                root.join("verificacion/muestras")
+                    .join(file)
+                    .to_str()
+                    .unwrap(),
+                None,
+            )
+            .unwrap();
+            let until = Instant::now() + Duration::from_secs(12);
+            loop {
+                let event = m.wait(0.02);
+                if event.id == 8 {
+                    s.pending_load = false;
+                }
+                player::poll_loading(&m, &mut s).unwrap();
+                if !s.pending_load && m.get("video-dec-params/gamma").is_some() {
+                    break;
+                }
+                assert!(Instant::now() < until, "Load timeout: {name}");
+            }
+            player::apply(&m, &mut s).unwrap();
+            let until = Instant::now() + Duration::from_millis(350);
+            while Instant::now() < until {
+                m.wait(0.02);
+            }
+            let capture = dest.join(format!("{name}.png"));
+            m.set("user-data/enigmax-info-audit", capture.to_str().unwrap())
+                .unwrap();
+            info(&m, &s);
+            let labels: Vec<String> =
+                serde_json::from_str(&m.user_data("user-data/enigmax-info-labels").unwrap())
+                    .unwrap();
+            let color = labels.iter().find(|l| l.starts_with("COLOR · ")).unwrap();
+            if hdr {
+                assert!(color.contains("HDR"), "{color}");
+            } else {
+                assert!(
+                    color.contains("SDR") || color.contains("Formato de color no disponible"),
+                    "Unexpected stale HDR label: {color}"
+                );
+            }
+            assert!(capture.is_file(), "Missing screenshot: {name}");
+            assert_eq!(
+                m.user_data("user-data/enigmax-popup-state").as_deref(),
+                Some("")
+            );
         }
     }
 }

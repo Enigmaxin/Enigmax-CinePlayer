@@ -104,7 +104,7 @@ def main() -> None:
                 if path.suffix.lower() == '.a' and not rel.as_posix().startswith('native/vendor/ffmpeg/lib/'):
                     continue
                 archive.write(path, 'fuentes/EnigmaxCinePlayer/'+rel.as_posix())
-        for name, sha in (('mpv','dc4b285c93043d99492c3664a24f4ae08cdfdf0d'),('ffmpeg','6882969ce9fd2aa6aa1d0008b2bfe1c838aac11d')):
+        for name, sha in (('mpv','914a11c30c6a1710fe1f4333654696f2dfb3c3af'),('ffmpeg','1e65c6cd5d3d2d12cbb374460dbf08bedf54772a')):
             if subprocess.check_output([str(args.git),'--git-dir='+str((args.pinned/name/'.git').resolve()),'rev-parse','HEAD'],text=True).strip()!=sha:
                 raise ValueError('Pinned checkout changed')
             data = subprocess.check_output([str(args.git),'-C',str((args.pinned/name).resolve()),'archive','--format=tar',sha])

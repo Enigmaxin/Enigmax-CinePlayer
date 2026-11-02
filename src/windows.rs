@@ -72,6 +72,7 @@ pub fn choose(
                     id: 0,
                     label: content.chars().take(240).collect(),
                     enabled: false,
+                    emphasized: false,
                     checked: false,
                     children: vec![],
                 },
@@ -549,6 +550,7 @@ pub fn overlay_message(m: &crate::mpv::Mpv, text: &str, error: bool) {
                 label: chunk.iter().collect(),
                 checked: false,
                 enabled: false,
+                emphasized: false,
                 children: vec![],
             });
             if entries.len() >= 1000 {
@@ -609,7 +611,7 @@ impl Menu {
         unsafe { AppendMenuW(self.0, 0x800, 0, ptr::null()) };
     }
     pub fn show(&self, m: &crate::mpv::Mpv) -> Result<u32, String> {
-        if crate::popup::stereo(m)
+        if crate::popup::needs_eye_projection(crate::popup::projection(m))
             || m.user_data("user-data/enigmax-toolbar-popup").as_deref() == Some("yes")
         {
             return crate::popup::show(m, "Opciones", self.entries()?);
@@ -649,6 +651,7 @@ impl Menu {
                     label,
                     checked: state & 8 != 0,
                     enabled: state & 3 == 0,
+                    emphasized: false,
                     children: if child.is_null() {
                         vec![]
                     } else {
@@ -944,6 +947,48 @@ struct MonitorInfo {
     monitor: WindowRect,
     work: WindowRect,
     flags: u32,
+}
+/// Fit a 16:9 client rectangle inside half the physical monitor dimensions.
+/// Quantize to whole 16x9 units, avoiding fractional pixels on unusual monitors.
+fn movie_client_size(width: i32, height: i32) -> Option<(i32, i32)> {
+    let units = (width / 32).min(height / 18);
+    (units > 0).then_some((units * 16, units * 9))
+}
+/// mpv owns window sizing on its VO thread, including DPI-aware borders.
+/// Keep its geometry option authoritative across render-backend recreation.
+pub fn movie_geometry(window: usize) -> Result<String, String> {
+    let mut info = MonitorInfo {
+        size: std::mem::size_of::<MonitorInfo>() as u32,
+        monitor: WindowRect::default(),
+        work: WindowRect::default(),
+        flags: 0,
+    };
+    if unsafe { GetMonitorInfoW(MonitorFromWindow(window as Handle, 2), &mut info) } == 0 {
+        return Err("No se pudo consultar la pantalla de reproducción".into());
+    }
+    let (w, h) = movie_client_size(
+        info.monitor.right - info.monitor.left,
+        info.monitor.bottom - info.monitor.top,
+    )
+    .ok_or("Dimensiones de pantalla no válidas")?;
+    Ok(format!("{w}x{h}"))
+}
+#[cfg(test)]
+#[test]
+fn half_screen_client_is_16_by_9_on_portrait_ultrawide_and_4k() {
+    for (w, h) in [
+        (1920, 1080),
+        (3840, 2160),
+        (3440, 1440),
+        (1080, 1920),
+        (2560, 1600),
+    ] {
+        let (cw, ch) = movie_client_size(w, h).unwrap();
+        assert_eq!(cw * 9, ch * 16);
+        assert!(cw <= w / 2 && ch <= h / 2);
+        assert!(cw + 16 > w / 2 || ch + 9 > h / 2);
+    }
+    assert_eq!(movie_client_size(0, 1080), None);
 }
 /// On-demand physical window diagnostics, never a playback polling loop.
 pub fn display_geometry(window: usize) -> Option<serde_json::Value> {

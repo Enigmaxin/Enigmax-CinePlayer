@@ -13,7 +13,8 @@ typedef struct CineMenuItem {
 } CineMenuItem;
 typedef struct {
     CineMenuItem *items;
-    HWND host;
+    HWND host, owner;
+    UINT_PTR watch;
     HMENU root;
     HFONT normal, small;
     HBRUSH background;
@@ -28,6 +29,12 @@ static CineMenuItem *m_item(ULONG_PTR data) {
 static LRESULT CALLBACK m_procedure(HWND window,UINT msg,WPARAM wp,LPARAM lp,
                                    UINT_PTR id,DWORD_PTR data) {
     (void)id;(void)data;
+    // The owner is mpv's window on another input queue. Do not retain a modal
+    // menu after that window closes or after this host loses activation.
+    if((msg==WM_ACTIVATE&&LOWORD(wp)==WA_INACTIVE)||msg==WM_CANCELMODE||
+       (msg==WM_TIMER&&wp==m_theme.watch&&!IsWindow(m_theme.owner))) {
+        EndMenu();
+    }
     if(msg==WM_MEASUREITEM) {
         MEASUREITEMSTRUCT *mi=(MEASUREITEMSTRUCT*)lp;
         CineMenuItem *i=mi->CtlType==ODT_MENU?m_item(mi->itemData):NULL;
@@ -121,6 +128,7 @@ static void m_reset_background(HMENU menu) {
     }
 }
 void cine_menu_end(void) {
+    if(m_theme.watch)KillTimer(m_theme.host,m_theme.watch);
     if(m_theme.host)RemoveWindowSubclass(m_theme.host,m_procedure,1);
     if(m_theme.root)m_reset_background(m_theme.root);
     CineMenuItem *i=m_theme.items;
@@ -136,13 +144,16 @@ void cine_menu_end(void) {
     ZeroMemory(&m_theme,sizeof(m_theme));
 }
 void cine_menu_begin(HMENU menu,HWND host,HWND owner) {
+    if(!SetWindowSubclass(host,m_procedure,1,0))return;
+    m_theme.host=host;m_theme.owner=owner;
+    // No resident polling: this timer exists only for the native modal menu.
+    m_theme.watch=SetTimer(host,(UINT_PTR)&m_theme,100,NULL);
     HIGHCONTRASTW hc={sizeof(hc),0,NULL};
     if(SystemParametersInfoW(SPI_GETHIGHCONTRAST,sizeof(hc),&hc,0) && (hc.dwFlags&HCF_HIGHCONTRASTON))return;
     m_theme.dpi=(int)GetDpiForWindow(owner);if(m_theme.dpi<96)m_theme.dpi=96;
     m_theme.root=menu;
     m_theme.normal=font(m_px(15),400);m_theme.small=font(m_px(12),400);
     m_theme.background=CreateSolidBrush(RGB(27,31,34));
-    if(!m_theme.normal || !m_theme.small || !m_theme.background || !m_decorate(menu,0) ||
-       !SetWindowSubclass(host,m_procedure,1,0)){cine_menu_end();return;}
+    if(!m_theme.normal || !m_theme.small || !m_theme.background || !m_decorate(menu,0)){cine_menu_end();return;}
     m_theme.host=host;
 }

@@ -113,6 +113,19 @@ fn all_quality_transitions_keep_playback_tracks_color_and_transport() {
         // Let the selected view finish its initial geometry reconfiguration;
         // subsequent size changes are then attributable to the quality action.
         advance(&mut m, &mut s, 0.4);
+        let geometry = crate::windows::display_geometry(crate::owner(&m)).unwrap();
+        let monitor = &geometry["monitor"];
+        let unit = (monitor[2].as_i64().unwrap() / 32).min(monitor[3].as_i64().unwrap() / 18);
+        assert_eq!(
+            geometry["client"][2].as_i64(),
+            Some(unit * 16),
+            "{file}: {geometry}"
+        );
+        assert_eq!(
+            geometry["client"][3].as_i64(),
+            Some(unit * 9),
+            "{file}: {geometry}"
+        );
         for index in [1, 3, 2, 0, 2, 1, 0, 3, 0] {
             let before = number(&m, "time-pos");
             let before_drop = number(&m, "frame-drop-count");
@@ -429,4 +442,82 @@ fn measured_quality_resources() {
     )
     .unwrap();
     println!("{row}");
+}
+
+#[test]
+fn reset_subtitle_appearance_includes_position_for_srt_ass_and_pgs() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let temp = tempfile::tempdir().unwrap();
+    let mut m = setup(root);
+    let mut s = State::new(temp.path(), true);
+    for (file, expected) in [
+        ("pistas-qa", "scale"),
+        ("ass3d-fullsbs", "no"),
+        ("depth-qa-pgs", "yes"),
+    ] {
+        player::load(
+            &m,
+            &mut s,
+            root.join(format!("verificacion/muestras/quality-{file}.mkv"))
+                .to_str()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        wait_for(&mut m, &mut s, |m, s| {
+            !s.pending_load && m.get("video-params/w").is_some()
+        });
+        m.set("sid", "1").unwrap();
+        advance(&mut m, &mut s, 0.2);
+        player::action(&m, &mut s, 1149).unwrap();
+        crate::playback_features::action(&m, &mut s, 7104).unwrap();
+        crate::playback_features::action(&m, &mut s, 7121).unwrap();
+        let source = m.get("video-dec-params");
+        let audio = m.get("af");
+        crate::playback_features::action(&m, &mut s, 7131).unwrap();
+        advance(&mut m, &mut s, 0.1);
+        assert_eq!(s.prefs.sub_pos, 100);
+        assert_eq!(number(&m, "sub-pos"), 100.0);
+        assert_eq!(number(&m, "sub-scale"), 1.0);
+        assert_eq!(s.features.prefs.sub_color, "#FFFFFF");
+        assert_eq!(m.get("sub-ass-override").as_deref(), Some(expected));
+        assert_eq!(m.get("sub-ass-style-overrides").as_deref(), Some(""));
+        assert_eq!(m.get("af"), audio);
+        assert_eq!(m.get("video-dec-params"), source);
+        let entries = crate::windows::Menu::new().unwrap();
+        crate::playback_features::subtitle_menu(&entries, &m).unwrap();
+        assert_eq!(
+            entries.entries().unwrap()[0].children.last().unwrap().id,
+            7131
+        );
+    }
+}
+
+#[test]
+fn native_24_fractional_23976_and_25_keep_source_cadence_and_speed() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let temp = tempfile::tempdir().unwrap();
+    let mut m = setup(root);
+    let mut s = State::new(temp.path(), true);
+    for (name, expected) in [("24", 24.0), ("23976", 24000.0 / 1001.0), ("25", 25.0)] {
+        player::load(
+            &m,
+            &mut s,
+            root.join(format!("verificacion/muestras/refresh-{name}.mkv"))
+                .to_str()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        wait_for(&mut m, &mut s, |m, s| {
+            !s.pending_load && m.get("container-fps").is_some()
+        });
+        m.set("pause", "no").unwrap();
+        advance(&mut m, &mut s, 0.4);
+        assert!((number(&m, "container-fps") - expected).abs() < 0.0001);
+        assert!((number(&m, "estimated-vf-fps") - expected).abs() < 0.0001);
+        assert_eq!(number(&m, "speed"), 1.0);
+        assert_eq!(m.get("video-sync").as_deref(), Some("audio"));
+        assert_eq!(m.get("interpolation").as_deref(), Some("no"));
+    }
 }

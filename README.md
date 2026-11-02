@@ -1,14 +1,16 @@
-# Enigmax CinePlayer 0.2.23 — Windows 11 x64
+# Enigmax CinePlayer 1.0.1 — Windows 11 x64
 
-Cambios y límites de la versión vigente: **[validación de esta entrega](#validación-de-esta-entrega)**. Se corrigen el cursor estéreo y la conservación de la ventana, se preservan los estilos ASS y se simplifican los menús. Versión de desarrollo; no se certifican todas las pantallas o receptores.
+Cambios y límites de la versión vigente: **[validación de esta entrega](#validación-de-esta-entrega)**. Menú contextual nativo recuperado en 2D/anaglifo y posición de subtítulos mediante porcentajes seleccionables. No se certifican todas las pantallas o receptores.
 
-## Reproducción y subtítulos: novedades 0.2.23
+## Reproducción y subtítulos
 
 - **Opciones → Reproducción:** lectura adaptativa, frecuencia automática opcional, cursor estéreo y desentrelazado automático opcional.
-- **Subs → Aspecto de subtítulos:** tamaño entre 50 y 250 %, seis colores y restablecimiento para SRT. ASS/SSA y PGS conservan tamaño, color y posiciones originales; la profundidad 3D sigue disponible.
+- **Subs → Aspecto de subtítulos:** tamaño entre 50 y 250 % y seis colores para SRT. Restablecer aspecto, al final, recupera tamaño, color y posición para todas las pistas, respetando el contenido escrito en ASS/PGS. ASS/SSA y PGS conservan sus estilos originales; «Posición de subtítulos» ofrece el ajuste vertical del motor, sin forzar posiciones ASS explícitas.
 - Los ajustes se guardan atómicamente en `config/playback.json`. Los perfiles explícitamente guardados en `config/screens.json` recuperan salida SDR/automática, dispositivo de audio disponible, PCM/bitstream al cambiar de pantalla. No son una calibración colorimétrica automática ni perfiles ICC generados por el reproductor.
 - La lectura adaptativa usa datos comprimidos: reserva orientativa de tres segundos, ampliable a ocho ante espera de caché; máximo 128 MiB, o 32 MiB en mínimo consumo. No aumenta la cola de vídeo sin comprimir MVC. No garantiza resolver saturación o averías del disco. Los saltos MVC dentro del par actual y los cortos hacia delante reutilizan el decodificador, sin otra caché de imágenes.
-- La frecuencia automática está desactivada por defecto. Solo actúa en pantalla completa y conserva resolución, profundidad y orientación. Se ejecuta en otro hilo, comprueba modos del controlador e intenta restaurar el anterior al terminar, salir de pantalla completa o cerrar normalmente. No escribe modos personalizados ni cambia el registro. La API DEVMODE no distingue de forma fiable todas las frecuencias fraccionarias: comprueba los Hz reales en Diagnóstico. No activa HDMI 3D. Un cierre forzado o un fallo del controlador puede impedir restaurar el modo.
+- **Igualar frecuencia de fotogramas:** desactivada por defecto, actúa en pantalla completa. Prioriza la frecuencia original y después un múltiplo entero exacto: por ejemplo, 25→50 Hz si 25 Hz no está disponible. Verifica la fracción real con CCD y distingue 24 de 23,976 Hz. Conserva resolución y velocidad del vídeo; trabaja en un hilo secundario y restaura el modo anterior. Sin modo compatible o información verificable no fuerza otro. No activa HDMI 3D; un cierre forzado o un fallo del controlador puede impedir la restauración.
+- **Posición de subtítulos:** lista de 50–110 % en pasos de cinco puntos. Marca la posición actual, aplica y cierra al elegir, igual que Tamaño. Respeta las posiciones explícitas de ASS/SSA.
+- **Clic derecho:** menú nativo en cascada junto al puntero en 2D/anaglifo. SBS/OU y Frame Packing mantienen los menús por ojo. Los desplegables de la barra conservan su presentación anterior.
 - El cursor integrado se proyecta por ojo en SBS/OU y Frame Packing sobre los controles y menús. Anaglifo y 2D usan el cursor de Windows. La integración física con Virtual Desktop/Quest requiere validación adicional.
 - **Audio → Filtros:** Original, Modo nocturno y Claridad de voz. Los efectos son opcionales y se suspenden con bitstream para conservar el flujo original. Se han retirado los ajustes manuales de sincronización de audio y subtítulos, incluidos sus atajos.
 - El diagnóstico muestra caché, búsqueda, descartes, A/V y formatos de entrada/salida. Los contadores acumulados no demuestran una causa física. No se añaden miniaturas, análisis visual, servicios residentes ni inferencia IA.
@@ -191,53 +193,40 @@ La preparación pesada se ejecuta en un trabajador acotado y conserva el archivo
 
 ## Validación de esta entrega
 
-Fecha: 1 de noviembre de 2026. Base única vigente: este directorio, cuyo nombre histórico no indica la versión.
+### Versión 1.0.1
 
-### Cambios
+Fecha: 2 de noviembre de 2026. Corrección de menús sobre la base vigente. No se crea instalador ni se publica en GitHub.
 
-- Cursor estereoscópico mediante una franja bitmap transparente en el ID 63, por encima de los menús (59/60) y controles (61/62). Dos posiciones por ojo, sin lectura de vídeo ni textura del tamaño de toda la ventana. Coordenadas y tamaños acotados; movimiento comunicado con una propiedad observada que agrupa eventos. Los menús actualizan el cursor mientras su bucle ocupa el cliente principal. Se atiende movimiento también en las secciones inferiores de entrada y se limpia el cursor al cambiar de archivo.
-- Cursor integrado solo para SBS, OU y Frame Packing. Anaglifo y 2D recuperan la política del cursor de Windows.
-- Tamaño y color exclusivamente para pistas SRT. ASS/SSA conserva escala 1, estilos y posiciones originales, incluidos los pares 3D; se retira el ajuste que forzaba estilos ASS. PGS conserva su bitmap original. El procesamiento de profundidad estereoscópica existente no se elimina.
-- Se elimina la segunda escritura de `sub-ass-override` desde la ruta de vídeo; la política de apariencia tiene un único responsable.
-- Desactivado el redimensionado automático de la ventana al reconfigurar el vídeo. Se captura y restaura WINDOWPLACEMENT cuando hace falta cambiar entre gpu/gpu-next fuera de pantalla completa.
-- Audio incluye Filtros: Original, Modo nocturno y Claridad de voz. Los filtros se suspenden con bitstream; no se recodifica el flujo para aplicarlos.
-- Retirados diálogos y atajos de sincronización manual de audio/subtítulos. Los perfiles antiguos ya no restauran el retardo manual de audio. Se conserva el ajuste temporal interno del transporte MVC: no es un control manual.
-- Reproducción contiene exclusivamente lectura adaptativa, frecuencia automática, cursor estéreo y desentrelazado.
+#### Cambios autorizados
 
-### Validación ejecutada
+- Clic derecho en 2D y anaglifo: vuelve a utilizar el menú nativo de Windows con el diseño M existente, junto al puntero, y submenús en cascada. Anaglifo muestra el menú plano y con sus colores normales. No pasa por la conversión del vídeo.
+- SBS, HSBS, OU/HOU y Frame Packing conservan los menús del reproductor proyectados por ojo. Los desplegables de los controles inferiores mantienen su ruta anterior; esta entrega recupera específicamente el menú contextual nativo en 2D/anaglifo.
+- Posición de subtítulos pasa a ser una lista de 50 a 110 %, en pasos de cinco puntos, con el valor actual marcado. Se aplica y cierra al elegir, igual que Tamaño. Se retiran Subir/Bajar, el porcentaje informativo separado y cualquier consulta de información de altura. Restablecer aspecto sigue recuperando tamaño, color y posición 100 %.
+- El ajuste escribe sub-pos directamente y conserva los filtros y el renderizador. Los ASS con posiciones explícitas siguen respetando esas posiciones y su autoría estéreo; no se reescriben sus estilos ni los bitmaps PGS.
+- Se retira la infraestructura de callbacks que mantenía abierto el menú para pulsaciones repetidas: ya no es necesaria con la lista. No se introducen filtros globales de entrada ni hilos de interfaz adicionales.
+- Se cancela el menú nativo al perder la activación o recibir cancelación. Mientras está abierto, una comprobación temporal de su ventana de vídeo cada 100 ms evita retener el cierre si esa ventana desaparece. El temporizador y la subclase se liberan al cerrar el menú, también en alto contraste. No existe ese sondeo cuando el menú está cerrado.
+- La lógica de frecuencias, decodificación, color, HDR, audio y transporte 3D no se modifica. Se conservan la apertura al 50 % con área 16:9 y las demás mejoras de 1.0.0.
 
-- `build.ps1` vigente: tres pruebas C correctas, formato Rust, Clippy con advertencias como errores, 50 pruebas del núcleo y 50 del ejecutable aprobadas. Compilación release terminada. IO cancelable: 48 handles antes y después.
-- Prueba GDI aislada de 100 ciclos de menú aprobada (0 → 1).
-- Prueba adicional aislada de 10 ciclos de motor con dependencias residentes aprobada: tras el calentamiento, kernel/GDI/USER permaneció en 1135/12/2 hasta el último ciclo. En total, 102 pruebas Rust distintas aprobadas, contando las dos aisladas. Nueve pruebas opcionales permanecen sin ejecutar en esta entrega.
-- Comparación de píxeles: SRT crece y cambia a amarillo; ASS no cambia al variar las preferencias de apariencia; PGS mantiene su bitmap. No demuestra que todo ASS imaginable sea correcto: por ese motivo se ha retirado la personalización de estilos ASS.
-- Alternancia repetida SRT/ASS con cambio real de gpu-next/gpu: se mantienen posición y dimensiones de ventana. El cursor bitmap aparece por encima de los planos opacos de controles en la captura.
-- Pruebas Lua de ciclo de menús y cursor: SBS completo/medio, OU completo/medio, Frame Packing y exclusión de anaglifo. Generación de 540 combinaciones de modo/dimensiones, con coordenadas válidas y fuera de ventana. Son pruebas controladas, no validación con gafas físicas.
-- Estrategia adicional de recorrido de estados con orden pseudoaleatorio reproducible: 40 transiciones de pista, modo, pausa y seek, recorriendo Full SBS, HSBS, OU y HOU y cinco salidas. Se conservan geometría, pausa y primarias BT.709; no desborda la cola de eventos.
-- Se repiten además las pruebas existentes de códecs de audio, cambio de pistas, profundidad de subtítulos, HDR→SDR, menús, cierre y errores de estructuras de disco. Decodificación contra sumidero nulo no certifica salida HDMI física ni escucha humana.
+#### Pruebas
 
-### Hallazgo adicional: descarga de dependencias
+- build.ps1 final: formato Rust, Clippy con -D warnings, cuatro pruebas C, 53 pruebas del núcleo y 56 de aplicación aprobadas; compilación release y sustitución del EXE habitual correctas.
+- Selección real mediante libmpv: trece posiciones en cinco proyecciones (2D, SBS, OU, Frame Packing y anaglifo), 65 selecciones. Se comprueban aplicación, cierre, marcado único del valor actual y conservación de vf, af y current-vo. La prueba distingue la ruta nativa contextual de la ruta de los controles.
+- Recursos nativos aislados: 100 ciclos de decoración y liberación, GDI 0 → 1. Incluye alta/baja de los recursos temporales del menú. No equivale a una certificación universal de ausencia de fugas.
+- Verificación visual del EXE: clic derecho junto al punto pulsado en 2D; submenús nativos; menú plano en anaglifo; cierre al pulsar fuera y finalización al cerrar la ventana con el menú desplegado. Las sesiones usan --probe y no guardan preferencias personales.
+- Prueba interactiva separada del mismo renderizador nativo: cuatro niveles simultáneos, selección 75 % (ID 1145), reapertura con 75 % marcado, selección 110 % (ID 1152), acceso por Shift+F10, Escape y devolución del foco al propietario. Registro: work/101-native-interactive.log. La herramienta no instala hooks ni genera entrada global por sí misma.
+- Se repiten las pruebas de calidad/consumo y sus 153 transiciones, persistencia, color SDR/HDR→SDR, audio, ASS/SRT/PGS, cursor, controles estéreo, capítulos, búsquedas, historial, cancelación y cierre.
+- Una pasada concurrente no alcanzó la geometría de pantalla completa: quedó una ventana sin bordes de 982×596 frente a 3840×2160. La prueba aislada posterior pasó con gpu y gpu-next a 3840×2160, DPI 144, y la repetición completa final pasó sin fallos. No se ha demostrado la causa de aquel resultado; no se presenta como una reparación del motor de pantalla completa.
+- EXE final: 11 reproducciones supervisadas (incluidas tres aperturas de Hellcat), siete casos válidos/dañados y diez mutaciones de MKV. Todos terminan dentro del límite; los truncados son rechazados de forma controlada.
+- Ocho archivos de configuración personal conservan sus hashes. Se verifican las 125 DLL contra el manifiesto; las dependencias del motor no cambian. El ZIP se comprueba por extracción y hashes. El arranque del portátil se prueba con PATH limitado a Windows; el resultado queda en verificacion/1.0.1/portable-clean.json.
 
-Al crear y destruir motores **descargando y volviendo a cargar sus DLL entre ciclos** se observó crecimiento sostenido de handles: aproximadamente 24 por ciclo con GPU y 21 con salida null, incluso con un segundo de espera. GDI/USER no crecieron. Manteniendo cargada la misma biblioteca, el crecimiento desapareció después del calentamiento.
+#### Calidad y recursos
 
-La aplicación normal crea un único Mpv en `run()` y mantiene sus dependencias cargadas hasta salir. No se ha demostrado una fuga equivalente durante el cambio normal de película. La causa concreta dentro de las dependencias/runtime sigue sin identificarse; no se han añadido cierres manuales de handles ajenos ni cambios de arquitectura especulativos. La prueba opcional puede reproducir la recarga de DLL con `ENIGMAX_AUDIT_UNLOAD=1`; `ENIGMAX_AUDIT_VO=null` permite separar el renderizado GPU. Los registros de ambas variantes se conservan como evidencia.
+La ruta contextual nativa no crea los bitmaps por ojo del menú gráfico en 2D/anaglifo. La selección de altura no reconstruye el pipeline de vídeo o audio. Los menús gráficos siguen dibujándose por eventos en las salidas que necesitan proyección estéreo. Se evita añadir un mecanismo especial de menú persistente, un motor web o una nueva dependencia.
 
-### Validación final del EXE y entrega
+No se atribuye una mejora numérica de CPU/RAM a esta entrega: no se ha ejecutado una comparación estadística de recursos contra 1.0.0. Las comprobaciones de recursos, invariantes de filtros y código permiten acotar los cambios; no garantizan el menor consumo posible en todo equipo.
 
-- EXE restaurado por el usuario en `work/build/release`, versión de recursos 0.2.23, 2.840.064 bytes; SHA-256 `DE97308128720F76820FECCCC6AF363E30A6462DE3B5359F9BE7AB532BE64B21`.
-- Muestra enviada al portal oficial de Kaspersky como privada y con informe dinámico completo. Resultado observado: **Clean**, cero detecciones y cero actividades sospechosas en ese análisis. No certifica por sí solo todas las dependencias ni toda posible ejecución. El usuario confirmó el envío de la petición a expertos sobre la contradicción con la alerta local; sin respuesta técnica confirmada todavía.
-- El usuario autorizó continuar sin esperar esa respuesta. No se ha desactivado Kaspersky ni creado exclusiones.
-- La copia de `outputs/EnigmaxCinePlayer-0.2.1/EnigmaxCinePlayer.exe` sigue bloqueada por otro proceso. La lectura y la sustitución devuelven archivo en uso. Se utiliza para pruebas y empaquetado el EXE restaurado que coincide exactamente con el hash analizado. La sustitución de la copia bloqueada queda pendiente de liberarla; esto no se presenta como una corrección del antivirus.
-- `fault_probe.py`: siete casos aprobados. SRT, ASS y HDR reprodujeron y cerraron normalmente; MKV vacío/truncado, MP4 inválido e ISO inválida finalizaron con error controlado, en menos de un segundo cada caso dañado. Configuración personal intacta.
-- `release_probe.py`: once casos aprobados con controles visibles: Full SBS, HSBS, OU, HOU, anaglifo, anamórfico, Frame Packing, PGS y tres aperturas/cierres de Hellcat. Capturas y estados en `verificacion/0.2.23/release/`.
-- Se ejecutaron los dos tests optativos sobre Hellcat: 50 recargas con búsquedas y 30 cierres anticipados. Ambos aprobados. El total de pruebas Rust distintas ejecutadas y aprobadas pasa de 102 a **104**; tres pruebas C aprobadas. Siete pruebas opcionales siguen sin ejecutarse en esta entrega.
-- Se revisaron visualmente las capturas SBS, HOU y anaglifo. No equivalen a una comprobación mediante visor o TV 3D físicos.
-- El empaquetador permite indicar expresamente el EXE restaurado sin otra base de código. Comprueba la versión del recurso, hashes del payload y cada archivo del ZIP extraído en un directorio temporal propio; rechaza una versión equivocada antes de crear un paquete. El paquete contiene el informe vigente al que enlaza el README.
-- La integridad y el estado de entrega se registran en `verificacion/0.2.23/delivery-status.json`. Las fuentes correspondientes se actualizan sin recomprimir innecesariamente las dependencias sin cambios.
+#### Límites y entrega
 
-### Límites
+No se certifica ausencia universal de bugs ni comportamiento idéntico en todos los controladores y pantallas. No hay nueva certificación física Quest/Virtual Desktop, HDR nativo, bitstream HDMI ni ISO MVC/UHD no disponibles. El caso previamente señalado de modificación manual de frecuencia entre vídeos sigue pendiente de una revisión específica; la lógica de frecuencias no se ha tocado en esta corrección de menús. Las propuestas de supervisor independiente y confirmación de modo de pantalla no están implementadas.
 
-- Sin validación física de Virtual Desktop/Quest, receptores HDMI, HDR o todas las pantallas/DPI.
-- Sin nueva campaña sobre ISO grandes: TALKTOME y Titanic no estaban disponibles en las rutas autorizadas. Hellcat sí se ha probado de nuevo; no se han modificado originales.
-- No se certifica ausencia absoluta de bugs, fidelidad colorimétrica universal ni reproducción sostenida perfecta.
-- Sin instalador ni publicación en GitHub. No se marca la versión 1.0.
-- Los paquetes y compilaciones obsoletos se retiran después de validar su sustituto, conforme a la política del proyecto.
+El informe de entrega y los hashes se guardan en verificacion/1.0.1/delivery-status.json. Los paquetes obsoletos se retiran después de validar los nuevos; se mantienen los informes históricos. Las fuentes de dependencias se reutilizan con su hash verificado, sin recompilarlas ni recomprimirlas.

@@ -23,6 +23,11 @@ $probeTest=Join-Path $nativeTests 'test_probe_nal.exe'
 if($LASTEXITCODE -ne 0){throw 'Error al compilar la prueba de detección MVC'}
 & $probeTest
 if($LASTEXITCODE -ne 0){throw 'Error en la detección estructural MVC'}
+$displayTest=Join-Path $nativeTests 'test_display_policy.exe'
+& gcc -std=c11 -O2 -Wall -Wextra -Werror (Join-Path $PSScriptRoot 'native/test_display_policy.c') -o $displayTest
+if($LASTEXITCODE -ne 0){throw 'Error al compilar la prueba de frecuencias'}
+& $displayTest
+if($LASTEXITCODE -ne 0){throw 'Error de selección y restauración de frecuencias'}
 $ff=[IO.Path]::GetFullPath($FfmpegDirectory)
 $edge=Join-Path $PSScriptRoot 'native\vendor\edge264-mvc'
 & make -C $edge OS=windows STATIC=yes BUILDTEST=no VARIANTS=x86-64-v2,x86-64-v3 'CFLAGS=-march=x86-64 -mtune=generic' -j4

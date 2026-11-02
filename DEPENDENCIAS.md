@@ -1,9 +1,9 @@
-# Dependencias de 0.2.22
+# Dependencias de 0.2.24
 
 Código propio GPL-3.0-or-later. Rust 1.99.1 GNU x64 y w64devkit 2.10.1/GCC 16.2.0 para el ejecutable y puente; MSYS2 UCRT64/GCC 16.2.0, Meson 1.12.1 y Ninja 1.13.2 para el motor. No se requieren para ejecutar.
 
-- mpv dc4b285c93043d99492c3664a24f4ae08cdfdf0d: compilación propia compartida con Lua 5.1, D3D11, WASAPI, libass, libplacebo, Blu-ray y gestión de color. JavaScript, VapourSynth y SMTC no se habilitan.
-- FFmpeg 6882969ce9fd2aa6aa1d0008b2bfe1c838aac11d: compilación propia GPL v3 compartida. Motor y puente utilizan el mismo conjunto FFmpeg, sin otro FFmpeg estático dentro de libmpv. D3D11VA/D3D12VA/DXVA2 y selección de CPU en ejecución. Argumentos completos en native/build-engine.sh. Whisper y libmysofa no se habilitan.
+- mpv 914a11c30c6a1710fe1f4333654696f2dfb3c3af: compilación propia compartida con Lua 5.1, D3D11, WASAPI, libass, libplacebo, Blu-ray y gestión de color. JavaScript, VapourSynth y SMTC no se habilitan.
+- FFmpeg 1e65c6cd5d3d2d12cbb374460dbf08bedf54772a: compilación propia GPL v3 compartida. Motor y puente utilizan el mismo conjunto FFmpeg, sin otro FFmpeg estático dentro de libmpv. D3D11VA/D3D12VA/DXVA2 y selección de CPU en ejecución. Argumentos completos en native/build-engine.sh. Whisper y libmysofa no se habilitan.
 - Otras DLL: paquetes UCRT64 de MSYS2, con versiones fijadas y binarios validados mediante PGP por pacman. Se distribuye la clausura de importaciones PE de 125 DLL, excluyendo las DLL del sistema Windows. Versiones, paquetes propietarios y hashes en licencias/engine-manifest.txt; avisos y textos en licencias/third-party-runtime.txt y las licencias individuales.
 - edge264-mvc API 2, fuentes BSD conservadas en native/vendor. Base x86-64 y variantes x86-64-v2/v3 seleccionadas en ejecución. Cuatro hilos para el puente. libudfread LGPL 2.1+, fuentes conservadas en native/vendor. La ISO se abre en lectura.
 - Actualizador: semver, serde_json y tempfile, con dependencias fijadas en Cargo.lock. PowerShell 5.1, .NET y Windows Forms del sistema realizan la consulta HTTPS y el auxiliar. No hay servicio ni runtime asíncrono residente.
@@ -39,3 +39,5 @@ Los coeficientes Dubois siguen la referencia stereo3d de FFmpeg. ASS 3D utiliza 
 0.2.20 conserva las revisiones del motor y las dependencias Cargo de 0.2.19. Se recompila la aplicación y el puente nativo habitual; no se añade ningún códec ni servicio residente.
 
 0.2.21 mantiene mpv/FFmpeg y dependencias Cargo. Recompila el puente cine_mvc.dll para IO cancelable Windows y consulta explícita de metadatos; conserva la estructura EC_Info histórica. No añade DLL de terceros.
+
+0.2.24 actualiza mpv y FFmpeg dentro de la rama mantenida 9.0, conservando el parche propio de subtítulos 3D. Incorpora libarchive 3.8.11-1, FriBidi 1.0.18-1 y libjpeg-turbo 3.2.1-1 desde paquetes oficiales MSYS2 validados con PGP. No cambia libplacebo, libass ni el decodificador MVC. Las revisiones actuales y la evidencia de pruebas están en el inventario y VERIFICACION_0.2.24.md.

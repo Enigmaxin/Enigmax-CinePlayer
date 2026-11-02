@@ -9,6 +9,7 @@ unsafe extern "C" {
     fn cine_display_create() -> *mut c_void;
     fn cine_display_update(context: *mut c_void, hwnd: usize, enabled: i32, fps: f64) -> i32;
     fn cine_display_destroy(context: *mut c_void);
+    fn cine_display_rate(context: *mut c_void, hwnd: usize) -> f64;
 }
 pub fn identity(hwnd: usize) -> String {
     let mut text = [0_u16; 256];
@@ -22,7 +23,7 @@ pub fn identity(hwnd: usize) -> String {
 struct Worker {
     pending: Arc<Mailbox>,
     thread: Option<thread::JoinHandle<()>>,
-    reply: mpsc::Receiver<i32>,
+    reply: mpsc::Receiver<(i32, f64)>,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Request {
@@ -63,15 +64,19 @@ impl Display {
     }
     pub fn update(&mut self, hwnd: usize, enabled: bool, fps: f64) {
         if let Some(w) = &self.worker {
-            while let Ok(code) = w.reply.try_recv() {
+            while let Ok((code, hz)) = w.reply.try_recv() {
                 self.status = match code {
                     0 => "modo conservado / restaurado",
                     1 => "sin frecuencia compatible a resolución nativa",
-                    2 => "frecuencia solicitada al controlador; comprobar Hz reales",
+                    2 => "frecuencia verificada por Windows",
                     3 => "cambio reservado por otra instancia o acceso no disponible",
+                    -5 => "no se pudo verificar la restauración de la frecuencia anterior",
                     _ => "el controlador rechazó el cambio",
                 }
                 .into();
+                if code == 2 {
+                    self.status = format!("{hz:.3} Hz verificados por Windows");
+                }
             }
         }
         if !enabled && self.worker.is_none() {
@@ -98,13 +103,14 @@ impl Display {
                 .spawn(move || {
                     let context = unsafe { cine_display_create() };
                     if context.is_null() {
-                        let _ = reply_tx.send(-1);
+                        let _ = reply_tx.send((-1, 0.0));
                         return;
                     }
                     while let Request::Mode(hwnd, on, fps) = requests.next() {
                         let code =
                             unsafe { cine_display_update(context, hwnd, i32::from(on), fps) };
-                        let _ = reply_tx.send(code);
+                        let hz = unsafe { cine_display_rate(context, hwnd) };
+                        let _ = reply_tx.send((code, hz));
                     }
                     unsafe { cine_display_destroy(context) };
                 });

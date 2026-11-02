@@ -11,6 +11,7 @@ pub struct Entry {
     pub label: String,
     pub checked: bool,
     pub enabled: bool,
+    pub emphasized: bool,
     pub children: Vec<Entry>,
 }
 impl Entry {
@@ -20,6 +21,7 @@ impl Entry {
             label,
             checked: false,
             enabled: true,
+            emphasized: false,
             children: vec![],
         }
     }
@@ -37,6 +39,12 @@ pub fn stereo(m: &Mpv) -> bool {
     matches!(
         projection(m),
         Projection::Sbs | Projection::Ou | Projection::FramePack | Projection::Anaglyph
+    )
+}
+pub(crate) fn needs_eye_projection(projection: Projection) -> bool {
+    matches!(
+        projection,
+        Projection::Sbs | Projection::Ou | Projection::FramePack
     )
 }
 struct Guard<'a>(&'a Mpv);
@@ -259,6 +267,27 @@ fn show_sized(
                 .take(g.visible)
             {
                 let y = g.header + (index - page.offset) as i32 * g.row;
+                if item.emphasized {
+                    c.rounded(
+                        Rect {
+                            x: 5,
+                            y,
+                            w: g.rect.w - 10,
+                            h: g.row - 2,
+                        },
+                        5,
+                        [65, 64, 31, 255],
+                    );
+                    c.rect(
+                        Rect {
+                            x: 8,
+                            y: y + 4,
+                            w: 3,
+                            h: g.row - 10,
+                        },
+                        180,
+                    );
+                }
                 if item.id == 1231 {
                     c.rounded(
                         Rect {
@@ -567,6 +596,82 @@ mod tests {
         }
     }
     #[test]
+    fn context_menu_routes_only_packed_outputs_to_eye_projection() {
+        for (mode, expected) in [
+            (Projection::Mono, false),
+            (Projection::Anaglyph, false),
+            (Projection::Sbs, true),
+            (Projection::Ou, true),
+            (Projection::FramePack, true),
+        ] {
+            assert_eq!(needs_eye_projection(mode), expected);
+        }
+    }
+    #[test]
+    fn subtitle_position_percentages_select_close_and_mark_the_actual_value() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let temp = tempfile::tempdir().unwrap();
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.init().unwrap();
+        wait_message(&mut m, "controls-ready");
+        let mut s = State::new(temp.path(), true);
+        player::load(
+            &m,
+            &mut s,
+            root.join("verificacion/muestras/ass3d-black.mkv")
+                .to_str()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        let until = Instant::now() + Duration::from_secs(10);
+        loop {
+            if m.wait(0.02).id == 8 {
+                break;
+            }
+            assert!(Instant::now() < until);
+        }
+        s.pending_load = false;
+        player::apply(&m, &mut s).unwrap();
+        m.command(&[
+            "load-script",
+            root.join("verificacion/tests/stereo_popup.lua")
+                .to_str()
+                .unwrap(),
+        ])
+        .unwrap();
+        wait_message(&mut m, "popup-qa-ready");
+        m.set("user-data/enigmax-toolbar-popup", "yes").unwrap();
+        for mode in ["mono", "sbs", "ou", "framepack", "anaglyph"] {
+            m.set("user-data/enigmax-projection", mode).unwrap();
+            for (i, position) in player::SUB_POSITIONS.iter().enumerate() {
+                let id = player::SUB_POSITION_FIRST + i as u32;
+                m.set("user-data/enigmax-popup-test",&serde_json::json!({"sequence":["Aspecto de subtítulos","Posición de subtítulos",id],"delay":0.02,"eye":1}).to_string()).unwrap();
+                let video = m.get("vf");
+                let audio = m.get("af");
+                let renderer = m.get("current-vo");
+                crate::choose_track(&m, &mut s, true).unwrap();
+                assert_eq!(s.prefs.sub_pos, *position, "{mode}/{position}");
+                assert_eq!(
+                    m.get("sub-pos").unwrap().parse::<f64>().unwrap(),
+                    *position as f64
+                );
+                let entries = crate::playback_features::subtitle_position_menu(&m)
+                    .unwrap()
+                    .entries()
+                    .unwrap();
+                assert_eq!(entries.len(), player::SUB_POSITIONS.len());
+                assert!(entries.iter().all(|e| e.enabled));
+                let checked: Vec<_> = entries.iter().filter(|e| e.checked).map(|e| e.id).collect();
+                assert_eq!(checked, vec![id]);
+                assert_eq!(m.get("vf"), video);
+                assert_eq!(m.get("af"), audio);
+                assert_eq!(m.get("current-vo"), renderer);
+            }
+        }
+    }
+    #[test]
     fn wrong_input_format_can_be_corrected_again_from_the_3d_button() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let temp = tempfile::tempdir().unwrap();
@@ -784,7 +889,7 @@ mod tests {
         );
         m.set(
             "user-data/enigmax-popup-test",
-            &serde_json::json!({"sequence":[1233,"Avanzado","Método de color",1042],"eye":0})
+            &serde_json::json!({"sequence":[1233,"Avanzado","Algoritmo anaglifo",1042],"eye":0})
                 .to_string(),
         )
         .unwrap();

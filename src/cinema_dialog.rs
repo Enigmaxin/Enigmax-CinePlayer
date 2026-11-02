@@ -48,7 +48,10 @@ pub fn show(
             })
             .collect::<Vec<_>>();
         if !glasses {
-            entries.push(crate::popup::Entry::action(1232, "Formato 3D".into()));
+            entries.push(crate::popup::Entry::action(
+                1232,
+                "Formato 3D de entrada".into(),
+            ));
             entries.push(crate::popup::Entry::action(
                 1233,
                 "Todas las opciones 3D".into(),

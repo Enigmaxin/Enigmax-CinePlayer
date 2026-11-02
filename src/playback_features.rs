@@ -305,7 +305,7 @@ pub fn menu(root: &windows::Menu, s: &State) -> Result<(), String> {
         "Lectura adaptativa (caché comprimida limitada)",
         p.adaptive,
     )?;
-    menu.item(7001, "Ajustar frecuencia en pantalla completa", p.refresh)?;
+    menu.item(7001, "Igualar frecuencia de fotogramas", p.refresh)?;
     menu.item(7002, "Cursor estereoscópico", p.cursor)?;
     menu.item(7003, "Desentrelazado automático", p.deinterlace)?;
     root.submenu("Reproducción", menu)
@@ -338,40 +338,58 @@ fn subtitle_is_srt(m: &Mpv) -> bool {
     )
 }
 pub fn subtitle_menu(subs: &windows::Menu, m: &Mpv) -> Result<(), String> {
-    if !subtitle_is_srt(m) {
-        subs.label("Tamaño y color: disponibles para pistas SRT")?;
-        return Ok(());
-    }
     let style = windows::Menu::new()?;
-    let size = windows::Menu::new()?;
-    let current = number(m, "sub-scale");
-    for (i, scale) in [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5]
-        .iter()
-        .enumerate()
-    {
-        size.item(
-            7100 + i as u32,
-            &format!("{:.0} %", scale * 100.0),
-            (current - scale).abs() < 0.01,
-        )?;
+    if subtitle_is_srt(m) {
+        let size = windows::Menu::new()?;
+        let current = number(m, "sub-scale");
+        for (i, scale) in [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5]
+            .iter()
+            .enumerate()
+        {
+            size.item(
+                7100 + i as u32,
+                &format!("{:.0} %", scale * 100.0),
+                (current - scale).abs() < 0.01,
+            )?;
+        }
+        style.submenu("Tamaño", size)?;
+        let colors = windows::Menu::new()?;
+        for (i, (label, color)) in COLORS.iter().enumerate() {
+            colors.item(
+                7120 + i as u32,
+                label,
+                m.get("sub-color").is_some_and(|v| {
+                    v.eq_ignore_ascii_case(color)
+                        || (v.len() == 9
+                            && v.get(3..)
+                                .is_some_and(|rgb| rgb.eq_ignore_ascii_case(&color[1..])))
+                }),
+            )?;
+        }
+        style.submenu("Color", colors)?;
+    } else {
+        style.label("Tamaño y color: disponibles para pistas SRT")?;
     }
-    style.submenu("Tamaño", size)?;
-    let colors = windows::Menu::new()?;
-    for (i, (label, color)) in COLORS.iter().enumerate() {
-        colors.item(
-            7120 + i as u32,
-            label,
-            m.get("sub-color").is_some_and(|v| {
-                v.eq_ignore_ascii_case(color)
-                    || (v.len() == 9
-                        && v.get(3..)
-                            .is_some_and(|rgb| rgb.eq_ignore_ascii_case(&color[1..])))
-            }),
-        )?;
-    }
-    style.submenu("Color", colors)?;
+    let position = subtitle_position_menu(m)?;
+    style.submenu("Posición de subtítulos", position)?;
     style.item(7131, "Restablecer aspecto", false)?;
     subs.submenu("Aspecto de subtítulos", style)
+}
+pub fn subtitle_position_menu(m: &Mpv) -> Result<windows::Menu, String> {
+    let menu = windows::Menu::new()?;
+    let current = m
+        .get("sub-pos")
+        .and_then(|s| s.parse::<f64>().ok())
+        .filter(|n| n.is_finite())
+        .unwrap_or(100.0);
+    for (i, position) in crate::player::SUB_POSITIONS.iter().enumerate() {
+        menu.item(
+            crate::player::SUB_POSITION_FIRST + i as u32,
+            &format!("{position} %"),
+            (current - *position as f64).abs() < 0.01,
+        )?;
+    }
+    Ok(menu)
 }
 const COLORS: [(&str, &str); 6] = [
     ("Blanco", "#FFFFFF"),
@@ -392,6 +410,7 @@ pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
     if id == 7030 || id == 7031 {
         return screen_profile(m, s, id == 7030);
     }
+    let old_position = s.prefs.sub_pos;
     let old = s.features.prefs.clone();
     let p = &mut s.features.prefs;
     match id {
@@ -408,10 +427,15 @@ pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
         7131 => {
             p.sub_scale = 1.0;
             p.sub_color = "#FFFFFF".into();
+            s.prefs.sub_pos = 100;
+            s.applied = None;
         }
         _ => return Ok(()),
     }
     let result = s.features.apply(m, s.passthrough).and_then(|()| {
+        if id == 7131 {
+            crate::player::apply(m, s)?;
+        }
         if s.automatic {
             s.features.save(&s.dir)
         } else {
@@ -420,6 +444,11 @@ pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
     });
     if let Err(e) = result {
         s.features.prefs = old;
+        s.prefs.sub_pos = old_position;
+        if id == 7131 {
+            s.applied = None;
+            let _ = crate::player::apply(m, s);
+        }
         s.features.invalidate();
         let _ = s.features.apply(m, s.passthrough);
         return Err(e);
@@ -850,7 +879,12 @@ mod tests {
         assert!(m.get("sub-ass-style-overrides").unwrap().is_empty());
         s.features.save(dir.path()).unwrap();
         assert_eq!(Features::load(dir.path(), false).prefs, s.features.prefs);
+        crate::player::action(&m, &mut s, 1149).unwrap();
+        assert_eq!(m.get("sub-pos").unwrap().parse::<f64>().unwrap(), 95.0);
         action(&m, &mut s, 7131).unwrap();
+        assert_eq!(s.prefs.sub_pos, 100);
+        assert_eq!(m.get("sub-pos").unwrap().parse::<f64>().unwrap(), 100.0);
+        assert_eq!(s.features.prefs.sub_color, "#FFFFFF");
         assert_eq!(m.get("sub-scale").unwrap().parse::<f64>().unwrap(), 1.0);
         assert_eq!(m.get("sub-ass-override").as_deref(), Some("scale"));
         s.features.last_tick = Instant::now() - std::time::Duration::from_secs(2);

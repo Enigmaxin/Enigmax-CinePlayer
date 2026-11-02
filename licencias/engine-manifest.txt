@@ -3,8 +3,8 @@
   "modules": [
     {
       "path": "libmpv-2.dll",
-      "bytes": 3768692,
-      "sha256": "29b1f799b626388751233c84acfca5f939777e6146745f9c9f502a4d3fd3bb36",
+      "bytes": 3767162,
+      "sha256": "8161e2bf9d1e764c2bc1e1164612f37823865d0064be94411a39380288c9a817",
       "imports": [
         "avcodec-63.dll",
         "avdevice-63.dll",
@@ -13,6 +13,23 @@
         "avutil-61.dll",
         "swresample-7.dll",
         "swscale-10.dll",
+        "libarchive-13.dll",
+        "libass-9.dll",
+        "libbluray-4.dll",
+        "libcaca-0.dll",
+        "libcurl-4.dll",
+        "libjpeg-8.dll",
+        "liblcms2-2.dll",
+        "lua51.dll",
+        "libplacebo-387.dll",
+        "libshaderc_shared.dll",
+        "libspirv-cross-c-shared.dll",
+        "libuchardet.dll",
+        "libva.dll",
+        "libva_win32.dll",
+        "vulkan-1.dll",
+        "zlib1.dll",
+        "libzimg-2.dll",
         "ADVAPI32.dll",
         "AVRT.dll",
         "dwmapi.dll",
@@ -40,24 +57,7 @@
         "SHELL32.dll",
         "USER32.dll",
         "UxTheme.dll",
-        "VERSION.dll",
-        "libarchive-13.dll",
-        "libass-9.dll",
-        "libbluray-4.dll",
-        "libcaca-0.dll",
-        "libcurl-4.dll",
-        "libjpeg-8.dll",
-        "liblcms2-2.dll",
-        "lua51.dll",
-        "libplacebo-387.dll",
-        "libshaderc_shared.dll",
-        "libspirv-cross-c-shared.dll",
-        "libuchardet.dll",
-        "libva.dll",
-        "libva_win32.dll",
-        "vulkan-1.dll",
-        "zlib1.dll",
-        "libzimg-2.dll"
+        "VERSION.dll"
       ],
       "provider": "own-source-build"
     },
@@ -76,8 +76,8 @@
     },
     {
       "path": "runtime/avcodec-63.dll",
-      "bytes": 20447232,
-      "sha256": "c64f3bc9da3d257579a445e43a0cfee4acc3882e68b65a213dbdc7cd872f1ee8",
+      "bytes": 20439552,
+      "sha256": "4e1aca7e5ec157087fef02800a475f5866d5a516fb49203a5d017c8be0891457",
       "imports": [
         "libaom.dll",
         "libcairo-2.dll",
@@ -133,8 +133,8 @@
     },
     {
       "path": "runtime/avdevice-63.dll",
-      "bytes": 151552,
-      "sha256": "eceda6c5cccb2cd7748b763464ea8e3e6346bcd25762ff496d6b360f2dbd166d",
+      "bytes": 151040,
+      "sha256": "6ee7679678b6ac9a907a669829a16f1dbe1d5cd8c855d204e07aa7e615032abe",
       "imports": [
         "GDI32.dll",
         "KERNEL32.dll",
@@ -159,8 +159,8 @@
     },
     {
       "path": "runtime/avfilter-12.dll",
-      "bytes": 6696960,
-      "sha256": "83bfee32473b69101b6e683f4878dc30347b5f9a46e88923df0d6bf97332695d",
+      "bytes": 6694912,
+      "sha256": "d1094f1c793da81bf8f7b802fcf26ca2cf42c87a2e71d2a246a4c278a3292e83",
       "imports": [
         "libass-9.dll",
         "libfontconfig-1.dll",
@@ -200,8 +200,8 @@
     },
     {
       "path": "runtime/avformat-63.dll",
-      "bytes": 2925056,
-      "sha256": "0a0fca43cc97351a96f9e3f16a8fb687ad83dec66996bc8faffb2b74abc93ee0",
+      "bytes": 2923008,
+      "sha256": "6d8637bb91cecad03bbdfd6cba283a64336eb371db2d10d2845b14507984029b",
       "imports": [
         "libbluray-4.dll",
         "libbz2-1.dll",
@@ -235,8 +235,8 @@
     },
     {
       "path": "runtime/avutil-61.dll",
-      "bytes": 1263104,
-      "sha256": "72305ff9e668c69c559c0a53248ac2f493272dc70a3f23d6010021e2920a2fc4",
+      "bytes": 1262592,
+      "sha256": "c97ec2681d03a1fa8a33ed1d100b57da7f150ad5d37de662a221a059937ed63c",
       "imports": [
         "bcrypt.dll",
         "KERNEL32.dll",
@@ -264,7 +264,7 @@
     {
       "path": "runtime/swresample-7.dll",
       "bytes": 178176,
-      "sha256": "4c4ce060cf62b2461b1427c22c609d8aaadfffb9b07f45b664efba86944bbc6b",
+      "sha256": "e875491d0c0122e00c3b1bcd513d6f8a1d0be9f52914ef3d4be92bf67de4a554",
       "imports": [
         "KERNEL32.dll",
         "api-ms-win-crt-math-l1-1-0.dll",
@@ -280,7 +280,7 @@
     {
       "path": "runtime/swscale-10.dll",
       "bytes": 2187776,
-      "sha256": "37817c6bf60ae73a05d093bd02122cb14b033fdb1adc0e7a469b1de5ef49fe8f",
+      "sha256": "6b88aaaabd62b9797e1c79695a15a7fc8fe5bb11cd0a34ffb2c5150283e07ee7",
       "imports": [
         "libgcc_s_seh-1.dll",
         "KERNEL32.dll",
@@ -299,33 +299,9 @@
       "provider": "own-source-build"
     },
     {
-      "path": "runtime/libiconv-2.dll",
-      "bytes": 1141951,
-      "sha256": "94ec68fb8d342b6c91b6b48a8d95092819cdcd006a7166e0b68062f946afd08a",
-      "imports": [
-        "KERNEL32.dll",
-        "api-ms-win-crt-convert-l1-1-0.dll",
-        "api-ms-win-crt-heap-l1-1-0.dll",
-        "api-ms-win-crt-locale-l1-1-0.dll",
-        "api-ms-win-crt-private-l1-1-0.dll",
-        "api-ms-win-crt-runtime-l1-1-0.dll",
-        "api-ms-win-crt-stdio-l1-1-0.dll",
-        "api-ms-win-crt-string-l1-1-0.dll",
-        "api-ms-win-crt-utility-l1-1-0.dll"
-      ],
-      "package": "mingw-w64-ucrt-x86_64-libiconv",
-      "version": "1.19-1",
-      "base": "mingw-w64-libiconv",
-      "licenses": [
-        "spdx:LGPL-2.1-or-later",
-        "documentation:spdx:GPL-3.0-or-later"
-      ],
-      "provider": "signature-verified-msys2-package"
-    },
-    {
       "path": "runtime/libarchive-13.dll",
       "bytes": 1001421,
-      "sha256": "607330aaac68f8977dc52eeb8f630c29a583f5edce36c8aae1e991a369520cab",
+      "sha256": "3f7754632098af48f8c30f628e3f344939b78160be953e9e45dca62b26eb0168",
       "imports": [
         "bcrypt.dll",
         "KERNEL32.dll",
@@ -351,7 +327,7 @@
         "libzstd.dll"
       ],
       "package": "mingw-w64-ucrt-x86_64-libarchive",
-      "version": "3.8.10-1",
+      "version": "3.8.11-1",
       "base": "mingw-w64-libarchive",
       "licenses": [
         "spdx:BSD-2-Clause"
@@ -496,8 +472,8 @@
     },
     {
       "path": "runtime/libjpeg-8.dll",
-      "bytes": 967184,
-      "sha256": "c63acd5a3231725aa96aa35444b74cd8d607a6fbdab1dd18b0e0ada7e39476d4",
+      "bytes": 963471,
+      "sha256": "22286acc18b907d03eec1177c99f54a802a6f8437888d1abb79e65a7ecd14605",
       "imports": [
         "KERNEL32.dll",
         "api-ms-win-crt-convert-l1-1-0.dll",
@@ -512,7 +488,7 @@
         "api-ms-win-crt-utility-l1-1-0.dll"
       ],
       "package": "mingw-w64-ucrt-x86_64-libjpeg-turbo",
-      "version": "3.2.0-1",
+      "version": "3.2.1-1",
       "base": "mingw-w64-libjpeg-turbo",
       "licenses": [
         "custom:BSD-like"
@@ -800,6 +776,30 @@
       "base": "mingw-w64-zimg",
       "licenses": [
         "spdx:WTFPL"
+      ],
+      "provider": "signature-verified-msys2-package"
+    },
+    {
+      "path": "runtime/libiconv-2.dll",
+      "bytes": 1141951,
+      "sha256": "94ec68fb8d342b6c91b6b48a8d95092819cdcd006a7166e0b68062f946afd08a",
+      "imports": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "package": "mingw-w64-ucrt-x86_64-libiconv",
+      "version": "1.19-1",
+      "base": "mingw-w64-libiconv",
+      "licenses": [
+        "spdx:LGPL-2.1-or-later",
+        "documentation:spdx:GPL-3.0-or-later"
       ],
       "provider": "signature-verified-msys2-package"
     },
@@ -1665,8 +1665,8 @@
     },
     {
       "path": "runtime/libfribidi-0.dll",
-      "bytes": 152541,
-      "sha256": "14bd0ed4c24d0068434bc23cd4f39e8dc0edcf56f2c9996b6fe39b39ffc54673",
+      "bytes": 153053,
+      "sha256": "4c775e98b38991c93affaf71f088306b37fd2c0d94ff8a90c4906db4669746c9",
       "imports": [
         "KERNEL32.dll",
         "api-ms-win-crt-convert-l1-1-0.dll",
@@ -1679,7 +1679,7 @@
         "api-ms-win-crt-utility-l1-1-0.dll"
       ],
       "package": "mingw-w64-ucrt-x86_64-fribidi",
-      "version": "1.0.17-1",
+      "version": "1.0.18-1",
       "base": "mingw-w64-fribidi",
       "licenses": [
         "spdx:LGPL-2.1-or-later"
@@ -3429,12 +3429,12 @@
     "wsock32.dll",
     "xmllite.dll"
   ],
-  "mpvCommit": "dc4b285c93043d99492c3664a24f4ae08cdfdf0d",
-  "ffmpegCommit": "6882969ce9fd2aa6aa1d0008b2bfe1c838aac11d",
+  "mpvCommit": "914a11c30c6a1710fe1f4333654696f2dfb3c3af",
+  "ffmpegCommit": "1e65c6cd5d3d2d12cbb374460dbf08bedf54772a",
   "mpvLocalPatches": [
     {
       "path": "native/mpv-subtitle-stereo.patch",
-      "sha256": "740d43348b76698d787f89894647db5a5cbeec730efecf7dda73aa3b104dade4",
+      "sha256": "101ef9e809cc6361ade1f795ec5d426b4b98bc8f3fa7932951d09967168e2809",
       "description": "Per-eye subtitle geometry and depth; application bitmap overlays are not stereo-duplicated a second time"
     }
   ]
