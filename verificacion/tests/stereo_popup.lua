@@ -27,14 +27,24 @@ local function on_state(_,value)
             if not found then mp.set_property('user-data/enigmax-popup-test-error','Stale position label');cfg=nil;mp.commandv('script-message-to',state.client,'popup-input','close');return end
         end
         if wanted=='@back' then cfg.step=(cfg.step or 1)+1;mp.commandv('keypress','LEFT');return
+        elseif wanted=='@back-key' then cfg.step=(cfg.step or 1)+1;mp.commandv('keypress','BS');return
         elseif wanted=='@escape' then
             cfg=nil;mp.commandv('keypress','ESC');return
         elseif wanted=='@outside' then body=table.concat({state.w,state.h,1,1},'|')
         elseif wanted=='@subs' then body=cfg.finish_body
         elseif cfg.close_button then body=cfg.close_button
         else
-            local index
-            for i,id in ipairs(state.ids)do if id==wanted or (type(wanted)=="string" and state.labels[i]==wanted) then index=i-1;break end end
+            local index,button_slot
+            if wanted=='@back-button' then index=-1
+            else for i,id in ipairs(state.ids)do if id==wanted or (type(wanted)=="string" and state.labels[i]==wanted) then index=i-1;break end end end
+            if not index and state.controls then
+                for i=1,#state.ids do local buttons=state.controls[i]
+                    if type(buttons)=='table' then
+                        for slot=1,3 do local id=buttons[slot];if id==wanted then index=i-1;button_slot=slot-1;break end end
+                    end
+                    if index then break end
+                end
+            end
             if not index then
                 -- A resize can publish the old page after the previous click.
                 -- Wait for the expected page instead of closing a valid transition.
@@ -47,12 +57,16 @@ local function on_state(_,value)
                 mp.commandv('script-message-to',state.client,'popup-input','close');cfg=nil;return
             end
             cfg.retries=0
-            if index<state.offset or index>=state.offset+state.visible then
+            if index>=0 and (index<state.offset or index>=state.offset+state.visible) then
                 mp.commandv('script-message-to',state.client,'popup-input',index<state.offset and 'wheelup'or'wheeldown')
                 return
             end
-            local x=state.x+state.width/2
-            local y=state.y+state.header+(index-state.offset+0.5)*state.row
+            local x=index<0 and state.x+20 or state.x+state.width/2
+            if button_slot then
+                local bw=math.max(24,math.min(44,state.row+6))
+                x=state.x+state.width-12-(3-button_slot)*(bw+6)+bw/2
+            end
+            local y=index<0 and state.y+state.header/2 or state.y+state.header+(index-state.offset+0.5)*state.row
             local depth=math.max(2,math.min(8,state.w/480))
             local second=cfg.eye==1
             local sign=second and -1 or 1
@@ -80,4 +94,5 @@ local function on_state(_,value)
     end)
 end
 mp.observe_property('user-data/enigmax-popup-state','native',on_state)
+mp.set_property('user-data/enigmax-popup-qa-ready','yes')
 mp.commandv('script-message','popup-qa-ready')

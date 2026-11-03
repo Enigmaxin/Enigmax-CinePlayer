@@ -73,6 +73,8 @@ pub fn choose(
                     label: content.chars().take(240).collect(),
                     enabled: false,
                     emphasized: false,
+                    controls: None,
+                    swatch: None,
                     checked: false,
                     children: vec![],
                 },
@@ -551,6 +553,8 @@ pub fn overlay_message(m: &crate::mpv::Mpv, text: &str, error: bool) {
                 checked: false,
                 enabled: false,
                 emphasized: false,
+                controls: None,
+                swatch: None,
                 children: vec![],
             });
             if entries.len() >= 1000 {
@@ -611,10 +615,13 @@ impl Menu {
         unsafe { AppendMenuW(self.0, 0x800, 0, ptr::null()) };
     }
     pub fn show(&self, m: &crate::mpv::Mpv) -> Result<u32, String> {
+        self.show_titled(m, "Opciones")
+    }
+    pub(crate) fn show_titled(&self, m: &crate::mpv::Mpv, title: &str) -> Result<u32, String> {
         if crate::popup::needs_eye_projection(crate::popup::projection(m))
             || m.user_data("user-data/enigmax-toolbar-popup").as_deref() == Some("yes")
         {
-            return crate::popup::show(m, "Opciones", self.entries()?);
+            return crate::popup::show(m, title, self.entries()?);
         }
         let window = m.get("window-id").and_then(|v| v.parse().ok()).unwrap_or(0);
         // Pause only overlay input/timing, not the movie. The Lua script also
@@ -652,6 +659,8 @@ impl Menu {
                     checked: state & 8 != 0,
                     enabled: state & 3 == 0,
                     emphasized: false,
+                    controls: None,
+                    swatch: None,
                     children: if child.is_null() {
                         vec![]
                     } else {

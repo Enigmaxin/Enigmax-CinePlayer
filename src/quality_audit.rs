@@ -62,6 +62,92 @@ fn number(m: &Mpv, key: &str) -> f64 {
         .unwrap_or(0.0)
 }
 #[test]
+fn eye_selection_preserves_packed_sdr_hdr_tracks_and_playback() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let temp = tempfile::tempdir().unwrap();
+    let mut m = setup(root);
+    let mut s = State::new(temp.path(), true);
+    for (file, layout) in [
+        ("fullsbs", Layout::FullSbs),
+        ("hsbs", Layout::HalfSbs),
+        ("fullou", Layout::FullOu),
+        ("hou", Layout::HalfOu),
+        ("ass3d-fullsbs", Layout::FullSbs),
+        ("ass3d-hou", Layout::HalfOu),
+        ("pistas-qa", Layout::Mono),
+        ("uhd_hdr10", Layout::Mono),
+    ] {
+        s.prefs.layout = layout;
+        s.prefs.output = Output::Original;
+        player::load(
+            &m,
+            &mut s,
+            root.join(format!("verificacion/muestras/quality-{file}.mkv"))
+                .to_str()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        wait_for(&mut m, &mut s, |m, s| {
+            !s.pending_load && m.get("video-params/w").is_some()
+        });
+        player::apply(&m, &mut s).unwrap();
+        let path = m.get("path");
+        let generation = s.generation;
+        let actions = if layout.packed() {
+            vec![1200, 1021, 1022, 1021, 1220, 1021]
+        } else {
+            vec![1021, 1022, 1021, 1020]
+        };
+        for paused in [false, true] {
+            m.set("pause", if paused { "yes" } else { "no" }).unwrap();
+            for id in &actions {
+                let before = number(&m, "time-pos");
+                let aid = m.get("aid");
+                let sid = m.get("sid");
+                let changed_at = Instant::now();
+                player::action(&m, &mut s, *id).unwrap();
+                advance(&mut m, &mut s, 0.12);
+                while !paused && number(&m, "time-pos") <= before {
+                    tick(&mut m, &mut s);
+                    assert!(
+                        changed_at.elapsed() < Duration::from_secs(3),
+                        "Playback stopped at {file}/{id}: {before}, pause={:?}, seeking={:?}, pipeline={}",
+                        m.get("pause"),
+                        m.get("seeking"),
+                        s.pipeline
+                    );
+                }
+                assert_eq!(m.get("path"), path, "{file}/{id}");
+                assert_eq!(s.generation, generation, "{file}/{id}");
+                assert_eq!(m.get("aid"), aid);
+                assert_eq!(m.get("sid"), sid);
+                assert_eq!(
+                    m.get("pause").as_deref(),
+                    Some(if paused { "yes" } else { "no" })
+                );
+                assert!(!s.pending_load && m.get("idle-active").as_deref() == Some("no"));
+                let after = number(&m, "time-pos");
+                assert!(
+                    if paused {
+                        (after - before).abs() < 0.1
+                    } else {
+                        after > before && after - before < changed_at.elapsed().as_secs_f64() + 0.25
+                    },
+                    "{file}/{id}: {before} -> {after}"
+                );
+                if changed_at.elapsed() > Duration::from_millis(500) {
+                    println!(
+                        "{file}/{id}: first observed time advance after {:.3}s",
+                        changed_at.elapsed().as_secs_f64()
+                    );
+                }
+            }
+        }
+        println!("{file}: eye changes while playing/paused keep source, tracks and position");
+    }
+}
+#[test]
 fn all_quality_transitions_keep_playback_tracks_color_and_transport() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let temp = tempfile::tempdir().unwrap();
@@ -486,10 +572,7 @@ fn reset_subtitle_appearance_includes_position_for_srt_ass_and_pgs() {
         assert_eq!(m.get("video-dec-params"), source);
         let entries = crate::windows::Menu::new().unwrap();
         crate::playback_features::subtitle_menu(&entries, &m).unwrap();
-        assert_eq!(
-            entries.entries().unwrap()[0].children.last().unwrap().id,
-            7131
-        );
+        assert_eq!(entries.entries().unwrap()[0].id, 7140);
     }
 }
 
@@ -520,4 +603,165 @@ fn native_24_fractional_23976_and_25_keep_source_cadence_and_speed() {
         assert_eq!(m.get("video-sync").as_deref(), Some("audio"));
         assert_eq!(m.get("interpolation").as_deref(), Some("no"));
     }
+}
+
+#[test]
+#[ignore = "Explicit isolated cache measurement; requires ENIGMAX_SUB_CACHE_* paths"]
+fn subtitle_cache_resource_probe() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let temp = tempfile::tempdir().unwrap();
+    let mut m = setup(root);
+    let mut s = State::new(temp.path(), true);
+    let cap = std::env::var("ENIGMAX_SUB_CACHE_MB").unwrap();
+    m.set("sub-bitmap-max-size", &cap).unwrap();
+    player::load(
+        &m,
+        &mut s,
+        &std::env::var("ENIGMAX_SUB_CACHE_VIDEO").unwrap(),
+        None,
+    )
+    .unwrap();
+    wait_for(&mut m, &mut s, |m, s| {
+        !s.pending_load && m.get("video-params/w").is_some()
+    });
+    m.command(&[
+        "sub-add",
+        &std::env::var("ENIGMAX_SUB_CACHE_ASS").unwrap(),
+        "select",
+    ])
+    .unwrap();
+    player::apply(&m, &mut s).unwrap();
+    m.set("pause", "no").unwrap();
+    advance(&mut m, &mut s, 2.0);
+    let cpu = resources().0;
+    let start = Instant::now();
+    let mut peak = 0;
+    let drops = number(&m, "frame-drop-count");
+    while start.elapsed() < Duration::from_secs(4) {
+        tick(&mut m, &mut s);
+        peak = peak.max(resources().2);
+    }
+    let elapsed = start.elapsed().as_secs_f64();
+    let cpu = (resources().0 - cpu) / elapsed;
+    let dropped = number(&m, "frame-drop-count") - drops;
+    m.set("pause", "yes").unwrap();
+    m.seek(4.0, true).unwrap();
+    wait_for(&mut m, &mut s, |m, _| {
+        (number(m, "time-pos") - 4.0).abs() < 0.05
+    });
+    advance(&mut m, &mut s, 0.25);
+    let (w, h, pixels) = m.screenshot_pixels().unwrap();
+    let hash = pixels.iter().fold(14695981039346656037_u64, |hash, b| {
+        (hash ^ *b as u64).wrapping_mul(1099511628211)
+    });
+    let row = serde_json::json!({"cache_mb":cap,"cpu_one_core_pct":cpu*100.0,"private_peak_mib":peak as f64/1048576.0,"dropped":dropped,"pixels":format!("{w}x{h}/{hash:016x}"),"renderer":m.get("current-vo"),"hwdec":m.get("hwdec-current")});
+    std::fs::write(
+        std::env::var("ENIGMAX_SUB_CACHE_OUT").unwrap(),
+        serde_json::to_vec_pretty(&row).unwrap(),
+    )
+    .unwrap();
+    println!("{row}");
+}
+
+/// Explicit diagnostics only: do not poll render timings during normal playback.
+#[test]
+#[ignore = "Isolated pacing measurement; requires ENIGMAX_PACING_* paths"]
+fn steady_playback_pacing_probe() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let temp = tempfile::tempdir().unwrap();
+    let mut m = setup(root);
+    m.set("autofit", "1920x1080").unwrap();
+    let mut s = State::new(temp.path(), true);
+    let mode = std::env::var("ENIGMAX_PACING_MODE").unwrap();
+    if mode.starts_with("sbs") {
+        s.prefs.layout = Layout::FullSbs;
+        s.prefs.output = if mode.contains("anaglyph") {
+            Output::Anaglyph
+        } else {
+            Output::Original
+        };
+    }
+    s.hdr_sdr = mode == "hdr";
+    player::load(
+        &m,
+        &mut s,
+        &std::env::var("ENIGMAX_PACING_VIDEO").unwrap(),
+        None,
+    )
+    .unwrap();
+    wait_for(&mut m, &mut s, |m, s| {
+        !s.pending_load && m.get("video-params/w").is_some()
+    });
+    if let Ok(ass) = std::env::var("ENIGMAX_PACING_ASS") {
+        m.command(&["sub-add", &ass, "select"]).unwrap();
+    }
+    player::apply(&m, &mut s).unwrap();
+    m.set("pause", "no").unwrap();
+    advance(&mut m, &mut s, 3.0);
+    let counters = ["frame-drop-count", "decoder-frame-drop-count"];
+    let before = counters.map(|p| number(&m, p));
+    let cpu = resources().0;
+    let start = Instant::now();
+    let mut next = Instant::now();
+    let mut rows = Vec::new();
+    let mut peak = 0;
+    while start.elapsed() < Duration::from_secs(16) {
+        tick(&mut m, &mut s);
+        if Instant::now() < next {
+            continue;
+        }
+        next = Instant::now() + Duration::from_millis(250);
+        peak = peak.max(resources().2);
+        let props = [
+            "time-pos",
+            "audio-pts",
+            "avsync",
+            "pause",
+            "seeking",
+            "paused-for-cache",
+            "frame-drop-count",
+            "decoder-frame-drop-count",
+            "mistimed-frame-count",
+            "vo-delayed-frame-count",
+            "display-sync-active",
+            "display-fps",
+            "estimated-display-fps",
+            "vsync-jitter",
+            "speed",
+            "estimated-vf-fps",
+            "osd-width",
+            "osd-height",
+        ]
+        .map(|p| (p, m.get(p)));
+        let passes: serde_json::Value =
+            serde_json::from_str(&m.get("vo-passes").unwrap_or_default()).unwrap_or_default();
+        let fresh = passes.get("fresh").and_then(|p| p.as_array());
+        let gpu_sum_ms = fresh.map(|items| {
+            items
+                .iter()
+                .filter_map(|p| p.get("last").and_then(|v| v.as_f64()))
+                .sum::<f64>()
+                / 1_000_000.0
+        });
+        rows.push(serde_json::json!({
+            "elapsed":start.elapsed().as_secs_f64(), "properties":props.into_iter().collect::<std::collections::BTreeMap<_, _>>(),
+            "gpu_pass_sum_last_ms":gpu_sum_ms,
+        }));
+    }
+    let row = serde_json::json!({
+        "mode":mode, "seconds":start.elapsed().as_secs_f64(),
+        "cpu_one_core_pct":(resources().0-cpu)/start.elapsed().as_secs_f64()*100.0,
+        "private_peak_mib":peak as f64/1048576.0,
+        "vo_drops":number(&m,counters[0])-before[0],
+        "decoder_drops":number(&m,counters[1])-before[1],
+        "renderer":m.get("current-vo"), "hwdec":m.get("hwdec-current"),
+        "pipeline":s.pipeline, "samples":rows,
+    });
+    assert!(rows.len() >= 40, "Too few pacing samples");
+    std::fs::write(
+        std::env::var("ENIGMAX_PACING_OUT").unwrap(),
+        serde_json::to_vec_pretty(&row).unwrap(),
+    )
+    .unwrap();
+    println!("Pacing: {} samples; output written", rows.len());
 }

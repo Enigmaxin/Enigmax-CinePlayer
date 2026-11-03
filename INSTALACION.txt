@@ -1,4 +1,4 @@
-ENIGMAX CINEPLAYER 1.0.1 — PORTÁTIL PARA WINDOWS 11 X64
+ENIGMAX CINEPLAYER 1.0.2 — PORTÁTIL PARA WINDOWS 11 X64
 
 Descomprime el ZIP completo en una carpeta donde tengas permisos de escritura.
 Ejecuta EnigmaxCinePlayer.exe. Conserva junto a él libmpv-2.dll y las carpetas

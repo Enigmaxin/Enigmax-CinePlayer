@@ -1,6 +1,6 @@
 //! Optional playback policy. No extra decoder, image analysis or per-frame polling.
 use crate::{mpv::Mpv, player::State, windows};
-use cineplayer_core::stereo::Quality;
+use cineplayer_core::stereo::{Quality, Settings};
 use serde_json::{Value, json};
 use std::{path::Path, time::Instant};
 
@@ -65,8 +65,47 @@ impl Preferences {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct VisualPreferences {
+    sub_pos: i32,
+    left_gain: f32,
+    right_gain: f32,
+    crosstalk: f32,
+}
+impl VisualPreferences {
+    fn from_settings(p: &Settings) -> Self {
+        Self {
+            sub_pos: p.sub_pos,
+            left_gain: p.left_gain,
+            right_gain: p.right_gain,
+            crosstalk: p.crosstalk,
+        }
+    }
+    fn restore(&self, p: &mut Settings) {
+        p.sub_pos = self.sub_pos;
+        p.left_gain = self.left_gain;
+        p.right_gain = self.right_gain;
+        p.crosstalk = self.crosstalk;
+    }
+    fn decode(v: &Value) -> Option<Self> {
+        let p = Settings {
+            sub_pos: i32::try_from(v["sub_pos"].as_i64()?).ok()?,
+            left_gain: v["left_gain"].as_f64()? as f32,
+            right_gain: v["right_gain"].as_f64()? as f32,
+            crosstalk: v["crosstalk"].as_f64()? as f32,
+            ..Settings::default()
+        };
+        p.validate().ok()?;
+        Some(Self::from_settings(&p))
+    }
+    fn encode(&self) -> Value {
+        json!({"sub_pos":self.sub_pos,"left_gain":self.left_gain,"right_gain":self.right_gain,"crosstalk":self.crosstalk})
+    }
+}
+
 pub struct Features {
     pub prefs: Preferences,
+    saved_visual: Option<VisualPreferences>,
     applied: Option<(Preferences, u8)>,
     last_tick: Instant,
     cache_cap: u64,
@@ -84,6 +123,7 @@ impl Default for Features {
     fn default() -> Self {
         Self {
             prefs: Preferences::default(),
+            saved_visual: None,
             applied: None,
             last_tick: Instant::now(),
             cache_cap: 0,
@@ -133,17 +173,40 @@ pub fn cache_budget(bitrate: f64, low: bool, stalled: bool) -> (u64, f64) {
 }
 impl Features {
     pub fn load(dir: &Path, probe: bool) -> Self {
+        let stored = if probe {
+            Value::Null
+        } else {
+            read(&dir.join("config/playback.json"))
+        };
         Self {
-            prefs: if probe {
-                Preferences::default()
-            } else {
-                Preferences::decode(&read(&dir.join("config/playback.json")))
-            },
+            prefs: Preferences::decode(&stored),
+            saved_visual: (stored["version"] == 1)
+                .then(|| VisualPreferences::decode(&stored["visual"]))
+                .flatten(),
             ..Default::default()
         }
     }
     pub fn save(&self, dir: &Path) -> Result<(), String> {
-        write(&dir.join("config/playback.json"), &self.prefs.encode())
+        let mut value = self.prefs.encode();
+        if let Some(visual) = &self.saved_visual {
+            value["visual"] = visual.encode();
+        }
+        write(&dir.join("config/playback.json"), &value)
+    }
+    pub fn restore_visual(&self, prefs: &mut Settings) {
+        if let Some(visual) = &self.saved_visual {
+            visual.restore(prefs);
+        }
+    }
+    pub fn save_visual(&mut self, dir: &Path, prefs: &Settings) -> Result<(), String> {
+        prefs.validate()?;
+        let value = VisualPreferences::from_settings(prefs);
+        let old = self.saved_visual.replace(value);
+        if let Err(error) = self.save(dir) {
+            self.saved_visual = old;
+            return Err(error);
+        }
+        Ok(())
     }
     pub fn apply(&mut self, m: &Mpv, passthrough: u8) -> Result<(), String> {
         if self
@@ -337,43 +400,14 @@ fn subtitle_is_srt(m: &Mpv) -> bool {
         Some("subrip" | "srt")
     )
 }
-pub fn subtitle_menu(subs: &windows::Menu, m: &Mpv) -> Result<(), String> {
-    let style = windows::Menu::new()?;
-    if subtitle_is_srt(m) {
-        let size = windows::Menu::new()?;
-        let current = number(m, "sub-scale");
-        for (i, scale) in [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5]
-            .iter()
-            .enumerate()
-        {
-            size.item(
-                7100 + i as u32,
-                &format!("{:.0} %", scale * 100.0),
-                (current - scale).abs() < 0.01,
-            )?;
-        }
-        style.submenu("Tamaño", size)?;
-        let colors = windows::Menu::new()?;
-        for (i, (label, color)) in COLORS.iter().enumerate() {
-            colors.item(
-                7120 + i as u32,
-                label,
-                m.get("sub-color").is_some_and(|v| {
-                    v.eq_ignore_ascii_case(color)
-                        || (v.len() == 9
-                            && v.get(3..)
-                                .is_some_and(|rgb| rgb.eq_ignore_ascii_case(&color[1..])))
-                }),
-            )?;
-        }
-        style.submenu("Color", colors)?;
-    } else {
-        style.label("Tamaño y color: disponibles para pistas SRT")?;
-    }
-    let position = subtitle_position_menu(m)?;
-    style.submenu("Posición de subtítulos", position)?;
-    style.item(7131, "Restablecer aspecto", false)?;
-    subs.submenu("Aspecto de subtítulos", style)
+pub(crate) fn subtitle_position_supported(m: &Mpv) -> bool {
+    !matches!(
+        m.get("current-tracks/sub/codec").as_deref(),
+        Some("ass" | "ssa")
+    )
+}
+pub fn subtitle_menu(subs: &windows::Menu, _m: &Mpv) -> Result<(), String> {
+    subs.item(7140, "Aspecto de subtítulos…", false)
 }
 pub fn subtitle_position_menu(m: &Mpv) -> Result<windows::Menu, String> {
     let menu = windows::Menu::new()?;
@@ -390,6 +424,172 @@ pub fn subtitle_position_menu(m: &Mpv) -> Result<windows::Menu, String> {
         )?;
     }
     Ok(menu)
+}
+const SUB_SCALES: [f64; 8] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5];
+fn subtitle_aspect_entries(m: &Mpv, id: u32) -> Result<Vec<crate::popup::Entry>, String> {
+    if (1140..=1152).contains(&id) {
+        return subtitle_position_menu(m)?.entries();
+    }
+    if !subtitle_is_srt(m) {
+        return Err("Tamaño y color requieren una pista SRT".into());
+    }
+    let rows: Vec<(u32, String, bool)> = if (7100..=7107).contains(&id) {
+        let scale = number(m, "sub-scale");
+        SUB_SCALES
+            .iter()
+            .enumerate()
+            .map(|(i, value)| {
+                (
+                    7100 + i as u32,
+                    format!("{:.0} %", value * 100.0),
+                    (scale - value).abs() < 0.01,
+                )
+            })
+            .collect()
+    } else if (7120..=7125).contains(&id) {
+        let current = m.get("sub-color").unwrap_or_default();
+        COLORS
+            .iter()
+            .enumerate()
+            .map(|(i, (label, color))| {
+                let checked = current.eq_ignore_ascii_case(color)
+                    || (current.len() == 9
+                        && current
+                            .get(3..)
+                            .is_some_and(|rgb| rgb.eq_ignore_ascii_case(&color[1..])));
+                (7120 + i as u32, (*label).into(), checked)
+            })
+            .collect()
+    } else {
+        return Err("Ajuste de subtítulos inválido".into());
+    };
+    Ok(rows
+        .into_iter()
+        .map(|(id, label, checked)| {
+            let mut entry = crate::popup::Entry::action(id, label);
+            entry.checked = checked;
+            entry
+        })
+        .collect())
+}
+fn apply_subtitle_aspect(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
+    if (1140..=1152).contains(&id) && !subtitle_position_supported(m) {
+        return Ok(());
+    }
+    if !subtitle_aspect_entries(m, id)?.iter().any(|e| e.id == id) {
+        return Err("Ajuste de subtítulos inválido".into());
+    }
+    if subtitle_aspect_entries(m, id)?
+        .iter()
+        .any(|e| e.id == id && e.checked)
+    {
+        return Ok(());
+    }
+    if (1140..=1152).contains(&id) {
+        crate::player::action(m, s, id)
+    } else {
+        action(m, s, id)
+    }
+}
+pub fn edit_subtitle_aspect(m: &Mpv, s: &mut State, id: u32) -> Result<bool, String> {
+    if !(7140..=7142).contains(&id) {
+        apply_subtitle_aspect(m, s, id)?;
+    }
+    let result = crate::popup::show_live_panel(
+        m,
+        "Aspecto de subtítulos",
+        subtitle_panel_entries(m)?,
+        &mut |choice| {
+            if choice == 7131 {
+                action(m, s, choice)?;
+            } else {
+                apply_subtitle_aspect(m, s, choice)?;
+            }
+            subtitle_panel_entries(m)
+        },
+    )?;
+    Ok(result == crate::popup::BACK)
+}
+fn subtitle_panel_entries(m: &Mpv) -> Result<Vec<crate::popup::Entry>, String> {
+    use crate::popup::Entry;
+    let srt = subtitle_is_srt(m);
+    let mut size = Entry::action(
+        7140,
+        if srt {
+            format!("Tamaño: {:.0} %", number(m, "sub-scale") * 100.0)
+        } else {
+            "Tamaño: original ASS/PGS".into()
+        },
+    );
+    size.enabled = srt;
+    if srt {
+        let current = number(m, "sub-scale");
+        size.controls = Some([
+            SUB_SCALES
+                .iter()
+                .rposition(|v| *v < current - 0.001)
+                .map(|i| 7100 + i as u32),
+            SUB_SCALES
+                .iter()
+                .position(|v| *v > current + 0.001)
+                .map(|i| 7100 + i as u32),
+            Some(7102),
+        ]);
+    }
+    let current = number(m, "sub-pos");
+    let supported = subtitle_position_supported(m);
+    let mut position = Entry::action(
+        7142,
+        if supported {
+            format!("Posición: {current:.0} %")
+        } else {
+            "Posición".into()
+        },
+    );
+    position.enabled = supported;
+    position.controls = Some(if supported {
+        [
+            crate::player::SUB_POSITIONS
+                .iter()
+                .rposition(|v| (*v as f64) < current - 0.001)
+                .map(|i| 1140 + i as u32),
+            crate::player::SUB_POSITIONS
+                .iter()
+                .position(|v| (*v as f64) > current + 0.001)
+                .map(|i| 1140 + i as u32),
+            Some(1150),
+        ]
+    } else {
+        [None, None, None]
+    });
+    let palette = if srt {
+        subtitle_aspect_entries(m, 7120)?
+    } else {
+        Vec::new()
+    };
+    let known_colour = palette.iter().any(|e| e.checked);
+    let mut colour = Entry::action(
+        7141,
+        if srt && !known_colour {
+            "Color: personalizado".into()
+        } else if srt {
+            "Color".into()
+        } else {
+            "Color: original ASS/PGS".into()
+        },
+    );
+    colour.enabled = false;
+    let mut result = vec![size];
+    if supported {
+        result.push(position);
+    }
+    result.push(colour);
+    result.extend(palette);
+    result.push(Entry::action(
+        7131,
+        "Restablecer todos los ajustes de subtítulos".into(),
+    ));
+    Ok(result)
 }
 const COLORS: [(&str, &str); 6] = [
     ("Blanco", "#FFFFFF"),
@@ -420,9 +620,7 @@ pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
         7003 => p.deinterlace = !p.deinterlace,
         7010..=7012 => p.track_rule = (id - 7010) as u8,
         7020..=7022 => p.audio_mode = (id - 7020) as u8,
-        7100..=7107 => {
-            p.sub_scale = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5][(id - 7100) as usize]
-        }
+        7100..=7107 => p.sub_scale = SUB_SCALES[(id - 7100) as usize],
         7120..=7125 => p.sub_color = COLORS[(id - 7120) as usize].1.into(),
         7131 => {
             p.sub_scale = 1.0;
@@ -437,7 +635,11 @@ pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
             crate::player::apply(m, s)?;
         }
         if s.automatic {
-            s.features.save(&s.dir)
+            if id == 7131 {
+                s.save_visual()
+            } else {
+                s.features.save(&s.dir)
+            }
         } else {
             Ok(())
         }
@@ -675,6 +877,219 @@ fn select_tracks(rows: &[Value], rule: u8) -> Vec<(&'static str, i64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn ass_position_is_disabled_and_srt_pgs_position_moves_rendered_pixels() {
+        use cineplayer_core::stereo::{Delivery, Layout, Output};
+        use std::time::Duration;
+        fn spin(m: &mut Mpv, s: &mut State, seconds: f64) {
+            let until = Instant::now() + Duration::from_secs_f64(seconds);
+            while Instant::now() < until {
+                let event = m.wait(0.02);
+                let (id, cookie) = (event.id, event.userdata);
+                if id == 5 && cookie & (1_u64 << 63) != 0 {
+                    m.seek_reply(cookie).unwrap();
+                }
+                if id == 8 {
+                    s.pending_load = false;
+                }
+                let changed = (id == 8 || id == 22) && crate::player::subtitle_event(m, s).unwrap();
+                if !s.pending_load && (id == 8 || id == 17 || changed) {
+                    crate::player::apply(m, s).unwrap();
+                }
+            }
+        }
+        fn center(m: &Mpv) -> f64 {
+            let (w, h, pixels) = m.screenshot_pixels().unwrap();
+            let mut sum = 0_u64;
+            let mut count = 0_u64;
+            for (index, p) in pixels.as_chunks::<4>().0.iter().enumerate() {
+                if p[..3].iter().any(|v| *v > 180) {
+                    sum += (index / w) as u64;
+                    count += 1;
+                }
+            }
+            assert!(count > 30, "Missing rendered subtitle pixels");
+            sum as f64 / count as f64 / h as f64
+        }
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let temp = tempfile::tempdir().unwrap();
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        crate::configure(&m, true, root).unwrap();
+        m.option("autofit", "640x360").unwrap();
+        m.init().unwrap();
+        let mut s = State::new(temp.path(), true);
+        s.prefs.layout = Layout::Mono;
+        crate::player::load(
+            &m,
+            &mut s,
+            root.join("verificacion/muestras/depth-qa-pgs.mkv")
+                .to_str()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while s.pending_load {
+            spin(&mut m, &mut s, 0.03);
+            assert!(Instant::now() < deadline);
+        }
+        let mut tracks = vec![("pgs", "1".to_owned())];
+        for ext in ["srt", "ass"] {
+            m.command(&[
+                "sub-add",
+                root.join(format!("verificacion/muestras/depth-qa.{ext}"))
+                    .to_str()
+                    .unwrap(),
+                "select",
+            ])
+            .unwrap();
+            spin(&mut m, &mut s, 0.2);
+            tracks.push((ext, m.get("sid").unwrap()));
+        }
+        s.automatic = true;
+        for (kind, sid) in tracks.iter().rev() {
+            m.set("sid", sid).unwrap();
+            s.features.invalidate();
+            spin(&mut m, &mut s, 0.2);
+            for (layout, output, delivery) in [
+                (Layout::Mono, Output::Left, Delivery::Native),
+                (Layout::FullSbs, Output::Original, Delivery::Native),
+                (Layout::HalfSbs, Output::Original, Delivery::Native),
+                (Layout::FullOu, Output::Original, Delivery::Native),
+                (Layout::HalfOu, Output::Original, Delivery::Native),
+                (Layout::FullSbs, Output::Anaglyph, Delivery::Native),
+                (Layout::FullSbs, Output::Original, Delivery::Anamorphic),
+                (Layout::FullSbs, Output::Original, Delivery::FramePack),
+            ] {
+                s.prefs.layout = layout;
+                s.prefs.output = output;
+                s.prefs.delivery = delivery;
+                m.set("pause", "yes").unwrap();
+                m.seek(0.5, true).unwrap();
+                spin(&mut m, &mut s, 0.2);
+                action(&m, &mut s, 7131).unwrap();
+                crate::player::apply(&m, &mut s).unwrap();
+                m.set("pause", "no").unwrap();
+                spin(&mut m, &mut s, 0.08);
+                m.set("pause", "yes").unwrap();
+                spin(&mut m, &mut s, 0.15);
+                let entries = subtitle_panel_entries(&m).unwrap();
+                let position = entries.iter().find(|e| e.id == 7142);
+                assert!(
+                    entries.iter().all(|e| e.swatch.is_none()),
+                    "Repeated colour swatch"
+                );
+                let source = m.get("video-dec-params");
+                let audio = m.get("aid");
+                if *kind == "ass" {
+                    assert!(position.is_none(), "ASS position must be hidden");
+                    let before = m.get("sub-pos");
+                    crate::player::action(&m, &mut s, 1148).unwrap();
+                    apply_subtitle_aspect(&m, &mut s, 1148).unwrap();
+                    assert_eq!(m.get("sub-pos"), before);
+                    assert_eq!(s.prefs.sub_pos, 100);
+                } else {
+                    let position = position.unwrap();
+                    assert!(position.enabled);
+                    let original = center(&m);
+                    m.set("pause", "no").unwrap();
+                    apply_subtitle_aspect(&m, &mut s, 1146).unwrap();
+                    spin(&mut m, &mut s, 0.15);
+                    m.set("pause", "yes").unwrap();
+                    spin(&mut m, &mut s, 0.1);
+                    let raised = center(&m);
+                    assert!(
+                        raised < original - 0.01,
+                        "{kind}/{layout:?}/{output:?}/{delivery:?}: {original} -> {raised}"
+                    );
+                    assert_eq!(State::new(temp.path(), false).prefs.sub_pos, 80);
+                    action(&m, &mut s, 7131).unwrap();
+                    spin(&mut m, &mut s, 0.15);
+                    assert!(
+                        (center(&m) - original).abs() < 0.01,
+                        "Reset did not restore pixels"
+                    );
+                    assert!(position.controls.is_some());
+                }
+                assert_eq!(m.get("video-dec-params"), source);
+                assert_eq!(m.get("aid"), audio);
+            }
+            println!(
+                "{kind}: eight output routes checked; ASS disabled or rendered position moved/reset"
+            );
+        }
+        // Exercise every available SRT size and colour, alternating play/pause.
+        m.set("sid", &tracks[1].1).unwrap();
+        spin(&mut m, &mut s, 0.15);
+        s.prefs.layout = Layout::Mono;
+        s.prefs.output = Output::Left;
+        s.prefs.delivery = Delivery::Native;
+        action(&m, &mut s, 7131).unwrap();
+        crate::player::apply(&m, &mut s).unwrap();
+        spin(&mut m, &mut s, 0.15);
+        let path = m.get("path");
+        let generation = s.generation;
+        let mut sizes = Vec::new();
+        for (i, value) in SUB_SCALES.iter().enumerate() {
+            m.set("pause", if i % 2 == 0 { "no" } else { "yes" })
+                .unwrap();
+            action(&m, &mut s, 7100 + i as u32).unwrap();
+            spin(&mut m, &mut s, 0.12);
+            assert!((number(&m, "sub-scale") - *value).abs() < 0.001);
+            let (_, _, pixels) = m.screenshot_pixels().unwrap();
+            sizes.push(
+                pixels
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .filter(|p| p[..3].iter().any(|v| *v > 180))
+                    .count(),
+            );
+        }
+        assert!(
+            sizes.iter().all(|v| *v > 30) && sizes[7] > sizes[0] * 2,
+            "SRT sizes not rendered: {sizes:?}"
+        );
+        for (i, (_, hex)) in COLORS.iter().enumerate() {
+            m.set("pause", if i % 2 == 0 { "no" } else { "yes" })
+                .unwrap();
+            action(&m, &mut s, 7120 + i as u32).unwrap();
+            spin(&mut m, &mut s, 0.12);
+            let n = u32::from_str_radix(&hex[1..], 16).unwrap();
+            let expected = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
+            let (_, _, pixels) = m.screenshot_pixels().unwrap();
+            assert!(
+                pixels
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .filter(|p| p[..3].iter().zip(expected).all(|(a, b)| a.abs_diff(b) < 40))
+                    .count()
+                    > 20,
+                "SRT colour not rendered: {hex}"
+            );
+            let entries = subtitle_panel_entries(&m).unwrap();
+            assert_eq!(
+                entries
+                    .iter()
+                    .filter(|e| e.checked)
+                    .map(|e| e.id)
+                    .collect::<Vec<_>>(),
+                vec![7120 + i as u32]
+            );
+            assert!(entries.iter().all(|e| e.swatch.is_none()));
+        }
+        assert_eq!(m.get("path"), path);
+        assert_eq!(s.generation, generation);
+        action(&m, &mut s, 7131).unwrap();
+        // Returning through ASS must not leave position disabled on SRT/PGS.
+        for (_, sid) in tracks.iter().chain(tracks[..2].iter()) {
+            m.set("sid", sid).unwrap();
+            spin(&mut m, &mut s, 0.1);
+            assert_eq!(subtitle_position_supported(&m), sid != &tracks[2].1);
+        }
+        m.command(&["quit"]).unwrap();
+    }
     #[test]
     fn screen_profile_applies_and_restores_defaults_without_switching_monitor_modes() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -919,5 +1334,110 @@ mod tests {
         assert_eq!(s.features.prefs, old);
         assert_eq!(m.get("sub-scale"), scale);
         m.command(&["quit"]).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod live_subtitle_tests {
+    use super::*;
+    use std::time::Duration;
+    #[test]
+    fn aspect_lists_stay_open_update_selection_and_close_with_escape_or_outside() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let temp = tempfile::tempdir().unwrap();
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        crate::configure(&m, true, root).unwrap();
+        m.init().unwrap();
+        m.command(&[
+            "load-script",
+            root.join("verificacion/tests/stereo_popup.lua")
+                .to_str()
+                .unwrap(),
+        ])
+        .unwrap();
+        let mut s = State::new(temp.path(), true);
+        crate::player::load(
+            &m,
+            &mut s,
+            root.join("verificacion/muestras/pistas-qa.mkv")
+                .to_str()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(12);
+        while s.pending_load
+            || m.user_data("user-data/enigmax-popup-qa-ready").as_deref() != Some("yes")
+        {
+            if m.wait(0.02).id == 8 {
+                s.pending_load = false;
+            }
+            assert!(Instant::now() < deadline);
+        }
+        let tracks: Value = serde_json::from_str(&m.get("track-list").unwrap()).unwrap();
+        let sid = tracks
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["codec"] == "subrip")
+            .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        m.set("sid", &sid.to_string()).unwrap();
+        let menu = windows::Menu::new().unwrap();
+        subtitle_menu(&menu, &m).unwrap();
+        let entries = menu.entries().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].id, 7140);
+        assert!(entries[0].enabled && entries[0].children.is_empty());
+        m.set("loop-file", "inf").unwrap();
+        crate::player::apply(&m, &mut s).unwrap();
+        m.set("pause", "no").unwrap();
+        for mode in ["mono", "sbs", "ou", "framepack", "anaglyph"] {
+            m.set("user-data/enigmax-projection", mode).unwrap();
+            let mut plan = json!({"sequence":[7103,7104,7121,1149,1148,7102,7124,1150,7131,"@escape"],"delay":0.04,"eye":1,"panel":mode});
+            if mode == "mono" {
+                plan["capture"] = root
+                    .join("verificacion/1.0.2/panel-subtitulos.png")
+                    .to_string_lossy()
+                    .into_owned()
+                    .into();
+            }
+            m.set("user-data/enigmax-popup-test", &plan.to_string())
+                .unwrap();
+            let before = (
+                m.get("vf"),
+                m.get("af"),
+                m.get("current-vo"),
+                m.get("aid"),
+                m.get("sid"),
+            );
+            edit_subtitle_aspect(&m, &mut s, 7140).unwrap();
+            assert_eq!(
+                (
+                    m.get("vf"),
+                    m.get("af"),
+                    m.get("current-vo"),
+                    m.get("aid"),
+                    m.get("sid")
+                ),
+                before
+            );
+            assert_eq!(s.features.prefs.sub_scale, 1.0);
+            assert_eq!(s.features.prefs.sub_color, "#FFFFFF");
+            assert_eq!(s.prefs.sub_pos, 100);
+            assert_eq!(
+                m.user_data("user-data/enigmax-popup-state").as_deref(),
+                Some("")
+            );
+            m.set("user-data/enigmax-toolbar-popup", "yes").unwrap();
+            m.set("user-data/enigmax-popup-test",&json!({"sequence":[7140,7103,"@back-button",7140,7102,"@back-key",7140,"@escape"],"delay":0.04,"eye":1,"return_flow":mode}).to_string()).unwrap();
+            crate::choose_track(&m, &mut s, true).unwrap();
+            assert_eq!(s.features.prefs.sub_scale, 1.0);
+        }
+
+        println!(
+            "Compact subtitle panel: +/- controls, colour selection and per-row/global Reset; five projections, playback preserved"
+        );
     }
 }

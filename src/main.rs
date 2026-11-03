@@ -370,14 +370,30 @@ fn track_menus(m: &Mpv, s: &State) -> Result<TrackMenus, String> {
     Ok((tracks, subs, actions))
 }
 fn choose_track(m: &Mpv, s: &mut State, sub: bool) -> Result<(), String> {
-    let (audio, subs, actions) = track_menus(m, s)?;
-    let id = if sub { subs.show(m)? } else { audio.show(m)? };
-    if let Some((_, a)) = actions.into_iter().find(|(n, _)| *n == id) {
-        action(m, s, a)?;
-    } else if (7100..=7131).contains(&id) || (7020..=7022).contains(&id) {
-        action(m, s, Action::Id(id))?;
+    loop {
+        let (audio, subs, actions) = track_menus(m, s)?;
+        let id = if sub {
+            subs.show_titled(m, "Pista de subtítulos")?
+        } else {
+            audio.show(m)?
+        };
+        if (7140..=7142).contains(&id)
+            || (1140..=1152).contains(&id)
+            || (7100..=7107).contains(&id)
+            || (7120..=7125).contains(&id)
+        {
+            if playback_features::edit_subtitle_aspect(m, s, id)? {
+                continue;
+            }
+            return Ok(());
+        }
+        if let Some((_, a)) = actions.into_iter().find(|(n, _)| *n == id) {
+            action(m, s, a)?;
+        } else if (7100..=7131).contains(&id) || (7020..=7022).contains(&id) {
+            action(m, s, Action::Id(id))?;
+        }
+        return Ok(());
     }
-    Ok(())
 }
 type MenuActions = Vec<(u32, Action)>;
 fn build_menu(m: &Mpv, s: &State, remaining: bool) -> Result<(windows::Menu, MenuActions), String> {
@@ -519,137 +535,105 @@ fn original(m: &Mpv) -> Result<(), String> {
     m.set("window-scale", "1")
 }
 fn info(m: &Mpv, s: &State) {
-    let get = |key: &str| {
-        m.get(key)
-            .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| "No disponible".into())
-    };
-    let bytes = std::fs::metadata(&s.source)
-        .ok()
-        .map(|f| cineplayer_core::media::size(f.len()))
-        .unwrap_or_else(|| "No disponible".into());
+    use cineplayer_core::information::known;
+    let get = |key: &str| m.get(key).and_then(|v| known(&v));
+    let mut lines = vec!["ARCHIVO".to_owned()];
     let filename = cineplayer_core::media::title(&s.source, "");
-    let fps = m
-        .get("container-fps")
-        .and_then(|v| v.parse::<f64>().ok())
-        .filter(|v| v.is_finite() && *v > 0.0)
-        .map(|v| {
-            format!("{v:.3}")
-                .trim_end_matches('0')
-                .trim_end_matches('.')
-                .to_owned()
-        })
-        .unwrap_or_else(|| "No disponible".into());
-    let pixels = m
-        .get("video-params/hw-pixelformat")
-        .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| get("video-params/pixelformat"));
-    let mut lines = vec![
-        "ARCHIVO".to_owned(),
-        s.display_title.clone(),
-        format!(
-            "{} · {} · {}",
-            cineplayer_core::media::title(&s.source, ""),
-            get("file-format"),
-            bytes
-        ),
-        "VÍDEO".into(),
-        format!(
-            "{} · {}×{} · {} fps · {}",
-            get("video-format"),
-            get("video-params/w"),
-            get("video-params/h"),
-            fps,
-            cineplayer_core::media::bitrate(m.get("video-bitrate"))
-        ),
-        format!(
-            "Píxeles: {} · Decodificación: {}",
-            pixels,
-            get("hwdec-current")
-        ),
-        format!(
-            "Renderizador: {} · Descartados: {}",
-            get("current-vo"),
-            get("frame-drop-count")
-        ),
+    if !s.display_title.is_empty() && s.display_title != filename {
+        lines.push(s.display_title.clone());
+    }
+    let mut file = vec![filename];
+    if let Some(format) = get("file-format") {
+        file.push(format);
+    }
+    if let Ok(metadata) = std::fs::metadata(&s.source) {
+        file.push(cineplayer_core::media::size(metadata.len()));
+    }
+    lines.push(file.join(" · "));
+    let tracks: serde_json::Value = m
+        .get("track-list")
+        .and_then(|v| serde_json::from_str(&v).ok())
+        .unwrap_or_default();
+    let properties = [
+        "video-format",
+        "video-dec-params",
+        "video-dec-params/w",
+        "video-dec-params/h",
+        "video-dec-params/hw-pixelformat",
+        "video-dec-params/pixelformat",
+        "container-fps",
+        "video-bitrate",
+        "hwdec-current",
+        "current-vo",
+        "frame-drop-count",
+        "video-params/gamma",
+        "video-target-params/gamma",
+        "video-target-params/primaries",
+    ]
+    .into_iter()
+    .filter_map(|key| m.get(key).map(|v| (key.to_owned(), v)))
+    .collect();
+    let video = cineplayer_core::information::video(&properties, &tracks);
+    if !video.is_empty() {
+        lines.push("VÍDEO".into());
+        lines.extend(video);
         if s.input_layout(m).packed() {
-            format!(
+            lines.push(format!(
                 "3D: {} → {}",
                 s.input_layout(m).label(),
                 s.prefs.output.label()
-            )
-        } else {
-            "Presentación: 2D".into()
-        },
-    ];
-    if s.display_title.is_empty() || s.display_title == filename {
-        lines.remove(1);
+            ));
+        }
     }
-    let tracks: serde_json::Value =
-        serde_json::from_str(&m.get("track-list").unwrap_or_default()).unwrap_or_default();
-    let decoded: serde_json::Value =
-        serde_json::from_str(&m.get("video-dec-params").unwrap_or_default()).unwrap_or_default();
-    let processed: serde_json::Value =
-        serde_json::from_str(&m.get("video-params").unwrap_or_default()).unwrap_or_default();
-    let mut color = cineplayer_core::color_info::describe(&decoded, &tracks);
-    color.push(if s.hdr_sdr {
-        "Destino solicitado: SDR · conversión HDR → SDR cuando corresponda".into()
-    } else {
-        "Destino automático · depende de Windows y la pantalla".into()
-    });
-    if let Some(transfer) = processed["gamma"].as_str() {
-        color.push(format!("Transferencia tras filtros: {transfer}"));
-    }
-    let insert = lines
-        .iter()
-        .position(|l| l == "VÍDEO")
-        .map_or(lines.len(), |i| i + 2);
-    lines.splice(insert..insert, color);
     for (kind, heading) in [("audio", "AUDIOS"), ("sub", "SUBTÍTULOS")] {
+        let Some(tracks) = tracks.as_array() else {
+            continue;
+        };
         lines.push(heading.into());
         let mut found = false;
-        for t in tracks
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter(|t| t["type"].as_str() == Some(kind))
-        {
+        for t in tracks.iter().filter(|t| t["type"].as_str() == Some(kind)) {
             found = true;
-            let field = |k: &str| t[k].as_str().unwrap_or("");
-            let id = t["id"].as_i64().unwrap_or(0);
-            let selected = if t["selected"].as_bool() == Some(true) {
-                "●"
-            } else {
-                "○"
-            };
-            let mut details = vec![
-                field("codec").to_owned(),
-                field("lang").to_owned(),
-                field("title").to_owned(),
-            ];
+            let mut details: Vec<String> = ["codec", "lang", "title"]
+                .into_iter()
+                .filter_map(|k| t[k].as_str().and_then(known))
+                .collect();
             if kind == "audio" {
-                if let Some(n) = t["demux-samplerate"].as_u64() {
-                    details.push(format!("{n} Hz"));
+                for (key, suffix) in [
+                    ("demux-samplerate", "Hz"),
+                    ("demux-channel-count", "canales"),
+                ] {
+                    if let Some(n) = t[key].as_u64().filter(|n| *n > 0) {
+                        details.push(format!("{n} {suffix}"));
+                    }
                 }
-                if let Some(n) = t["demux-channel-count"].as_u64() {
-                    details.push(format!("{n} canales"));
-                }
-                if let Some(n) = t["demux-bitrate"].as_u64() {
+                if let Some(n) = t["demux-bitrate"].as_u64().filter(|n| *n > 0) {
                     details.push(cineplayer_core::media::bitrate(Some(n.to_string())));
                 }
             }
-            details.retain(|s| !s.is_empty());
-            lines.push(format!("{selected} {id} · {}", details.join(" · ")));
+            if !details.is_empty() {
+                let selected = if t["selected"].as_bool() == Some(true) {
+                    "● "
+                } else {
+                    ""
+                };
+                let id = t["id"]
+                    .as_u64()
+                    .map(|v| format!("{v} · "))
+                    .unwrap_or_default();
+                lines.push(format!("{selected}{id}{}", details.join(" · ")));
+            }
         }
         if !found {
             lines.push("Sin pistas".into());
         }
         if kind == "audio" {
-            lines.push(format!(
-                "Salida: {} · {}",
-                get("audio-out-params/format"),
-                get("audio-out-params/hr-channels")
-            ));
+            let output: Vec<_> = ["audio-out-params/format", "audio-out-params/hr-channels"]
+                .into_iter()
+                .filter_map(get)
+                .collect();
+            if !output.is_empty() {
+                lines.push(format!("Salida: {}", output.join(" · ")));
+            }
         }
     }
     let entries = lines
@@ -663,6 +647,7 @@ fn info(m: &Mpv, s: &State) {
         .collect();
     let _ = popup::show_information(m, "Información de audio y vídeo", entries);
 }
+
 fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
     if s.closing {
         return Ok(());
@@ -675,6 +660,12 @@ fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
             return Ok(());
         }
         Action::Id(id) => match id {
+            1140..=1152 | 7100..=7107 | 7120..=7125 | 7140..=7142 => {
+                if playback_features::edit_subtitle_aspect(m, s, id)? {
+                    return choose_track(m, s, true);
+                }
+                return Ok(());
+            }
             7000..=7131 => return playback_features::action(m, s, id),
             1 => return open(m, s, false),
             2 => return open(m, s, true),
@@ -2037,9 +2028,16 @@ mod tests {
         let brightness = advanced
             .children
             .iter()
-            .find(|e| e.label == "Ajuste de brillo por ojo")
+            .find(|e| e.label == "Ajuste de brillo por ojo y crosstalk…")
             .unwrap();
-        assert!(brightness.children.iter().any(|e| e.id == 1062));
+        assert_eq!(brightness.id, 1062);
+        assert!(brightness.children.is_empty());
+        assert!(
+            !advanced
+                .children
+                .iter()
+                .any(|e| matches!(e.id, 1064 | 1066 | 1068))
+        );
         assert!(
             advanced
                 .children
@@ -2060,26 +2058,13 @@ mod tests {
         );
         assert!(stereo.iter().any(|e| e.label == "Formato 3D de entrada"));
         let subtitle_entries = subs.entries().unwrap();
-        let appearance = subtitle_entries
-            .iter()
-            .find(|e| e.label == "Aspecto de subtítulos")
-            .unwrap();
-        assert_eq!(appearance.children.last().unwrap().id, 7131);
-        let position = appearance
-            .children
-            .iter()
-            .find(|e| e.label == "Posición de subtítulos")
-            .unwrap();
-        assert_eq!(
-            position
-                .children
+        let appearance = subtitle_entries.iter().find(|e| e.id == 7140).unwrap();
+        assert_eq!(appearance.label, "Aspecto de subtítulos…");
+        assert!(appearance.enabled && appearance.children.is_empty());
+        assert!(
+            !subtitle_entries
                 .iter()
-                .filter(|e| e.enabled)
-                .map(|e| e.id)
-                .collect::<Vec<_>>(),
-            (player::SUB_POSITION_FIRST
-                ..player::SUB_POSITION_FIRST + player::SUB_POSITIONS.len() as u32)
-                .collect::<Vec<_>>()
+                .any(|e| matches!(e.id, 7141 | 7142 | 7131))
         );
         let mut all = std::collections::BTreeMap::new();
         let mut toolbar = std::collections::BTreeMap::new();
@@ -2757,15 +2742,27 @@ mod information_audit {
             let labels: Vec<String> =
                 serde_json::from_str(&m.user_data("user-data/enigmax-info-labels").unwrap())
                     .unwrap();
-            let color = labels.iter().find(|l| l.starts_with("COLOR · ")).unwrap();
+            let color = labels.iter().find(|l| l.starts_with("COLOR · "));
             if hdr {
-                assert!(color.contains("HDR"), "{color}");
-            } else {
                 assert!(
-                    color.contains("SDR") || color.contains("Formato de color no disponible"),
-                    "Unexpected stale HDR label: {color}"
+                    color.is_some_and(|c| c.contains("HDR")),
+                    "{name}: {labels:?}"
+                );
+            } else if let Some(color) = color {
+                assert!(color.contains("SDR"), "Unexpected stale HDR label: {color}");
+            } else {
+                let gamma = m.get("video-dec-params/gamma").unwrap_or_default();
+                assert!(
+                    cineplayer_core::information::known(&gamma).is_none(),
+                    "Recognized gamma was hidden: {gamma}"
                 );
             }
+            assert!(
+                !labels
+                    .iter()
+                    .any(|l| l.contains("No disponible") || l.contains("no confirmados")),
+                "{labels:?}"
+            );
             assert!(capture.is_file(), "Missing screenshot: {name}");
             assert_eq!(
                 m.user_data("user-data/enigmax-popup-state").as_deref(),

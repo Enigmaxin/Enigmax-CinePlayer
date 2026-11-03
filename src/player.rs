@@ -234,8 +234,10 @@ impl State {
                 prefs.quality = *quality;
             }
         }
+        let features = crate::playback_features::Features::load(dir, probe);
+        features.restore_visual(&mut prefs);
         Self {
-            features: crate::playback_features::Features::load(dir, probe),
+            features,
             loader: None,
             opening: None,
             prepared_titles: None,
@@ -362,6 +364,13 @@ impl State {
             input
         }
     }
+    pub(crate) fn save_visual(&mut self) -> Result<(), String> {
+        if self.automatic {
+            self.features.save_visual(&self.dir, &self.prefs)
+        } else {
+            Ok(())
+        }
+    }
     fn save_quality(&self) -> Result<(), String> {
         use std::io::Write;
         let directory = self.dir.join("config");
@@ -406,7 +415,12 @@ fn wants_mvc(m: &Mpv, s: &State) -> bool {
     };
     paired
         && s.prefs.layout != Layout::Mono
-        && (s.subtitles.requested(s.prefs.ass_mode) == Some(cineplayer_core::ass3d::Packing::Sbs)
+        // Once both views are decoding, selecting one eye is a presentation
+        // change. Reopening bd:// here discards the working stream and can
+        // stall/resume from the wrong point on discs with costly seeks.
+        // A fresh 2D opening still uses the AVC base view without MVC workers.
+        && (s.raw.is_some()
+            || s.subtitles.requested(s.prefs.ass_mode) == Some(cineplayer_core::ass3d::Packing::Sbs)
             || match s.prefs.output {
                 Output::Left => s.prefs.swap,
                 Output::Right => !s.prefs.swap,
@@ -461,7 +475,7 @@ pub fn load(m: &Mpv, s: &mut State, path: &str, title: Option<i32>) -> Result<()
     } else {
         -1
     };
-    let use_mvc = if same_source {
+    let use_mvc = if same_source && (!disc || selected == s.title) {
         wants_mvc(m, s)
     } else if s.automatic {
         false
@@ -1262,39 +1276,7 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
     }
     root.separator();
     root.submenu("Formato 3D de entrada", layout_menu(s)?)?;
-    let advanced = windows::Menu::new()?;
-    let eye = windows::Menu::new()?;
-    eye.item(1021, "Izquierdo (habitual)", s.prefs.output == Output::Left)?;
-    eye.item(1022, "Derecho", s.prefs.output == Output::Right)?;
-    advanced.submenu("Ojo que mostrar en 2D", eye)?;
-    let algorithm = windows::Menu::new()?;
-    for (i, v) in Algorithm::ALL.iter().enumerate() {
-        algorithm.item(1040 + i as u32, v.label(), s.prefs.algorithm == *v)?;
-    }
-    advanced.submenu("Algoritmo anaglifo", algorithm)?;
-
-    let cal = windows::Menu::new()?;
-    for (id, label) in [
-        (1062, "Ganancia izquierda −5 %"),
-        (1063, "Ganancia izquierda +5 %"),
-        (1064, "Ganancia derecha −5 %"),
-        (1065, "Ganancia derecha +5 %"),
-        (1066, "Compensación de fugas −1 %"),
-        (1067, "Compensación de fugas +1 %"),
-        (1068, "Restablecer calibración"),
-        (1071, "Ver ajustes actuales"),
-    ] {
-        cal.item(id, label, false)?;
-    }
-    advanced.submenu("Ajuste de brillo por ojo", cal)?;
-    let subs = windows::Menu::new()?;
-    for (i, mode) in cineplayer_core::ass3d::Mode::ALL.iter().enumerate() {
-        subs.item(1100 + i as u32, mode.label(), s.prefs.ass_mode == *mode)?;
-    }
-    subs.separator();
-    subs.item(1104, "Información de detección ASS", false)?;
-    advanced.submenu("Subtítulos 3D", subs)?;
-    root.submenu("Avanzado", advanced)?;
+    root.submenu("Avanzado", advanced_menu(s)?)?;
     let profiles = windows::Menu::new()?;
     for (id, label) in [
         (1080, "Guardar como predeterminado"),
@@ -1306,6 +1288,156 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
     }
     root.submenu("Ajustes guardados", profiles)?;
     Ok(root)
+}
+fn advanced_menu(s: &State) -> Result<windows::Menu, String> {
+    let advanced = windows::Menu::new()?;
+    let eye = windows::Menu::new()?;
+    eye.item(1021, "Izquierdo (habitual)", s.prefs.output == Output::Left)?;
+    eye.item(1022, "Derecho", s.prefs.output == Output::Right)?;
+    advanced.submenu("Ojo que mostrar en 2D", eye)?;
+    let algorithm = windows::Menu::new()?;
+    for (i, v) in Algorithm::ALL.iter().enumerate() {
+        algorithm.item(1040 + i as u32, v.label(), s.prefs.algorithm == *v)?;
+    }
+    advanced.submenu("Algoritmo anaglifo", algorithm)?;
+
+    advanced.item(1062, "Ajuste de brillo por ojo y crosstalk…", false)?;
+    let subs = windows::Menu::new()?;
+    for (i, mode) in cineplayer_core::ass3d::Mode::ALL.iter().enumerate() {
+        subs.item(1100 + i as u32, mode.label(), s.prefs.ass_mode == *mode)?;
+    }
+    subs.separator();
+    subs.item(1104, "Información de detección ASS", false)?;
+    advanced.submenu("Subtítulos 3D", subs)?;
+    Ok(advanced)
+}
+fn calibration_entries(
+    settings: &Settings,
+    control: u32,
+) -> Result<Vec<crate::popup::Entry>, String> {
+    let (value, count) = match control {
+        1062 => (settings.left_gain * 100.0, 21),
+        1064 => (settings.right_gain * 100.0, 21),
+        1066 => (settings.crosstalk * 100.0, 16),
+        _ => return Err("Ajuste de brillo inválido".into()),
+    };
+    Ok((0..count)
+        .map(|index| {
+            let percent = if control == 1066 {
+                index
+            } else {
+                50 + index * 5
+            };
+            let mut item = crate::popup::Entry::action(1300 + index, format!("{percent} %"));
+            item.checked = (value - percent as f32).abs() < 0.01;
+            item
+        })
+        .collect())
+}
+fn set_calibration(m: &Mpv, s: &mut State, control: u32, choice: u32) -> Result<(), String> {
+    let index = choice.checked_sub(1300).ok_or("Porcentaje inválido")?;
+    let old = s.prefs.clone();
+    let (target, value) = match control {
+        1062 if index <= 20 => (&mut s.prefs.left_gain, (50 + index * 5) as f32 / 100.0),
+        1064 if index <= 20 => (&mut s.prefs.right_gain, (50 + index * 5) as f32 / 100.0),
+        1066 if index <= 15 => (&mut s.prefs.crosstalk, index as f32 / 100.0),
+        _ => return Err("Porcentaje inválido".into()),
+    };
+    if (*target - value).abs() < 0.0001 {
+        return Ok(());
+    }
+    *target = value;
+    s.applied = None;
+    if let Err(error) = apply(m, s).and_then(|()| s.save_visual()) {
+        s.prefs = old;
+        s.applied = None;
+        return match apply(m, s) {
+            Ok(()) => Err(error),
+            Err(restore) => Err(format!(
+                "{error}; no se pudo restaurar la calibración: {restore}"
+            )),
+        };
+    }
+    Ok(())
+}
+fn calibration_editor(m: &Mpv, s: &mut State, control: u32) -> Result<(), String> {
+    if !matches!(control, 1062 | 1064 | 1066) {
+        return Err("Ajuste de brillo inválido".into());
+    }
+    loop {
+        let result = crate::popup::show_live_panel(
+            m,
+            "Ajuste de brillo por ojo y crosstalk · anaglifo",
+            calibration_panel_entries(&s.prefs)?,
+            &mut |choice| {
+                if choice == 1068 {
+                    action(m, s, choice)?;
+                } else {
+                    let index = choice.checked_sub(1300).ok_or("Porcentaje inválido")? / 40;
+                    let control = *[1062, 1064, 1066]
+                        .get(index as usize)
+                        .ok_or("Ajuste de brillo inválido")?;
+                    set_calibration(m, s, control, 1300 + (choice - 1300) % 40)?;
+                }
+                calibration_panel_entries(&s.prefs)
+            },
+        )?;
+        if result != crate::popup::BACK {
+            return Ok(());
+        }
+        let selected = advanced_menu(s)?.show_titled(m, "Avanzado")?;
+        if selected == 0 {
+            return Ok(());
+        }
+        if matches!(selected, 1062 | 1064 | 1066) {
+            continue;
+        }
+        return action(m, s, selected);
+    }
+}
+fn calibration_panel_entries(p: &Settings) -> Result<Vec<crate::popup::Entry>, String> {
+    let mut rows = Vec::new();
+    for (index, (control, label)) in [
+        (1062, "Brillo izquierdo"),
+        (1064, "Brillo derecho"),
+        (1066, "Crosstalk"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let value = match control {
+            1062 => p.left_gain,
+            1064 => p.right_gain,
+            _ => p.crosstalk,
+        } * 100.0;
+        let entries = calibration_entries(p, control)?;
+        let percent = |entry: &crate::popup::Entry| {
+            if control == 1066 {
+                (entry.id - 1300) as f32
+            } else {
+                (50 + (entry.id - 1300) * 5) as f32
+            }
+        };
+        let offset = index as u32 * 40;
+        let mut row = crate::popup::Entry::action(control, format!("{label}: {value:.0} %"));
+        row.controls = Some([
+            entries
+                .iter()
+                .rfind(|e| percent(e) < value - 0.01)
+                .map(|e| e.id + offset),
+            entries
+                .iter()
+                .find(|e| percent(e) > value + 0.01)
+                .map(|e| e.id + offset),
+            Some(1300 + offset + if control == 1066 { 0 } else { 10 }),
+        ]);
+        rows.push(row);
+    }
+    rows.push(crate::popup::Entry::action(
+        1068,
+        "Restablecer toda la calibración".into(),
+    ));
+    Ok(rows)
 }
 pub fn quality_menu(s: &State) -> Result<windows::Menu, String> {
     let menu = windows::Menu::new()?;
@@ -1353,13 +1485,25 @@ pub fn menu(root: &windows::Menu, m: &Mpv, s: &State, include_stereo: bool) -> R
     Ok(())
 }
 pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
+    // Each live selection commits or rolls back separately. A later popup
+    // error must not undo earlier selections that have already been saved.
+    if matches!(id, 1062 | 1064 | 1066) {
+        return action_impl(m, s, id);
+    }
     let old = s.prefs.clone();
     let result = action_impl(m, s, id).and_then(|()| {
         if s.automatic && (matches!(id, 1050..=1053) || s.prefs.quality != old.quality) {
-            s.save_quality()
-        } else {
-            Ok(())
+            s.save_quality()?;
         }
+        if !matches!(id, 1062 | 1064 | 1066)
+            && (s.prefs.sub_pos != old.sub_pos
+                || s.prefs.left_gain != old.left_gain
+                || s.prefs.right_gain != old.right_gain
+                || s.prefs.crosstalk != old.crosstalk)
+        {
+            s.save_visual()?;
+        }
+        Ok(())
     });
     if result.is_err() {
         s.prefs = old;
@@ -1664,41 +1808,19 @@ fn action_impl(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
                 ])?;
             }
         }
-        1062..=1063 => {
-            s.prefs.left_gain =
-                (s.prefs.left_gain + if id == 1062 { -0.05 } else { 0.05 }).clamp(0.5, 1.5)
-        }
-        1064..=1065 => {
-            s.prefs.right_gain =
-                (s.prefs.right_gain + if id == 1064 { -0.05 } else { 0.05 }).clamp(0.5, 1.5)
-        }
-        1066..=1067 => {
-            s.prefs.crosstalk =
-                (s.prefs.crosstalk + if id == 1066 { -0.01 } else { 0.01 }).clamp(0.0, 0.15)
-        }
+        1062 | 1064 | 1066 => return calibration_editor(m, s, id),
         1068 => {
             s.prefs.left_gain = 1.0;
             s.prefs.right_gain = 1.0;
             s.prefs.crosstalk = 0.0;
         }
         1140..=1152 => {
+            if !crate::playback_features::subtitle_position_supported(m) {
+                return Ok(());
+            }
             let position = SUB_POSITIONS[(id - SUB_POSITION_FIRST) as usize];
             m.set("sub-pos", &position.to_string())?;
             s.prefs.sub_pos = position;
-            return Ok(());
-        }
-        1071 => {
-            windows::player_message(
-                m,
-                &format!(
-                    "Ganancias: {:.2} / {:.2}\nCompensación de fugas: {:.1} %\n{}",
-                    s.prefs.left_gain,
-                    s.prefs.right_gain,
-                    s.prefs.crosstalk * 100.0,
-                    s.pipeline
-                ),
-                false,
-            );
             return Ok(());
         }
         1080 => return s.save(&s.dir.join("config/default.ini")),
@@ -2122,6 +2244,235 @@ fn commit_disc_info(m: &Mpv, s: &mut State, info: mvc::Info) -> Result<(), Strin
 mod state_tests {
     use super::*;
     use std::time::{Duration, Instant};
+
+    #[test]
+    #[ignore = "Requires ENIGMAX_TEST_MVC_ISO; reads the explicitly authorized ISO"]
+    fn mvc_eye_selection_retains_running_transport() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let dir = tempfile::tempdir().unwrap();
+        let mut m = iso_engine(root);
+        let mut s = State::new(dir.path(), true);
+        s.prefs.layout = Layout::Mvc;
+        s.prefs.output = Output::Original;
+        let source = std::env::var("ENIGMAX_TEST_MVC_ISO").unwrap();
+        load(&m, &mut s, &source, None).unwrap();
+        iso_pump(&mut m, &mut s, |m, s| {
+            s.raw.is_some() && !s.pending_load && m.get("video-params/w").is_some()
+        });
+        m.set("pause", "no").unwrap();
+        iso_pump(&mut m, &mut s, |m, _| {
+            m.get("time-pos")
+                .and_then(|v| v.parse::<f64>().ok())
+                .is_some_and(|v| v > 1.0)
+        });
+        let path = m.get("path");
+        let generation = s.generation;
+        for (paused, id) in [
+            (false, 1021),
+            (false, 1022),
+            (true, 1021),
+            (true, 1022),
+            (false, 1220),
+            (false, 1210),
+            (false, 1200),
+            (false, 1021),
+        ] {
+            m.set("pause", if paused { "yes" } else { "no" }).unwrap();
+            let before = m.get("time-pos").unwrap().parse::<f64>().unwrap();
+            let audio = m.get("aid");
+            let subtitle = m.get("sid");
+            action(&m, &mut s, id).unwrap();
+            println!(
+                "eye {id}: path {:?} -> {:?}, generation {generation} -> {}, pending={}, resume={:?}",
+                path,
+                m.get("path"),
+                s.generation,
+                s.pending_load,
+                s.resume
+            );
+            iso_pump(&mut m, &mut s, |m, s| {
+                !s.pending_load
+                    && s.resume.is_none()
+                    && m.get("time-pos")
+                        .and_then(|v| v.parse::<f64>().ok())
+                        .is_some_and(|v| (v - before).abs() < 1.0)
+            });
+            assert_eq!(
+                m.get("path"),
+                path,
+                "Eye selection replaced the active MVC transport"
+            );
+            assert_eq!(s.generation, generation);
+            assert_eq!(m.get("aid"), audio);
+            assert_eq!(m.get("sid"), subtitle);
+            assert_eq!(
+                m.get("pause").as_deref(),
+                Some(if paused { "yes" } else { "no" })
+            );
+            assert!(s.raw.is_some());
+            if !paused {
+                iso_pump(&mut m, &mut s, |m, _| {
+                    m.get("time-pos")
+                        .and_then(|v| v.parse::<f64>().ok())
+                        .is_some_and(|v| v > before + 0.2)
+                });
+            }
+        }
+        m.command(&["quit"]).unwrap();
+        drop(s);
+        drop(m);
+        let mut m = iso_engine(root);
+        let mut s = State::new(dir.path(), true);
+        s.prefs.layout = Layout::Mvc;
+        s.prefs.output = Output::Left;
+        load(&m, &mut s, &source, None).unwrap();
+        iso_pump(&mut m, &mut s, |m, s| {
+            !s.pending_load && m.get("video-params/w").is_some()
+        });
+        assert!(
+            s.raw.is_none(),
+            "A fresh 2D opening started MVC unnecessarily"
+        );
+        m.set("pause", "no").unwrap();
+        iso_pump(&mut m, &mut s, |m, _| {
+            m.get("time-pos")
+                .and_then(|v| v.parse::<f64>().ok())
+                .is_some_and(|v| v > 0.3)
+        });
+        println!(
+            "Fresh left eye: base {:?}, hwdec {:?}",
+            m.get("path"),
+            m.get("hwdec-current")
+        );
+        s.automatic = true;
+        s.history_asked = true;
+        action(&m, &mut s, 1022).unwrap();
+        iso_pump(&mut m, &mut s, |m, s| {
+            s.raw.is_some()
+                && !s.pending_load
+                && s.resume.is_none()
+                && m.get("video-params/w").as_deref() == Some("3840")
+        });
+        let path = m.get("path");
+        let generation = s.generation;
+        action(&m, &mut s, 1021).unwrap();
+        assert_eq!(s.generation, generation);
+        assert_eq!(m.get("path"), path);
+        assert!(s.raw.is_some());
+        s.prefs.layout = Layout::FullSbs;
+        load(
+            &m,
+            &mut s,
+            root.join("verificacion/muestras/quality-fullsbs.mkv")
+                .to_str()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        iso_pump(&mut m, &mut s, |m, s| {
+            !s.pending_load
+                && m.get("path")
+                    .is_some_and(|p| p.ends_with("quality-fullsbs.mkv"))
+        });
+        assert!(s.raw.is_none(), "MVC transport leaked into the next MKV");
+        m.command(&["quit"]).unwrap();
+    }
+
+    #[test]
+    fn visual_autosave_restores_only_requested_fields_and_ignores_invalid_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = State::new(dir.path(), false);
+        s.prefs.layout = Layout::HalfOu;
+        s.prefs.sub_pos = 85;
+        s.prefs.left_gain = 1.15;
+        s.prefs.right_gain = 0.9;
+        s.prefs.crosstalk = 0.04;
+        s.features.prefs.sub_scale = 1.5;
+        s.save_visual().unwrap();
+        let restored = State::new(dir.path(), false);
+        assert_eq!(restored.prefs.sub_pos, 85);
+        assert_eq!(restored.prefs.left_gain, 1.15);
+        assert_eq!(restored.prefs.right_gain, 0.9);
+        assert_eq!(restored.prefs.crosstalk, 0.04);
+        assert_eq!(restored.prefs.layout, Settings::default().layout);
+        assert_eq!(restored.features.prefs.sub_scale, 1.5);
+        assert_eq!(State::new(dir.path(), true).prefs, Settings::default());
+        let path = dir.path().join("config/playback.json");
+        let valid = std::fs::read(&path).unwrap();
+        for key in ["sub_pos", "left_gain", "right_gain", "crosstalk"] {
+            let mut value: serde_json::Value = serde_json::from_slice(&valid).unwrap();
+            value["visual"][key] = serde_json::json!(999);
+            std::fs::write(&path, value.to_string()).unwrap();
+            assert_eq!(State::new(dir.path(), false).prefs, Settings::default());
+        }
+        std::fs::write(&path, r#"{"version":1,"sub_scale":1.5}"#).unwrap();
+        assert_eq!(State::new(dir.path(), false).prefs, Settings::default());
+        assert_eq!(State::new(dir.path(), false).features.prefs.sub_scale, 1.5);
+    }
+
+    #[test]
+    fn visual_controls_autosave_immediately_reset_and_roll_back_failed_writes() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let dir = tempfile::tempdir().unwrap();
+        let mut m = iso_engine(root);
+        let mut s = State::new(dir.path(), true);
+        load(
+            &m,
+            &mut s,
+            root.join("verificacion/muestras/quality-fullsbs.mkv")
+                .to_str()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        iso_pump(&mut m, &mut s, |m, s| {
+            !s.pending_load && m.get("video-params/w").is_some()
+        });
+        s.prefs.layout = Layout::FullSbs;
+        s.prefs.output = Output::Anaglyph;
+        s.automatic = true;
+        for (control, choice, value) in [(1062, 1313, 1.15), (1064, 1308, 0.9), (1066, 1304, 0.04)]
+        {
+            set_calibration(&m, &mut s, control, choice).unwrap();
+            let restored = State::new(dir.path(), false);
+            let actual = match control {
+                1062 => restored.prefs.left_gain,
+                1064 => restored.prefs.right_gain,
+                _ => restored.prefs.crosstalk,
+            };
+            assert!((actual - value).abs() < 0.0001);
+        }
+        action(&m, &mut s, 1149).unwrap();
+        assert_eq!(State::new(dir.path(), false).prefs.sub_pos, 95);
+        crate::playback_features::action(&m, &mut s, 7104).unwrap();
+        assert_eq!(State::new(dir.path(), false).prefs.sub_pos, 95);
+        action(&m, &mut s, 1068).unwrap();
+        let restored = State::new(dir.path(), false);
+        assert_eq!(
+            (
+                restored.prefs.left_gain,
+                restored.prefs.right_gain,
+                restored.prefs.crosstalk
+            ),
+            (1.0, 1.0, 0.0)
+        );
+        crate::playback_features::action(&m, &mut s, 7131).unwrap();
+        assert_eq!(State::new(dir.path(), false).prefs.sub_pos, 100);
+        let path = dir.path().join("config/playback.json");
+        let saved = std::fs::read(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        let old = s.prefs.clone();
+        assert!(set_calibration(&m, &mut s, 1062, 1314).is_err());
+        assert_eq!(s.prefs, old);
+        assert!(action(&m, &mut s, 1148).is_err());
+        assert_eq!(s.prefs, old);
+        assert_eq!(m.get("sub-pos").as_deref(), Some("100.000000"));
+        std::fs::remove_dir(&path).unwrap();
+        std::fs::write(&path, saved).unwrap();
+        assert_eq!(State::new(dir.path(), false).prefs.sub_pos, 100);
+        m.command(&["quit"]).unwrap();
+    }
 
     #[test]
     fn quality_is_persisted_independently_and_survives_restart_and_bad_records() {
@@ -2633,3 +2984,165 @@ mod state_tests {
 #[cfg(test)]
 #[path = "reliability_audit.rs"]
 mod reliability_audit;
+
+#[cfg(test)]
+mod calibration_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+    #[test]
+    fn live_percentages_keep_one_popup_and_preserve_playback_in_every_projection() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let temp = tempfile::tempdir().unwrap();
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        crate::configure(&m, true, root).unwrap();
+        m.option("autofit", "960x540").unwrap();
+        m.init().unwrap();
+        let mut s = State::new(temp.path(), true);
+        m.command(&[
+            "load-script",
+            root.join("verificacion/tests/stereo_popup.lua")
+                .to_str()
+                .unwrap(),
+        ])
+        .unwrap();
+        let ready_deadline = Instant::now() + Duration::from_secs(8);
+        while m.user_data("user-data/enigmax-popup-qa-ready").as_deref() != Some("yes") {
+            m.wait(0.02);
+            assert!(
+                Instant::now() < ready_deadline,
+                "Popup driver did not initialize"
+            );
+        }
+        for (layout, output, delivery) in [
+            (Layout::Mono, Output::Left, stereo::Delivery::Native),
+            (Layout::FullSbs, Output::Original, stereo::Delivery::Native),
+            (Layout::FullOu, Output::Original, stereo::Delivery::Native),
+            (
+                Layout::FullSbs,
+                Output::Original,
+                stereo::Delivery::FramePack,
+            ),
+            (Layout::FullSbs, Output::Anaglyph, stereo::Delivery::Native),
+        ] {
+            s.prefs.layout = layout;
+            s.prefs.output = output;
+            s.prefs.delivery = delivery;
+            load(
+                &m,
+                &mut s,
+                root.join("verificacion/muestras/quality-fullsbs.mkv")
+                    .to_str()
+                    .unwrap(),
+                None,
+            )
+            .unwrap();
+            let until = Instant::now() + Duration::from_secs(12);
+            loop {
+                let event = m.wait(0.02);
+                if event.id == 8 {
+                    s.pending_load = false;
+                }
+                if !s.pending_load && m.get("video-params/w").is_some() {
+                    break;
+                }
+                assert!(Instant::now() < until, "load timeout");
+            }
+            m.set("sid", "no").unwrap();
+            apply(&m, &mut s).unwrap();
+            m.set("pause", "no").unwrap();
+            for control in [1062, 1064, 1066] {
+                let first = if control == 1066 { 1301 } else { 1300 };
+                let (last, neutral) = if control == 1066 {
+                    (1315, 1300)
+                } else {
+                    (1320, 1310)
+                };
+                m.set("user-data/enigmax-popup-test", &serde_json::json!({"sequence":[first,last,neutral,"@escape"],"delay":0.04,"eye":1,"control":control}).to_string()).unwrap();
+                let (vf, af, vo, aid, sid) = (
+                    m.get("vf"),
+                    m.get("af"),
+                    m.get("current-vo"),
+                    m.get("aid"),
+                    m.get("sid"),
+                );
+                let mut clients = Vec::new();
+                let mut choices = Vec::new();
+                crate::popup::show_live(
+                    &m,
+                    "Calibración",
+                    calibration_entries(&s.prefs, control).unwrap(),
+                    &mut |choice| {
+                        let state: serde_json::Value = serde_json::from_str(
+                            &m.user_data("user-data/enigmax-popup-state").unwrap(),
+                        )
+                        .unwrap();
+                        clients.push(state["client"].as_str().unwrap().to_owned());
+                        set_calibration(&m, &mut s, control, choice)?;
+                        choices.push(choice);
+                        let entries = calibration_entries(&s.prefs, control)?;
+                        assert_eq!(
+                            entries
+                                .iter()
+                                .filter(|e| e.checked)
+                                .map(|e| e.id)
+                                .collect::<Vec<_>>(),
+                            vec![choice]
+                        );
+                        Ok(entries)
+                    },
+                )
+                .unwrap();
+                assert_eq!(
+                    choices,
+                    vec![first, last, neutral],
+                    "{layout:?}/{output:?}/{control}"
+                );
+                assert!(clients.iter().all(|client| client == &clients[0]));
+                assert_eq!(
+                    (
+                        m.get("vf"),
+                        m.get("af"),
+                        m.get("current-vo"),
+                        m.get("aid"),
+                        m.get("sid")
+                    ),
+                    (vf, af, vo, aid, sid)
+                );
+                assert_eq!(m.get("pause").as_deref(), Some("no"));
+                assert_eq!(
+                    m.user_data("user-data/enigmax-popup-state").as_deref(),
+                    Some("")
+                );
+                let applied = s.applied.clone();
+                set_calibration(&m, &mut s, control, neutral).unwrap();
+                assert_eq!(
+                    s.applied, applied,
+                    "Unchanged percentage rebuilt the pipeline"
+                );
+                assert!(set_calibration(&m, &mut s, control, 1400).is_err());
+            }
+            let mut plan = serde_json::json!({"sequence":[1311,1351,1381,1312,1352,1382,1310,1350,1380,1068,"@escape"],"delay":0.04,"eye":1,"panel":format!("{layout:?}/{output:?}")});
+            if layout == Layout::Mono {
+                plan["capture"] = root
+                    .join("verificacion/1.0.2/panel-brillo.png")
+                    .to_string_lossy()
+                    .into_owned()
+                    .into();
+            }
+            m.set("user-data/enigmax-popup-test", &plan.to_string())
+                .unwrap();
+            calibration_editor(&m, &mut s, 1062).unwrap();
+            assert_eq!(
+                (s.prefs.left_gain, s.prefs.right_gain, s.prefs.crosstalk),
+                (1.0, 1.0, 0.0)
+            );
+            m.set("user-data/enigmax-toolbar-popup", "yes").unwrap();
+            m.set("user-data/enigmax-popup-test",&serde_json::json!({"sequence":[1311,"@back-button",1062,1310,"@back-key",1062,"@escape"],"delay":0.04,"eye":1,"return_flow":format!("{layout:?}/{output:?}")}).to_string()).unwrap();
+            calibration_editor(&m, &mut s, 1062).unwrap();
+            assert_eq!(s.prefs.left_gain, 1.0);
+        }
+        println!(
+            "Compact calibration panel: +/- and per-row/global Reset in five projections; 45 legacy selection regressions preserved"
+        );
+    }
+}

@@ -254,6 +254,8 @@ mp.set_key_bindings({
     {'UP',function()modal_input('previous')end},
     {'DOWN',function()modal_input('next')end},
     {'LEFT',function()modal_input('left')end},
+    {'BS',function()modal_input('back')end},
+    {'Alt+LEFT',function()modal_input('back')end},
     {'RIGHT',function()modal_input('right')end},
     {'ENTER',function()modal_input('enter')end},
 },'enigmax_popup','force')

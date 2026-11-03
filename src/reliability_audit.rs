@@ -316,11 +316,26 @@ fn async_iso_mvc_replace_and_quit_are_bounded() {
     });
     assert_eq!(s.title, title);
     for _ in 0..5 {
+        action(&m, &mut s, 1200).unwrap();
+        pump(&mut m, &mut s, |_, s| {
+            !loading(s) && !s.pending_load && s.raw.is_some()
+        });
+        let generation = s.generation;
         action(&m, &mut s, 1210).unwrap();
+        assert!(
+            s.raw.is_some(),
+            "Selecting one eye must retain the running decoder"
+        );
+        assert_eq!(s.generation, generation);
+        // Explicitly changing the input to 2D releases MVC. This is distinct
+        // from choosing one output eye and still exercises loader cancellation.
+        let mono = Layout::ALL.iter().position(|l| *l == Layout::Mono).unwrap();
+        action(&m, &mut s, 1000 + mono as u32).unwrap();
         pump(&mut m, &mut s, |_, s| {
             !loading(s) && !s.pending_load && s.raw.is_none()
         });
         action(&m, &mut s, 1200).unwrap();
+        assert!(loading(&s));
         cancel_loading(&mut s);
     }
     let start = Instant::now();

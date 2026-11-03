@@ -4,6 +4,7 @@ use cineplayer_core::{
     control_layout::{Layout, Projection, Rect},
     popup_geometry::Viewport,
 };
+pub const BACK: u32 = u32::MAX;
 
 #[derive(Clone, Debug)]
 pub struct Entry {
@@ -13,6 +14,8 @@ pub struct Entry {
     pub enabled: bool,
     pub emphasized: bool,
     pub children: Vec<Entry>,
+    pub controls: Option<[Option<u32>; 3]>,
+    pub swatch: Option<[u8; 3]>,
 }
 impl Entry {
     pub fn action(id: u32, label: String) -> Self {
@@ -23,6 +26,8 @@ impl Entry {
             enabled: true,
             emphasized: false,
             children: vec![],
+            controls: None,
+            swatch: None,
         }
     }
 }
@@ -119,23 +124,25 @@ fn geometry(w: i32, h: i32, count: usize, wide: bool) -> Result<Geometry, String
     })
 }
 fn activate(pages: &mut Vec<Page>, index: usize) -> Option<u32> {
-    let page = pages.last()?;
+    let page = pages.last_mut()?;
     let entry = page.items.get(index)?;
     if !entry.enabled {
         return None;
     }
+    page.selected = Some(index);
     if !entry.children.is_empty() {
-        pages.push(Page::new(entry.label.clone(), entry.children.clone()));
+        let child = Page::new(entry.label.clone(), entry.children.clone());
+        pages.push(child);
         None
     } else {
         Some(entry.id)
     }
 }
 pub fn show(m: &Mpv, title: &str, entries: Vec<Entry>) -> Result<u32, String> {
-    show_sized(m, title, entries, false, None)
+    show_sized(m, title, entries, false, None, None, None)
 }
 pub fn show_information(m: &Mpv, title: &str, entries: Vec<Entry>) -> Result<u32, String> {
-    show_sized(m, title, entries, true, None)
+    show_sized(m, title, entries, true, None, None, None)
 }
 pub fn show_anchored(
     m: &Mpv,
@@ -143,7 +150,63 @@ pub fn show_anchored(
     entries: Vec<Entry>,
     button: cineplayer_core::control_layout::Button,
 ) -> Result<u32, String> {
-    show_sized(m, title, entries, false, Some(button))
+    show_sized(m, title, entries, false, Some(button), None, None)
+}
+type LiveAction<'a> = Option<&'a mut dyn FnMut(u32) -> Result<Vec<Entry>, String>>;
+/// A focused editor: updates only after a selection, without reopening the menu.
+#[cfg(test)]
+pub fn show_live(
+    m: &Mpv,
+    title: &str,
+    entries: Vec<Entry>,
+    callback: &mut dyn FnMut(u32) -> Result<Vec<Entry>, String>,
+) -> Result<u32, String> {
+    show_sized(m, title, entries, false, None, Some(callback), None)
+}
+/// Compact, event-driven adjustment panel with inline controls.
+pub fn show_live_panel(
+    m: &Mpv,
+    title: &str,
+    entries: Vec<Entry>,
+    callback: &mut dyn FnMut(u32) -> Result<Vec<Entry>, String>,
+) -> Result<u32, String> {
+    show_sized(m, title, entries, true, None, Some(callback), None)
+}
+fn finish_activation(
+    pages: &mut [Page],
+    id: u32,
+    live: &mut LiveAction<'_>,
+) -> Result<Option<u32>, String> {
+    let Some(callback) = live.as_mut() else {
+        return Ok(Some(id));
+    };
+    let entries = callback(id)?;
+    let page = pages.last_mut().ok_or("Menú vacío")?;
+    page.selected = entries.iter().position(|e| {
+        e.enabled
+            && (e.id == id
+                || e.controls
+                    .is_some_and(|buttons| buttons.contains(&Some(id))))
+    });
+    page.items = entries;
+    // Re-entering a child must show its latest check marks, not its initial copy.
+    for index in (1..pages.len()).rev() {
+        let children = pages[index].items.clone();
+        let parent = &mut pages[index - 1];
+        if let Some(entry) = parent.selected.and_then(|i| parent.items.get_mut(i)) {
+            entry.children = children;
+        }
+    }
+    Ok(None)
+}
+fn inline_button(width: i32, row: i32, slot: usize) -> Rect {
+    let button = (row + 6).clamp(24, 44);
+    Rect {
+        x: width - 12 - (3 - slot as i32) * (button + 6),
+        y: 2,
+        w: button,
+        h: row - 4,
+    }
 }
 fn show_sized(
     m: &Mpv,
@@ -151,12 +214,15 @@ fn show_sized(
     entries: Vec<Entry>,
     wide: bool,
     anchor: Option<cineplayer_core::control_layout::Button>,
+    mut live: LiveAction<'_>,
+    initial_child: Option<usize>,
 ) -> Result<u32, String> {
     if entries.is_empty() {
         return Ok(0);
     }
     let source = m.get("path");
     let tracks = track_identity(m);
+    let selected_subtitle = m.get("sid");
     let mut input = m.popup_client()?;
     let name = input.name();
     let _guard = Guard(m);
@@ -167,6 +233,16 @@ fn show_sized(
         &name,
     ])?;
     let mut pages = vec![Page::new(title.to_owned(), entries)];
+    if let Some(index) = initial_child {
+        if !pages[0]
+            .items
+            .get(index)
+            .is_some_and(|e| e.enabled && !e.children.is_empty())
+        {
+            return Err("Página inicial de ajustes inválida".into());
+        }
+        activate(&mut pages, index);
+    }
     let (mut w, mut h) = dimensions(m);
     let mode = projection(m);
     let opener = anchor.or_else(|| {
@@ -202,9 +278,22 @@ fn show_sized(
         }
         let view = Viewport::new(w, h, mode).ok_or("La superficie del menú no está disponible")?;
         let depth = pages.len();
+        let panel_back = wide && live.is_some();
+        let back_width = if live.is_some() && (depth > 1 || panel_back) {
+            100
+        } else {
+            40
+        };
         let page = pages.last_mut().ok_or("Menú vacío")?;
         let mut g = geometry(w, h, page.items.len(), wide)?;
-        if !wide
+        // Adjustment panels keep the existing menu column and opener anchor;
+        // only their row spacing is compact. Information windows are unchanged.
+        if wide && live.is_some() {
+            let existing = geometry(w, h, page.items.len(), false)?;
+            g.rect.x = existing.rect.x;
+            g.rect.w = existing.rect.w;
+        }
+        if (!wide || live.is_some())
             && let Some(button) = opener
             && let Some(layout) = Layout::new(w, h)
             && let Some((_, anchor)) = layout.regions.iter().find(|(b, _)| *b == button)
@@ -235,7 +324,13 @@ fn show_sized(
                 g.header - 8,
                 &format!(
                     "{}{}",
-                    if depth > 1 { "‹  " } else { "" },
+                    if (depth > 1 || panel_back) && live.is_some() {
+                        "‹ Volver · "
+                    } else if depth > 1 {
+                        "‹  "
+                    } else {
+                        ""
+                    },
                     page.title.split('\t').next().unwrap_or_default()
                 ),
             );
@@ -320,14 +415,20 @@ fn show_sized(
                     .next()
                     .unwrap_or_default();
                 let second = lines.next();
+                let text_x = if item.swatch.is_some() { 62 } else { 28 };
+                let text_end = if item.controls.is_some() {
+                    inline_button(g.rect.w, g.row, 0).x - 8
+                } else {
+                    g.rect.w - 30
+                };
                 c.text_clipped(
-                    28,
+                    text_x,
                     y + if second.is_some() {
                         5
                     } else {
                         (g.row - g.font) / 2
                     },
-                    g.rect.w - 60,
+                    (text_end - text_x).max(1),
                     if second.is_some() {
                         g.row / 2
                     } else {
@@ -346,6 +447,40 @@ fn show_sized(
                 }
                 if item.checked {
                     c.text(8, y + 5, "✓");
+                }
+                if let Some([red, green, blue]) = item.swatch {
+                    c.rounded(
+                        Rect {
+                            x: 32,
+                            y: y + 5,
+                            w: 22,
+                            h: (g.row - 10).max(8),
+                        },
+                        3,
+                        [blue, green, red, 255],
+                    );
+                }
+                if let Some(buttons) = item.controls {
+                    for (slot, action) in buttons.iter().enumerate() {
+                        let mut rect = inline_button(g.rect.w, g.row, slot);
+                        rect.y += y;
+                        c.rounded(
+                            rect,
+                            4,
+                            if action.is_some() {
+                                [66, 60, 52, 255]
+                            } else {
+                                [40, 38, 34, 255]
+                            },
+                        );
+                        c.text_clipped(
+                            rect.x + 7,
+                            rect.y + (rect.h - g.font) / 2,
+                            rect.w - 10,
+                            rect.h,
+                            ["−", "+", "↺"][slot],
+                        );
+                    }
                 }
                 if !item.children.is_empty() {
                     c.text(g.rect.w - 23, y + 5, "›");
@@ -389,9 +524,12 @@ fn show_sized(
             }
             dirty = false;
             #[cfg(test)]
-            m.set("user-data/enigmax-popup-state",&serde_json::json!({"client":name,"w":w,"h":h,"mode":mode.code(),"x":g.rect.x,"y":g.rect.y,"width":g.rect.w,"height":g.rect.h,"header":g.header,"row":g.row,"visible":g.visible,"offset":page.offset,"depth":depth,"selected":page.selected,"ids":page.items.iter().map(|e|e.id).collect::<Vec<_>>(),"labels":page.items.iter().map(|e|&e.label).collect::<Vec<_>>(),"enabled":page.items.iter().map(|e|e.enabled).collect::<Vec<_>>()}).to_string())?;
+            m.set("user-data/enigmax-popup-state",&serde_json::json!({"client":name,"w":w,"h":h,"mode":mode.code(),"x":g.rect.x,"y":g.rect.y,"width":g.rect.w,"height":g.rect.h,"header":g.header,"row":g.row,"visible":g.visible,"offset":page.offset,"depth":depth,"selected":page.selected,"ids":page.items.iter().map(|e|e.id).collect::<Vec<_>>(),"labels":page.items.iter().map(|e|&e.label).collect::<Vec<_>>(),"enabled":page.items.iter().map(|e|e.enabled).collect::<Vec<_>>(),"checked":page.items.iter().map(|e|e.checked).collect::<Vec<_>>(),"controls":page.items.iter().map(|e|e.controls).collect::<Vec<_>>()}).to_string())?;
         }
-        if m.get("path") != source || track_identity(m) != tracks {
+        if m.get("path") != source
+            || track_identity(m) != tracks
+            || (live.is_some() && m.get("sid") != selected_subtitle)
+        {
             return Ok(0);
         }
         let Some(args) = (match input.next() {
@@ -413,19 +551,49 @@ fn show_sized(
         if kind == "close" {
             return Ok(0);
         }
+        if kind == "back" {
+            if pages.len() > 1 {
+                pages.pop();
+                dirty = true;
+            } else {
+                return Ok(if panel_back { BACK } else { 0 });
+            }
+            continue;
+        }
+        if matches!(kind, "left" | "right")
+            && live.is_some()
+            && let Some(buttons) = pages
+                .last()
+                .and_then(|p| p.selected.and_then(|i| p.items.get(i)))
+                .and_then(|e| e.controls)
+        {
+            if let Some(id) = buttons[usize::from(kind == "right")] {
+                finish_activation(&mut pages, id, &mut live)?;
+                dirty = true;
+            }
+            continue;
+        }
         if kind == "left" {
             if pages.len() > 1 {
                 pages.pop();
                 dirty = true;
             } else {
-                return Ok(0);
+                return Ok(if panel_back { BACK } else { 0 });
             }
             continue;
         }
         let page = pages.last_mut().ok_or("Menú vacío")?;
         if matches!(kind, "enter" | "right") {
+            if page
+                .selected
+                .and_then(|i| page.items.get(i))
+                .is_some_and(|e| e.controls.is_some())
+            {
+                continue;
+            }
             if let Some(index) = page.selected
                 && let Some(id) = activate(&mut pages, index)
+                && let Some(id) = finish_activation(&mut pages, id, &mut live)?
             {
                 return Ok(id);
             }
@@ -511,23 +679,50 @@ fn show_sized(
         if kind == "up" && mouse_down {
             mouse_down = false;
             if let Some(index) = index {
-                if let Some(id) = activate(&mut pages, index) {
+                let inline = pages
+                    .last()
+                    .and_then(|p| p.items.get(index))
+                    .and_then(|e| e.controls);
+                let chosen = if let Some(buttons) = inline {
+                    pages.last_mut().unwrap().selected = Some(index);
+                    point.and_then(|(x, y)| {
+                        buttons.iter().enumerate().find_map(|(slot, id)| {
+                            let mut r = inline_button(g.rect.w, g.row, slot);
+                            r.x += g.rect.x;
+                            r.y += g.rect.y
+                                + g.header
+                                + (index - pages.last().unwrap().offset) as i32 * g.row;
+                            r.contains(x, y).then_some(*id).flatten()
+                        })
+                    })
+                } else {
+                    activate(&mut pages, index)
+                };
+                if let Some(id) = chosen
+                    && let Some(id) = finish_activation(&mut pages, id, &mut live)?
+                {
                     return Ok(id);
                 }
                 dirty = true;
             } else if let Some((x, y)) = point {
                 if g.rect.contains(x, y)
                     && y < (g.rect.y + g.header) as f64
-                    && x < (g.rect.x + 40) as f64
-                    && pages.len() > 1
+                    && x < (g.rect.x + back_width) as f64
+                    && (pages.len() > 1 || panel_back)
                 {
-                    pages.pop();
-                    dirty = true;
+                    if pages.len() > 1 {
+                        pages.pop();
+                        dirty = true;
+                    } else {
+                        return Ok(BACK);
+                    }
                 } else {
                     if !g.rect.contains(x, y)
                         && let Some(hit) =
                             Layout::new(w, h).and_then(|l| l.hit(mode, values[2], values[3]))
                         && Some(hit) != opener
+                        && !(live.is_some()
+                            && hit == cineplayer_core::control_layout::Button::Subtitles)
                         && hit != cineplayer_core::control_layout::Button::Stereo
                     {
                         m.command(&[
@@ -563,6 +758,36 @@ fn track_identity(m: &Mpv) -> Vec<(String, u64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn live_child_check_marks_survive_back_and_reentry() {
+        let mut group = Entry::action(100, "Grupo".into());
+        group.children = vec![
+            Entry::action(1, "Uno".into()),
+            Entry::action(2, "Dos".into()),
+        ];
+        let mut pages = vec![Page::new(
+            "Ajustes".into(),
+            vec![Entry::action(99, "Otro".into()), group],
+        )];
+        assert_eq!(activate(&mut pages, 1), None);
+        let mut callback = |id| {
+            let mut entries = vec![
+                Entry::action(1, "Uno".into()),
+                Entry::action(2, "Dos".into()),
+            ];
+            entries[1].checked = id == 2;
+            Ok(entries)
+        };
+        assert_eq!(
+            finish_activation(&mut pages, 2, &mut Some(&mut callback)).unwrap(),
+            None
+        );
+        pages.pop();
+        assert_eq!(pages[0].selected, Some(1));
+        activate(&mut pages, 1);
+        assert!(pages[1].items[1].checked);
+        assert!(!pages[1].items[0].checked);
+    }
     use crate::{
         configure,
         controls::Controls,
@@ -608,32 +833,13 @@ mod tests {
         }
     }
     #[test]
-    fn subtitle_position_percentages_select_close_and_mark_the_actual_value() {
+    fn subtitle_position_percentages_apply_close_on_escape_and_mark_the_actual_value() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let temp = tempfile::tempdir().unwrap();
         let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
         configure(&m, true, root).unwrap();
         m.init().unwrap();
         wait_message(&mut m, "controls-ready");
-        let mut s = State::new(temp.path(), true);
-        player::load(
-            &m,
-            &mut s,
-            root.join("verificacion/muestras/ass3d-black.mkv")
-                .to_str()
-                .unwrap(),
-            None,
-        )
-        .unwrap();
-        let until = Instant::now() + Duration::from_secs(10);
-        loop {
-            if m.wait(0.02).id == 8 {
-                break;
-            }
-            assert!(Instant::now() < until);
-        }
-        s.pending_load = false;
-        player::apply(&m, &mut s).unwrap();
         m.command(&[
             "load-script",
             root.join("verificacion/tests/stereo_popup.lua")
@@ -643,34 +849,86 @@ mod tests {
         .unwrap();
         wait_message(&mut m, "popup-qa-ready");
         m.set("user-data/enigmax-toolbar-popup", "yes").unwrap();
-        for mode in ["mono", "sbs", "ou", "framepack", "anaglyph"] {
-            m.set("user-data/enigmax-projection", mode).unwrap();
-            for (i, position) in player::SUB_POSITIONS.iter().enumerate() {
-                let id = player::SUB_POSITION_FIRST + i as u32;
-                m.set("user-data/enigmax-popup-test",&serde_json::json!({"sequence":["Aspecto de subtítulos","Posición de subtítulos",id],"delay":0.02,"eye":1}).to_string()).unwrap();
-                let video = m.get("vf");
-                let audio = m.get("af");
-                let renderer = m.get("current-vo");
-                crate::choose_track(&m, &mut s, true).unwrap();
-                assert_eq!(s.prefs.sub_pos, *position, "{mode}/{position}");
-                assert_eq!(
-                    m.get("sub-pos").unwrap().parse::<f64>().unwrap(),
-                    *position as f64
-                );
-                let entries = crate::playback_features::subtitle_position_menu(&m)
-                    .unwrap()
-                    .entries()
-                    .unwrap();
-                assert_eq!(entries.len(), player::SUB_POSITIONS.len());
-                assert!(entries.iter().all(|e| e.enabled));
-                let checked: Vec<_> = entries.iter().filter(|e| e.checked).map(|e| e.id).collect();
-                assert_eq!(checked, vec![id]);
-                assert_eq!(m.get("vf"), video);
-                assert_eq!(m.get("af"), audio);
-                assert_eq!(m.get("current-vo"), renderer);
+        let mut s = State::new(temp.path(), true);
+        for (file, codec) in [
+            ("quality-pistas-qa.mkv", "subrip"),
+            ("quality-depth-qa-pgs.mkv", "hdmv_pgs_subtitle"),
+        ] {
+            player::load(
+                &m,
+                &mut s,
+                root.join("verificacion/muestras")
+                    .join(file)
+                    .to_str()
+                    .unwrap(),
+                None,
+            )
+            .unwrap();
+            let until = Instant::now() + Duration::from_secs(10);
+            loop {
+                if m.wait(0.02).id == 8 {
+                    break;
+                }
+                assert!(Instant::now() < until);
             }
+            s.pending_load = false;
+            let tracks: serde_json::Value =
+                serde_json::from_str(&m.get("track-list").unwrap()).unwrap();
+            let sid = tracks
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|v| v["codec"] == codec)
+                .unwrap()["id"]
+                .as_u64()
+                .unwrap();
+            m.set("sid", &sid.to_string()).unwrap();
+            while m.get("current-tracks/sub/codec").as_deref() != Some(codec) {
+                m.wait(0.02);
+                assert!(Instant::now() < until);
+            }
+            player::apply(&m, &mut s).unwrap();
+            for mode in ["mono", "sbs", "ou", "framepack", "anaglyph"] {
+                m.set("user-data/enigmax-projection", mode).unwrap();
+                for (i, position) in player::SUB_POSITIONS.iter().enumerate() {
+                    let id = player::SUB_POSITION_FIRST + i as u32;
+                    let mut sequence = vec![serde_json::json!(7140)];
+                    let mut current =
+                        m.get("sub-pos").unwrap().parse::<f64>().unwrap().round() as i32;
+                    while current != *position {
+                        current += if current < *position { 5 } else { -5 };
+                        sequence.push(serde_json::json!(
+                            player::SUB_POSITION_FIRST + ((current - 50) / 5) as u32
+                        ));
+                    }
+                    sequence.push(serde_json::json!("@escape"));
+                    m.set("user-data/enigmax-popup-test",&serde_json::json!({"sequence":sequence,"delay":0.02,"eye":1,"target":id,"file":file}).to_string()).unwrap();
+                    let before = (m.get("vf"), m.get("af"), m.get("current-vo"));
+                    crate::choose_track(&m, &mut s, true).unwrap();
+                    assert_eq!(s.prefs.sub_pos, *position, "{file}/{mode}/{position}");
+                    assert_eq!(
+                        m.get("sub-pos").unwrap().parse::<f64>().unwrap(),
+                        *position as f64
+                    );
+                    assert_eq!((m.get("vf"), m.get("af"), m.get("current-vo")), before);
+                    let entries = crate::playback_features::subtitle_position_menu(&m)
+                        .unwrap()
+                        .entries()
+                        .unwrap();
+                    assert_eq!(
+                        entries
+                            .iter()
+                            .filter(|e| e.checked)
+                            .map(|e| e.id)
+                            .collect::<Vec<_>>(),
+                        vec![id]
+                    );
+                }
+            }
+            println!("{codec}: 65 position selections in five projections passed");
         }
     }
+
     #[test]
     fn wrong_input_format_can_be_corrected_again_from_the_3d_button() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));

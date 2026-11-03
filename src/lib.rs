@@ -3,6 +3,7 @@ pub mod ass3d;
 pub mod color_info;
 pub mod control_layout;
 pub mod history;
+pub mod information;
 pub mod media;
 pub mod performance;
 pub mod playback;
