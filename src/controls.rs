@@ -318,6 +318,7 @@ impl Frame {
 pub enum Input {
     None,
     Menu,
+    Parallax,
     Options,
     Audio,
     Subtitles,
@@ -837,6 +838,7 @@ impl Controls {
                 Button::Back => texts.push((r.x, cy - l.panel / 10, "−10".into())),
                 Button::Forward => texts.push((r.x, cy - l.panel / 10, "+10".into())),
                 Button::Stereo => texts.push((r.x + r.w / 5, cy - l.panel / 10, "3D".into())),
+                Button::Parallax => texts.push((r.x + r.w / 8, cy - l.panel / 10, "↔".into())),
                 Button::Info => texts.push((r.x + r.w / 4, cy - l.panel / 10, "ⓘ".into())),
                 Button::Swap => texts.push((r.x + r.w / 5, cy - l.panel / 10, "⇄".into())),
                 Button::Audio => texts.push((
@@ -924,7 +926,8 @@ impl Controls {
             | Button::Chapters
             | Button::NextChapter
             | Button::Info
-            | Button::Swap),
+            | Button::Swap
+            | Button::Parallax),
         ) = hover
         {
             // A descriptive hint also explains compact A/S buttons in small windows.
@@ -933,6 +936,7 @@ impl Controls {
                 l.panel * 42 / 100,
                 match button {
                     Button::Info => "Información de audio y vídeo",
+                    Button::Parallax => "Paralaje / Convergencia",
                     Button::Swap => "Intercambiar ojos izquierdo / derecho",
                     Button::Audio => "Pista de audio",
                     Button::Subtitles => "Subtítulos",
@@ -1041,6 +1045,7 @@ impl Controls {
                         Button::Forward => m.seek(10.0, false)?,
                         Button::Mute => m.command_async(&["cycle", "mute"], 2)?,
                         Button::Fullscreen => m.command_async(&["cycle", "fullscreen"], 2)?,
+                        Button::Parallax => return Ok(Input::Parallax),
                         Button::Stereo => return Ok(Input::Menu),
                         Button::Info => return Ok(Input::Info),
                         Button::Swap => return Ok(Input::Swap),

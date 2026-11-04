@@ -9,14 +9,16 @@ typedef struct CineMenuItem {
     UINT position, type;
     ULONG_PTR data;
     wchar_t *label;
-    BOOL submenu;
+    BOOL submenu, back;
 } CineMenuItem;
 typedef struct {
     CineMenuItem *items;
     HWND host, owner;
     UINT_PTR watch;
     HMENU root;
-    HFONT normal, small;
+    HFONT normal, small, back_font;
+    HHOOK input_hook;
+    HMENU active;
     HBRUSH background;
     int dpi;
 } CineMenuTheme;
@@ -26,9 +28,30 @@ static CineMenuItem *m_item(ULONG_PTR data) {
     for(CineMenuItem *i=m_theme.items;i;i=i->next)if((ULONG_PTR)i==data)return i;
     return NULL;
 }
+#define CINE_MENU_BACK 0x7fff0103u
+// Local to this UI thread: translate a click on the large Back row into native
+// Left navigation. TrackPopupMenu remains open and keeps its cascade/focus.
+static LRESULT CALLBACK m_input(int code,WPARAM wp,LPARAM lp) {
+    if(code==MSGF_MENU) {
+        MSG *msg=(MSG*)lp;
+        if((msg->message==WM_LBUTTONDOWN || msg->message==WM_LBUTTONUP) &&
+           m_theme.active && m_theme.active!=m_theme.root) {
+            int pos=MenuItemFromPoint(m_theme.host,m_theme.active,msg->pt);
+            if(pos>=0 && GetMenuItemID(m_theme.active,pos)==CINE_MENU_BACK) {
+                if(msg->message==WM_LBUTTONUP)
+                    PostMessageW(m_theme.host,WM_KEYDOWN,VK_LEFT,0);
+                return 1;
+            }
+        }
+    }
+    return CallNextHookEx(m_theme.input_hook,code,wp,lp);
+}
 static LRESULT CALLBACK m_procedure(HWND window,UINT msg,WPARAM wp,LPARAM lp,
                                    UINT_PTR id,DWORD_PTR data) {
     (void)id;(void)data;
+    if(msg==WM_MENUSELECT && lp && HIWORD(wp)!=0xffff)
+        m_theme.active=(HMENU)lp;
+    if(msg==WM_INITMENUPOPUP)m_theme.active=(HMENU)wp;
     // The owner is mpv's window on another input queue. Do not retain a modal
     // menu after that window closes or after this host loses activation.
     if((msg==WM_ACTIVATE&&LOWORD(wp)==WA_INACTIVE)||msg==WM_CANCELMODE||
@@ -43,7 +66,7 @@ static LRESULT CALLBACK m_procedure(HWND window,UINT msg,WPARAM wp,LPARAM lp,
             RECT r={0};DrawTextW(dc,i->label,-1,&r,DT_CALCRECT|DT_NOPREFIX|DT_EXPANDTABS);
             SelectObject(dc,old);ReleaseDC(window,dc);
             mi->itemWidth=(UINT)min(m_px(580),max(m_px(220),r.right+m_px(66)));
-            mi->itemHeight=(UINT)m_px((i->type&MFT_SEPARATOR)?9:(wcschr(i->label,L'\n')?57:38));
+            mi->itemHeight=(UINT)m_px(i->back?52:(i->type&MFT_SEPARATOR)?9:(wcschr(i->label,L'\n')?57:38));
             return TRUE;
         }
     } else if(msg==WM_DRAWITEM) {
@@ -54,6 +77,10 @@ static LRESULT CALLBACK m_procedure(HWND window,UINT msg,WPARAM wp,LPARAM lp,
             BOOL disabled=(di->itemState&(ODS_DISABLED|ODS_GRAYED))!=0;
             BOOL selected=!disabled && (di->itemState&ODS_SELECTED);
             FillRect(dc,&r,m_theme.background);
+            if(i->back) {
+                RECT back=r;InflateRect(&back,-m_px(5),-m_px(4));
+                HBRUSH b=CreateSolidBrush(selected?RGB(73,88,88):RGB(47,62,63));FillRect(dc,&back,b);DeleteObject(b);
+            }
             if(i->type&MFT_SEPARATOR) {
                 RECT rule={r.left+m_px(12),(r.top+r.bottom)/2,r.right-m_px(12),(r.top+r.bottom)/2+1};
                 HBRUSH b=CreateSolidBrush(RGB(58,63,67));FillRect(dc,&rule,b);DeleteObject(b);return TRUE;
@@ -67,7 +94,7 @@ static LRESULT CALLBACK m_procedure(HWND window,UINT msg,WPARAM wp,LPARAM lp,
             }
             RECT label={r.left+m_px(32),r.top,r.right-m_px(30),r.bottom};
             const wchar_t *second=wcschr(i->label,L'\n');
-            HGDIOBJ old=SelectObject(dc,m_theme.normal);SetBkMode(dc,TRANSPARENT);
+            HGDIOBJ old=SelectObject(dc,i->back?m_theme.back_font:m_theme.normal);SetBkMode(dc,TRANSPARENT);
             SetTextColor(dc,disabled?RGB(161,170,174):RGB(237,240,242));
             if(second) {
                 label.top+=m_px(6);label.bottom=label.top+m_px(23);
@@ -96,6 +123,7 @@ static LRESULT CALLBACK m_procedure(HWND window,UINT msg,WPARAM wp,LPARAM lp,
 }
 static BOOL m_decorate(HMENU menu,int depth) {
     if(depth>16)return FALSE;
+    if(depth>0 && !InsertMenuW(menu,0,MF_BYPOSITION|MF_STRING,CINE_MENU_BACK,L"‹  Volver"))return FALSE;
     MENUINFO info={0};info.cbSize=sizeof(info);info.fMask=MIM_BACKGROUND;info.hbrBack=m_theme.background;
     SetMenuInfo(menu,&info);
     int count=GetMenuItemCount(menu);
@@ -106,6 +134,7 @@ static BOOL m_decorate(HMENU menu,int depth) {
         i->label=(wchar_t*)calloc((size_t)mi.cch+1,sizeof(wchar_t));
         if(!i->label){free(i);return FALSE;}
         i->menu=menu;i->position=(UINT)n;i->type=mi.fType;i->data=mi.dwItemData;i->submenu=mi.hSubMenu!=NULL;
+        i->back=depth>0 && n==0 && GetMenuItemID(menu,0)==CINE_MENU_BACK;
         HMENU child=mi.hSubMenu;
         mi.dwTypeData=i->label;mi.cch++;
         if(!GetMenuItemInfoW(menu,(UINT)n,TRUE,&mi)){free(i->label);free(i);return FALSE;}
@@ -127,7 +156,14 @@ static void m_reset_background(HMENU menu) {
         HMENU child=GetSubMenu(menu,n);if(child)m_reset_background(child);
     }
 }
+static void m_remove_back(HMENU menu) {
+    if(GetMenuItemID(menu,0)==CINE_MENU_BACK)DeleteMenu(menu,0,MF_BYPOSITION);
+    for(int n=0;n<GetMenuItemCount(menu);n++) {
+        HMENU child=GetSubMenu(menu,n);if(child)m_remove_back(child);
+    }
+}
 void cine_menu_end(void) {
+    if(m_theme.input_hook)UnhookWindowsHookEx(m_theme.input_hook);
     if(m_theme.watch)KillTimer(m_theme.host,m_theme.watch);
     if(m_theme.host)RemoveWindowSubclass(m_theme.host,m_procedure,1);
     if(m_theme.root)m_reset_background(m_theme.root);
@@ -138,7 +174,9 @@ void cine_menu_end(void) {
         MENUINFO info={0};info.cbSize=sizeof(info);info.fMask=MIM_BACKGROUND;SetMenuInfo(i->menu,&info);
         CineMenuItem *next=i->next;free(i->label);free(i);i=next;
     }
+    if(m_theme.root)m_remove_back(m_theme.root);
     if(m_theme.normal)DeleteObject(m_theme.normal);
+    if(m_theme.back_font)DeleteObject(m_theme.back_font);
     if(m_theme.small)DeleteObject(m_theme.small);
     if(m_theme.background)DeleteObject(m_theme.background);
     ZeroMemory(&m_theme,sizeof(m_theme));
@@ -151,9 +189,11 @@ void cine_menu_begin(HMENU menu,HWND host,HWND owner) {
     HIGHCONTRASTW hc={sizeof(hc),0,NULL};
     if(SystemParametersInfoW(SPI_GETHIGHCONTRAST,sizeof(hc),&hc,0) && (hc.dwFlags&HCF_HIGHCONTRASTON))return;
     m_theme.dpi=(int)GetDpiForWindow(owner);if(m_theme.dpi<96)m_theme.dpi=96;
-    m_theme.root=menu;
+    m_theme.root=menu;m_theme.active=menu;
     m_theme.normal=font(m_px(15),400);m_theme.small=font(m_px(12),400);
+    m_theme.back_font=font(m_px(18),600);
     m_theme.background=CreateSolidBrush(RGB(27,31,34));
-    if(!m_theme.normal || !m_theme.small || !m_theme.background || !m_decorate(menu,0)){cine_menu_end();return;}
+    if(!m_theme.normal || !m_theme.small || !m_theme.back_font || !m_theme.background || !m_decorate(menu,0)){cine_menu_end();return;}
+    m_theme.input_hook=SetWindowsHookExW(WH_MSGFILTER,m_input,NULL,GetCurrentThreadId());
     m_theme.host=host;
 }

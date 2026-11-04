@@ -75,6 +75,7 @@ pub fn choose(
                     emphasized: false,
                     controls: None,
                     swatch: None,
+                    slider: None,
                     checked: false,
                     children: vec![],
                 },
@@ -555,6 +556,7 @@ pub fn overlay_message(m: &crate::mpv::Mpv, text: &str, error: bool) {
                 emphasized: false,
                 controls: None,
                 swatch: None,
+                slider: None,
                 children: vec![],
             });
             if entries.len() >= 1000 {
@@ -661,6 +663,7 @@ impl Menu {
                     emphasized: false,
                     controls: None,
                     swatch: None,
+                    slider: None,
                     children: if child.is_null() {
                         vec![]
                     } else {

@@ -3,8 +3,8 @@
   "modules": [
     {
       "path": "libmpv-2.dll",
-      "bytes": 3767162,
-      "sha256": "8161e2bf9d1e764c2bc1e1164612f37823865d0064be94411a39380288c9a817",
+      "bytes": 3768646,
+      "sha256": "af23ecb87063eb4e4e4bcfa165c1fd9262948e7ce31aae96bce9f4ea3cd7722e",
       "imports": [
         "avcodec-63.dll",
         "avdevice-63.dll",
@@ -3434,8 +3434,8 @@
   "mpvLocalPatches": [
     {
       "path": "native/mpv-subtitle-stereo.patch",
-      "sha256": "101ef9e809cc6361ade1f795ec5d426b4b98bc8f3fa7932951d09967168e2809",
-      "description": "Per-eye subtitle geometry and depth; application bitmap overlays are not stereo-duplicated a second time"
+      "sha256": "77a8437b04bd22762f59bc142e1bf4d5dd0e0d753b0de693a9b71bf25a225893",
+      "description": "Per-eye subtitle geometry and Frame Packing projection; atomic live GPU parallax without decoder or track reloads"
     }
   ]
 }

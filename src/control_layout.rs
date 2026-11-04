@@ -34,6 +34,7 @@ pub enum Button {
     Forward,
     Mute,
     Stereo,
+    Parallax,
     Info,
     Swap,
     Audio,
@@ -167,6 +168,7 @@ impl Layout {
                 },
             ),
             (Button::Stereo, size * 6 / 5),
+            (Button::Parallax, size),
             (Button::Swap, size),
             (Button::Info, size),
         ] {

@@ -43,6 +43,8 @@ pub struct State {
     pub detection: Option<crate::detection::Worker>,
     detection_dirty: bool,
     pub prefs: Settings,
+    pub parallax: f32,
+    parallax_ready: bool,
     pub hdr_sdr: bool,
     pub passthrough: u8,
     pub device: String,
@@ -247,6 +249,8 @@ impl State {
             detection: crate::detection::Worker::new(dir),
             detection_dirty: false,
             prefs,
+            parallax: 0.0,
+            parallax_ready: false,
             hdr_sdr: false,
             passthrough: 0,
             device: String::new(),
@@ -301,6 +305,8 @@ impl State {
         self.dir.join(format!("config/media-{hash:016x}.ini"))
     }
     pub fn new_open(&mut self) {
+        self.parallax = 0.0;
+        self.parallax_ready = false;
         self.flush_history();
         self.last_remembered = false;
         self.startup_choice = false;
@@ -893,11 +899,9 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     // Ordinary subtitles can be projected after video presentation in native
     // SBS/OU, anamorphic and 2D. Keep gpu-next's HDR color management and avoid
     // a full-video intermediate. Only eye selection of authored ASS, anaglyph
-    // mixing and the frame-packing gap require fusion before the video shader.
-    let preblend = stereo_subs
-        && (ass.is_some()
-            || p.output == Output::Anaglyph
-            || (p.output == Output::Original && p.delivery == stereo::Delivery::FramePack));
+    // mixing require fusion before the video shader. Ordinary Frame Packing
+    // subtitles are projected at presentation resolution, outside its gap.
+    let preblend = stereo_subs && (ass.is_some() || p.output == Output::Anaglyph);
     let calibrated = p.left_gain != 1.0 || p.right_gain != 1.0 || p.crosstalk != 0.0;
     let cpu_compatibility =
         anaglyph && p.quality == Quality::Compatibility && !preblend && !calibrated;
@@ -925,7 +929,8 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     ]
     .map(|key| decoded[key].clone());
     let key = format!(
-        "{w}/{h}/{l:?}/{}/{}/{ass:?}/{canvas:?}/{}/{}/{}/{}/{}",
+        "{w}/{h}/{l:?}/{}/{}/{ass:?}/{canvas:?}/{}/{}/{}/{}/{}/{}",
+        s.parallax_ready,
         graph_prefs.encode(),
         s.hdr_sdr,
         s.generation,
@@ -947,7 +952,13 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     m.set(
         "cine-sub-layout",
         if stereo_subs && (preblend || p.output == Output::Original) {
-            if sub_horizontal { "1" } else { "2" }
+            if !preblend && p.delivery == stereo::Delivery::FramePack {
+                "3"
+            } else if sub_horizontal {
+                "1"
+            } else {
+                "2"
+            }
         } else {
             "0"
         },
@@ -955,20 +966,30 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     m.set("cine-sub-packed", if ass.is_some() { "yes" } else { "no" })?;
     // Ignore obsolete profile depth: retain authored ASS positions only.
     m.set("cine-sub-depth", "0")?;
+    m.set("cine-sub-parallax", if !preblend { "yes" } else { "no" })?;
+    let runtime_parallax = if l.packed()
+        && p.output != Output::Left
+        && p.output != Output::Right
+        && !cpu_compatibility
+    {
+        s.parallax
+    } else {
+        0.0
+    };
+    m.set("cine-video-parallax", &runtime_parallax.to_string())?;
     m.set(
         "cine-sub-par",
         &(if !preblend && p.delivery == stereo::Delivery::Anamorphic {
-            2.0
+            0.5
         } else {
-            aspect * eh as f64 / ew as f64
+            ew as f64 / (aspect * eh as f64)
         })
         .clamp(0.01, 100.0)
         .to_string(),
     )?;
     m.set("glsl-shaders", "")?;
     let raw_vf = s.raw.map(|i| i.metadata.filter()).unwrap_or_default();
-    m.set("vf", &raw_vf)?;
-    m.set("video-crop", "")?;
+    let mut desired_vf = raw_vf.clone();
     let renderer = if preblend { "gpu" } else { "gpu-next" };
     m.set("blend-subtitles", if preblend { "video" } else { "no" })?;
 
@@ -1000,9 +1021,27 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         aspect
     };
     let sub_par = if ass.is_some() {
+        // libass receives the inverse PAR of the final viewport even when
+        // blending onto the packed input before MAIN. Cancel that PAR using
+        // the selected output DAR, so the subsequent eye mapping transforms
+        // the authored canvas exactly once, together with the video.
+        let output_aspect = if p.output == Output::Original {
+            match p.delivery {
+                stereo::Delivery::Anamorphic => 16.0 / 9.0,
+                stereo::Delivery::FullSbs => 32.0 / 9.0,
+                stereo::Delivery::FramePack => 1920.0 / 2205.0,
+                stereo::Delivery::Native => viewport_aspect,
+            }
+        } else {
+            aspect
+        };
         canvas
-            .map(|c| viewport_aspect * c.height / c.width)
+            .map(|c| output_aspect * c.height / c.width)
             .ok_or("Falta el lienzo ASS")?
+    } else if stereo_subs {
+        // Ordinary ASS belongs to one logical eye. The packed video's PAR
+        // must not be applied a second time by libass after cine-sub-par.
+        1.0
     } else {
         0.0
     };
@@ -1087,31 +1126,36 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
             } else {
                 "format=fmt=rgb24"
             };
-            m.set(
-                "vf",
-                &format!(
-                    "{}{download},lavfi=[{color}setsar=1,stereo3d={input}:{},setsar={:.12}]",
-                    if raw_vf.is_empty() {
-                        String::new()
-                    } else {
-                        format!("{raw_vf},")
-                    },
-                    stereo::cpu_output(p.glasses, p.algorithm),
-                    aspect * eh as f64 / ew as f64
-                ),
-            )?;
+            desired_vf = format!(
+                "{}{download},lavfi=[{color}setsar=1,stereo3d={input}:{},setsar={:.12}]",
+                if raw_vf.is_empty() {
+                    String::new()
+                } else {
+                    format!("{raw_vf},")
+                },
+                stereo::cpu_output(p.glasses, p.algorithm),
+                aspect * eh as f64 / ew as f64
+            );
             s.pipeline = "Anaglifo CPU de compatibilidad · RGB 8 bits".into();
         } else {
             if hdr {
                 m.set("hwdec", "auto-copy")?;
-                m.set("vf",&format!("{}lavfi=[zscale=t=linear:npl=100,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=p=bt709:t=iec61966-2-1:m=bt709:r=limited,format=yuv420p10le]",if raw_vf.is_empty(){String::new()}else{format!("{raw_vf},")}))?;
+                desired_vf = format!(
+                    "{}lavfi=[zscale=t=linear:npl=100,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=p=bt709:t=iec61966-2-1:m=bt709:r=limited,format=yuv420p10le]",
+                    if raw_vf.is_empty() {
+                        String::new()
+                    } else {
+                        format!("{raw_vf},")
+                    }
+                );
                 s.pipeline = "HDR → SDR por CPU; composición anaglifa GPU".into();
             } else {
                 m.set("hwdec", "auto")?;
             }
-            let path = s
-                .shaders
-                .path(&s.dir, stereo::shader(p, l, hdr || gamma == "srgb")?)?;
+            let path = s.shaders.path(
+                &s.dir,
+                stereo::dynamic_shader(stereo::shader(p, l, hdr || gamma == "srgb")?, !preblend),
+            )?;
             m.command(&[
                 "change-list",
                 "glsl-shaders",
@@ -1123,7 +1167,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     } else if l.packed() && matches!(p.output, Output::Left | Output::Right) {
         m.set("hwdec", "auto")?;
         let second = (p.output == Output::Right) ^ p.swap;
-        if preblend {
+        {
             let path = s
                 .shaders
                 .path(&s.dir, crate::subtitles::eye_shader(l.horizontal(), second))?;
@@ -1134,32 +1178,23 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
                 path.to_str().ok_or("Ruta de shader inválida")?,
             ])?;
             m.set("video-aspect-override", &format!("{aspect:.12}"))?;
-        } else {
-            let (x, y) = if second {
-                if l.horizontal() { (ew, 0) } else { (0, eh) }
-            } else {
-                (0, 0)
-            };
-            m.set(
-                "video-aspect-override",
-                &format!(
-                    "{:.12}",
-                    aspect * (w as f64 / ew as f64) / (h as f64 / eh as f64)
-                ),
-            )?;
-            m.set("video-crop", &format!("{ew}x{eh}+{x}+{y}"))?;
         }
     } else {
         m.set("hwdec", "auto")?;
         if l.packed()
             && p.output == Output::Original
-            && (p.swap
+            && (s.parallax_ready
+                || p.swap
                 || p.delivery == stereo::Delivery::FramePack
                 || (!l.horizontal() && p.delivery != stereo::Delivery::Native))
         {
-            let path = s
-                .shaders
-                .path(&s.dir, stereo::packed_shader(l, p.delivery, p.swap, aspect))?;
+            let path = s.shaders.path(
+                &s.dir,
+                stereo::dynamic_shader(
+                    stereo::packed_shader(l, p.delivery, p.swap, aspect),
+                    !preblend,
+                ),
+            )?;
             m.command(&[
                 "change-list",
                 "glsl-shaders",
@@ -1190,7 +1225,19 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     s.quality_status(anaglyph, preblend, calibrated);
     // Clear only the decoded-frame layout tag: the application already
     // performs the actual projection, and mpv must not duplicate its OSD.
-    m.command(&["vf", "add", "@enigmax_layout:format=stereo-in=mono"])?;
+    if !desired_vf.is_empty() {
+        desired_vf.push(',');
+    }
+    desired_vf.push_str("@enigmax_layout:format=stereo-in=mono");
+    // A GPU eye/crop change needs no decoder filter reinitialization. Install
+    // the complete graph once only when it changes; never clear then append
+    // the identical layout filter on every mode selection.
+    if m.get("vf").as_deref() != Some(desired_vf.as_str()) {
+        m.set("vf", &desired_vf)?;
+    }
+    if m.get("video-crop").as_deref() != Some("") {
+        m.set("video-crop", "")?;
+    }
     s.applied = Some(key);
     Ok(())
 }
@@ -1276,7 +1323,8 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
     }
     root.separator();
     root.submenu("Formato 3D de entrada", layout_menu(s)?)?;
-    root.submenu("Avanzado", advanced_menu(s)?)?;
+    root.item(1550, "Paralaje / Convergencia…", false)?;
+    append_stereo_controls(&root, s)?;
     let profiles = windows::Menu::new()?;
     for (id, label) in [
         (1080, "Guardar como predeterminado"),
@@ -1289,8 +1337,7 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
     root.submenu("Ajustes guardados", profiles)?;
     Ok(root)
 }
-fn advanced_menu(s: &State) -> Result<windows::Menu, String> {
-    let advanced = windows::Menu::new()?;
+fn append_stereo_controls(advanced: &windows::Menu, s: &State) -> Result<(), String> {
     let eye = windows::Menu::new()?;
     eye.item(1021, "Izquierdo (habitual)", s.prefs.output == Output::Left)?;
     eye.item(1022, "Derecho", s.prefs.output == Output::Right)?;
@@ -1309,7 +1356,7 @@ fn advanced_menu(s: &State) -> Result<windows::Menu, String> {
     subs.separator();
     subs.item(1104, "Información de detección ASS", false)?;
     advanced.submenu("Subtítulos 3D", subs)?;
-    Ok(advanced)
+    Ok(())
 }
 fn calibration_entries(
     settings: &Settings,
@@ -1385,7 +1432,7 @@ fn calibration_editor(m: &Mpv, s: &mut State, control: u32) -> Result<(), String
         if result != crate::popup::BACK {
             return Ok(());
         }
-        let selected = advanced_menu(s)?.show_titled(m, "Avanzado")?;
+        let selected = stereo_menu(m, s)?.show_titled(m, "Vídeo 3D")?;
         if selected == 0 {
             return Ok(());
         }
@@ -1393,6 +1440,97 @@ fn calibration_editor(m: &Mpv, s: &mut State, control: u32) -> Result<(), String
             continue;
         }
         return action(m, s, selected);
+    }
+}
+pub fn parallax_supported(m: &Mpv, s: &State) -> bool {
+    s.effective(m).packed()
+        && matches!(s.prefs.output, Output::Original | Output::Anaglyph)
+        && !(s.prefs.output == Output::Anaglyph
+            && s.prefs.quality == Quality::Compatibility
+            && m.get("blend-subtitles").as_deref() != Some("video")
+            && s.prefs.left_gain == 1.0
+            && s.prefs.right_gain == 1.0
+            && s.prefs.crosstalk == 0.0)
+}
+fn parallax_entries(value: f32) -> Vec<crate::popup::Entry> {
+    let index = ((value * 1000.0).round() as i32 + 20).clamp(0, 40) as u32;
+    let mut number =
+        crate::popup::Entry::action(1551, format!("Paralaje: {:+.1} %", value * 100.0));
+    number.controls = Some([
+        index.checked_sub(1).map(|i| 16000 + i),
+        (index < 40).then_some(16001 + index),
+        Some(16020),
+    ]);
+    let mut slider = crate::popup::Entry::action(1552, String::new());
+    slider.slider = Some(crate::popup::Slider {
+        first: 16000,
+        steps: 40,
+        index,
+    });
+    vec![number, slider]
+}
+pub fn set_parallax(m: &Mpv, s: &mut State, value: f32) -> Result<(), String> {
+    if !value.is_finite() || value.abs() > 0.02000001 {
+        return Err("Paralaje fuera de rango".into());
+    }
+    if !parallax_supported(m, s) {
+        return Err(
+            "Paralaje disponible en salidas 3D compatibles; no se cambia el perfil Compatibilidad"
+                .into(),
+        );
+    }
+    if !s.parallax_ready {
+        // Prepare one stable shader once, never per drag event.
+        s.parallax_ready = true;
+        s.applied = None;
+        apply(m, s)?;
+    }
+    m.set("cine-video-parallax", &value.to_string())?;
+    s.parallax = value;
+    Ok(())
+}
+fn parallax_editor(m: &Mpv, s: &mut State) -> Result<(), String> {
+    if !parallax_supported(m, s) {
+        windows::message(
+            "Paralaje disponible en salidas 3D. En anaglifo con perfil Compatibilidad permanece desactivado.",
+            false,
+        );
+        return Ok(());
+    }
+    loop {
+        set_parallax(m, s, s.parallax)?;
+        let editor_source = m.get("path");
+        let result = crate::popup::show_live_panel(
+            m,
+            "Paralaje / Convergencia",
+            parallax_entries(s.parallax),
+            &mut |id| {
+                let index = id
+                    .checked_sub(16000)
+                    .filter(|i| *i <= 40)
+                    .ok_or("Valor de paralaje inválido")?;
+                set_parallax(m, s, (index as f32 - 20.0) / 1000.0)?;
+                Ok(parallax_entries(s.parallax))
+            },
+        );
+        if m.get("path") != editor_source {
+            let _ = result?;
+            return Ok(());
+        }
+        // The editor can be prewarmed at zero; remove that extra pass on closing.
+        if s.parallax == 0.0 {
+            s.parallax_ready = false;
+            s.applied = None;
+            apply(m, s)?;
+        }
+        if result? != crate::popup::BACK {
+            return Ok(());
+        }
+        match stereo_menu(m, s)?.show_titled(m, "Vídeo 3D")? {
+            0 => return Ok(()),
+            1550 => continue,
+            id => return action(m, s, id),
+        }
     }
 }
 fn calibration_panel_entries(p: &Settings) -> Result<Vec<crate::popup::Entry>, String> {
@@ -1808,6 +1946,7 @@ fn action_impl(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
                 ])?;
             }
         }
+        1550 => return parallax_editor(m, s),
         1062 | 1064 | 1066 => return calibration_editor(m, s, id),
         1068 => {
             s.prefs.left_gain = 1.0;

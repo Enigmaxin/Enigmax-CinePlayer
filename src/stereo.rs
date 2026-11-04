@@ -466,6 +466,18 @@ pub fn cpu_output(g: Glasses, a: Algorithm) -> &'static str {
     }
 }
 
+/// Stable float parameter: the native bridge supplies it without render options.
+pub const PARALLAX_PARAMETER: &str =
+    "//!PARAM cine_parallax\n//!TYPE float\n//!MINIMUM -0.02\n//!MAXIMUM 0.02\n0.0\n";
+pub fn dynamic_shader(source: String, gpu_next: bool) -> String {
+    let header = if gpu_next {
+        PARALLAX_PARAMETER.replace("TYPE float", "TYPE DYNAMIC float")
+    } else {
+        PARALLAX_PARAMETER.to_owned()
+    };
+    header + &source
+}
+
 pub fn shader(s: &Settings, layout: Layout, srgb: bool) -> Result<String, String> {
     s.validate()?;
     if !layout.packed() {
@@ -494,7 +506,13 @@ pub fn shader(s: &Settings, layout: Layout, srgb: bool) -> Result<String, String
     if s.swap {
         out.push_str("vec2 t=a;a=b;b=t;\n");
     }
-    writeln!(out,"vec3 l=lin(HOOKED_tex(a).rgb)*{:.7};vec3 r=lin(HOOKED_tex(b).rgb)*{:.7};vec3 ol=l;l=max(l-r*{:.7},0.0);r=max(r-ol*{:.7},0.0);",s.left_gain,s.right_gain,s.crosstalk,s.crosstalk).unwrap();
+    if layout.horizontal() {
+        let (lo_l, lo_r) = if s.swap { (0.5, 0.0) } else { (0.0, 0.5) };
+        writeln!(out, "a.x-=cine_parallax*0.25;b.x+=cine_parallax*0.25;bool vl=a.x>={lo_l}&&a.x<{};bool vr=b.x>={lo_r}&&b.x<{};", lo_l+0.5, lo_r+0.5).unwrap();
+    } else {
+        out.push_str("a.x-=cine_parallax*0.5;b.x+=cine_parallax*0.5;bool vl=a.x>=0.0&&a.x<=1.0;bool vr=b.x>=0.0&&b.x<=1.0;\n");
+    }
+    writeln!(out,"vec3 l=(vl?lin(HOOKED_tex(a).rgb):vec3(0.0))*{:.7};vec3 r=(vr?lin(HOOKED_tex(b).rgb):vec3(0.0))*{:.7};vec3 ol=l;l=max(l-r*{:.7},0.0);r=max(r-ol*{:.7},0.0);",s.left_gain,s.right_gain,s.crosstalk,s.crosstalk).unwrap();
     let m = matrix(s.glasses, s.algorithm);
     out.push_str("vec3 v;\n");
     for (i, channel) in ["r", "g", "b"].iter().enumerate() {
@@ -684,7 +702,7 @@ pub fn packed_shader(layout: Layout, delivery: Delivery, swap: bool, aspect: f64
         "vec2(1.0, 0.5)"
     };
     format!(
-        "//!DESC Enigmax packed stereo output\n//!HOOK MAIN\n//!BIND HOOKED\n//!WIDTH {width}\n//!HEIGHT {height}\nvec4 hook() {{ vec2 uv = HOOKED_pos; float eye = step(0.5, uv.{axis}); uv.{axis} = uv.{axis} * 2.0 - eye; eye = {eye}; uv=(uv-0.5)/vec2({fit_w:.12},{fit_h:.12})+0.5; if(any(lessThan(uv,vec2(0.0))) || any(greaterThan(uv,vec2(1.0)))) return vec4(0.0,0.0,0.0,1.0); vec2 lo = {bounds}; return HOOKED_tex(clamp({input}, lo + HOOKED_pt * 0.5, lo + {span} - HOOKED_pt * 0.5)); }}\n"
+        "//!DESC Enigmax packed stereo output\n//!HOOK MAIN\n//!BIND HOOKED\n//!WIDTH {width}\n//!HEIGHT {height}\nvec4 hook() {{ vec2 uv = HOOKED_pos; float eye = step(0.5, uv.{axis}); uv.{axis} = uv.{axis} * 2.0 - eye; float slot=eye; eye = {eye}; uv.x+=(slot<0.5?-0.5:0.5)*cine_parallax; uv=(uv-0.5)/vec2({fit_w:.12},{fit_h:.12})+0.5; if(any(lessThan(uv,vec2(0.0))) || any(greaterThan(uv,vec2(1.0)))) return vec4(0.0,0.0,0.0,1.0); vec2 lo = {bounds}; return HOOKED_tex(clamp({input}, lo + HOOKED_pt * 0.5, lo + {span} - HOOKED_pt * 0.5)); }}\n"
     )
 }
 /// 1080p frame-packing canvas only: never changes HDMI timing or signaling.
@@ -705,7 +723,7 @@ fn framepack_shader(layout: Layout, swap: bool, aspect: f64) -> String {
         )
     };
     format!(
-        "//!DESC Enigmax Frame Packing 1920x2205\n//!HOOK MAIN\n//!BIND HOOKED\n//!WIDTH 1920\n//!HEIGHT 2205\nvec4 hook(){{float y=HOOKED_pos.y*2205.0;if(y>=1080.0&&y<1125.0)return vec4(0.0,0.0,0.0,1.0);float eye=step(1125.0,y);vec2 uv=vec2(HOOKED_pos.x,(y-eye*1125.0)/1080.0);eye={eye};uv=(uv-0.5)/vec2({fit_w:.12},{fit_h:.12})+0.5;if(any(lessThan(uv,vec2(0.0)))||any(greaterThan(uv,vec2(1.0))))return vec4(0.0,0.0,0.0,1.0);vec2 lo={bounds};return HOOKED_tex(clamp({input},lo+HOOKED_pt*0.5,lo+{span}-HOOKED_pt*0.5));}}\n"
+        "//!DESC Enigmax Frame Packing 1920x2205\n//!HOOK MAIN\n//!BIND HOOKED\n//!WIDTH 1920\n//!HEIGHT 2205\nvec4 hook(){{float y=HOOKED_pos.y*2205.0;if(y>=1080.0&&y<1125.0)return vec4(0.0,0.0,0.0,1.0);float eye=step(1125.0,y);vec2 uv=vec2(HOOKED_pos.x,(y-eye*1125.0)/1080.0);float slot=eye;eye={eye};uv.x+=(slot<0.5?-0.5:0.5)*cine_parallax;uv=(uv-0.5)/vec2({fit_w:.12},{fit_h:.12})+0.5;if(any(lessThan(uv,vec2(0.0)))||any(greaterThan(uv,vec2(1.0))))return vec4(0.0,0.0,0.0,1.0);vec2 lo={bounds};return HOOKED_tex(clamp({input},lo+HOOKED_pt*0.5,lo+{span}-HOOKED_pt*0.5));}}\n"
     )
 }
 /// Fit the reconstructed eye in a logical 16:9 canvas before anamorphic stretching.

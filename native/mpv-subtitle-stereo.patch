@@ -1,19 +1,39 @@
+diff --git a/common/global.h b/common/global.h
+index 6cdbea5..6fcfd8a 100644
+--- a/common/global.h
++++ b/common/global.h
+@@ -1,10 +1,14 @@
+ #ifndef MPV_MPV_H
+ #define MPV_MPV_H
+ 
++#include <stdatomic.h>
++
+ // This should be accessed by glue code only, never normal code.
+ // The only purpose of this is to make mpv library-safe.
+ // Think hard before adding new members.
+ struct mpv_global {
++    // Per-instance signed total eye separation in millionths of one eye.
++    atomic_int cine_parallax;
+     struct mp_log *log;
+     struct m_config_shadow *config;
+     struct mp_client_api *client_api;
 diff --git a/options/options.c b/options/options.c
-index 68e121d..15885f1 100644
+index 68e121d..bd28d9e 100644
 --- a/options/options.c
 +++ b/options/options.c
-@@ -421,6 +421,10 @@ const struct m_sub_options mp_subtitle_shared_sub_opts = {
+@@ -421,6 +421,11 @@ const struct m_sub_options mp_subtitle_shared_sub_opts = {
  
  const struct m_sub_options mp_osd_render_sub_opts = {
      .opts = (const struct m_option[]){
-+        {"cine-sub-layout", OPT_INT(cine_sub_layout), M_RANGE(0, 2)},
++        {"cine-sub-layout", OPT_INT(cine_sub_layout), M_RANGE(0, 3)},
 +        {"cine-sub-packed", OPT_BOOL(cine_sub_packed)},
 +        {"cine-sub-depth", OPT_FLOAT(cine_sub_depth), M_RANGE(-0.1, 0.1)},
 +        {"cine-sub-par", OPT_FLOAT(cine_sub_par), M_RANGE(0.01, 100)},
++        {"cine-sub-parallax", OPT_BOOL(cine_sub_parallax)},
          {"osd", OPT_SUBSTRUCT(osd_style, osd_style_conf)},
          {"osd-bar", OPT_SUBSTRUCT(osd_bar_style, osd_bar_style_conf)},
          {"osd-scale", OPT_FLOAT(osd_scale), M_RANGE(0, 100)},
-@@ -437,6 +441,7 @@ const struct m_sub_options mp_osd_render_sub_opts = {
+@@ -437,6 +442,7 @@ const struct m_sub_options mp_osd_render_sub_opts = {
      .size = sizeof(OPT_BASE_STRUCT),
      .defaults = &(OPT_BASE_STRUCT){
          .osd_scale = 1,
@@ -22,10 +42,10 @@ index 68e121d..15885f1 100644
          .osd_selected_color = {250, 189, 47, 255},
          .osd_selected_outline_color = {0, 0, 0, 255},
 diff --git a/options/options.h b/options/options.h
-index 1f8e7cb..3d74bb4 100644
+index 1f8e7cb..41f2bd1 100644
 --- a/options/options.h
 +++ b/options/options.h
-@@ -146,6 +146,11 @@ struct mp_subtitle_shared_opts {
+@@ -146,6 +146,12 @@ struct mp_subtitle_shared_opts {
  };
  
  struct mp_osd_render_opts {
@@ -34,11 +54,71 @@ index 1f8e7cb..3d74bb4 100644
 +    bool cine_sub_packed;
 +    float cine_sub_depth;
 +    float cine_sub_par;
++    bool cine_sub_parallax;
      float osd_scale;
      bool osd_scale_by_window;
      struct m_color osd_selected_color;
+diff --git a/player/command.c b/player/command.c
+index 966cce3..829155c 100644
+--- a/player/command.c
++++ b/player/command.c
+@@ -40,6 +40,7 @@
+ #include "clipboard/clipboard.h"
+ #include "external_files.h"
+ #include "common/av_common.h"
++#include "common/global.h"
+ #include "common/codecs.h"
+ #include "common/msg.h"
+ #include "common/msg_control.h"
+@@ -512,6 +513,26 @@ static int mp_property_display_sync_active(void *ctx, struct m_property *prop,
+     return m_property_bool_ro(action, arg, mpctx->display_sync_active);
+ }
+ 
++// Unlike a render option, this value never reconfigures the VO/decoder.
++static int mp_property_cine_parallax(void *ctx, struct m_property *prop,
++                                     int action, void *arg)
++{
++    MPContext *mpctx = ctx;
++    if (action == M_PROPERTY_SET) {
++        double v = *(double *)arg;
++        if (!isfinite(v) || fabs(v) > 0.02000001)
++            return M_PROPERTY_ERROR;
++        atomic_store_explicit(&mpctx->global->cine_parallax,
++                              (int)llround(v * 1000000), memory_order_relaxed);
++        if (mpctx->video_out)
++            vo_redraw(mpctx->video_out);
++        return M_PROPERTY_OK;
++    }
++    return m_property_double_ro(action, arg,
++        atomic_load_explicit(&mpctx->global->cine_parallax,
++                             memory_order_relaxed) / 1000000.0);
++}
++
+ static int mp_property_pid(void *ctx, struct m_property *prop,
+                            int action, void *arg)
+ {
+@@ -4904,6 +4925,7 @@ static const struct m_property mp_properties_base[] = {
+     {"menu-data", mp_property_mdata, .is_noisy = true},
+     {"default-menu", mp_property_default_menu},
+ 
++    {"cine-video-parallax", mp_property_cine_parallax},
+     {"user-data", mp_property_udata},
+     {"term-size", mp_property_term_size},
+ 
+diff --git a/player/main.c b/player/main.c
+index 2fbb19d..a8f3d3a 100644
+--- a/player/main.c
++++ b/player/main.c
+@@ -289,6 +289,7 @@ struct MPContext *mp_create(void)
+     mp_mutex_init(&mpctx->abort_lock);
+ 
+     mpctx->global = talloc_zero(mpctx, struct mpv_global);
++    atomic_init(&mpctx->global->cine_parallax, 0);
+ 
+     demux_packet_pool_init(mpctx->global);
+     stats_global_init(mpctx->global);
 diff --git a/sub/osd.c b/sub/osd.c
-index 0a073bd..bed108e 100644
+index 0a073bd..eae944b 100644
 --- a/sub/osd.c
 +++ b/sub/osd.c
 @@ -18,6 +18,7 @@
@@ -49,7 +129,7 @@ index 0a073bd..bed108e 100644
  
  #include <libavutil/common.h>
  
-@@ -358,6 +359,68 @@ static struct sub_bitmaps *render_object(struct osd_state *osd,
+@@ -358,6 +359,93 @@ static struct sub_bitmaps *render_object(struct osd_state *osd,
      return res;
  }
  
@@ -78,9 +158,24 @@ index 0a073bd..bed108e 100644
 +    return b->w > 0 && b->h > 0;
 +}
 +
++// Physical post-video eye rectangles, excluding the 45-line packing gap.
++static struct mp_rect cine_framepack_eye(struct mp_osd_res full, int eye)
++{
++    int cw = MPMAX(1, full.w - full.ml - full.mr);
++    int ch = MPMAX(1, full.h - full.mt - full.mb);
++    double scale = MPMIN(cw / 1920.0, ch / 2205.0);
++    int w = MPMAX(1, lrint(1920 * scale));
++    int h = MPMAX(1, lrint(1080 * scale));
++    int x = full.ml + (cw - w) / 2;
++    int y = full.mt + (ch - lrint(2205 * scale)) / 2 +
++            lrint(eye * 1125 * scale);
++    return (struct mp_rect){x, y, x + w, y + h};
++}
++
 +static void cine_project_subs(struct sub_bitmaps *imgs,
 +                              struct mp_osd_res full,
-+                              const struct mp_osd_render_opts *opts)
++                              const struct mp_osd_render_opts *opts,
++                              int parallax)
 +{
 +    if (!imgs || !opts->cine_sub_layout || imgs->num_parts <= 0 ||
 +        imgs->num_parts > 100000 ||
@@ -95,7 +190,17 @@ index 0a073bd..bed108e 100644
 +    for (int eye = 0; eye < 2; eye++) {
 +        int ox = horizontal ? eye * ew : 0;
 +        int oy = horizontal ? 0 : eye * eh;
-+        int shift = lrintf(opts->cine_sub_depth * ew) * (eye ? -1 : 1);
++        if (opts->cine_sub_layout == 3) {
++            struct mp_rect r = cine_framepack_eye(full, eye);
++            ox = r.x0; oy = r.y0;
++            ew = mp_rect_w(r); eh = mp_rect_h(r);
++        }
++        float depth = opts->cine_sub_depth +
++                      (opts->cine_sub_parallax ? parallax / 2000000.0f : 0);
++        int content_width = (full.w - full.ml - full.mr) / (horizontal ? 2 : 1);
++        if (opts->cine_sub_layout == 3)
++            content_width = ew;
++        int shift = lrintf(depth * content_width) * (eye ? -1 : 1);
 +        for (int i = 0; i < imgs->num_parts; i++) {
 +            struct sub_bitmap b = imgs->parts[i];
 +            if (!opts->cine_sub_packed) {
@@ -118,14 +223,17 @@ index 0a073bd..bed108e 100644
  // Render OSD to a list of bitmap and return it. The returned object is
  // refcounted. Typically you should hold it only for a short time, and then
  // release it.
-@@ -370,6 +433,18 @@ struct sub_bitmap_list *osd_render(struct osd_state *osd, struct mp_osd_res res,
+@@ -370,6 +458,21 @@ struct sub_bitmap_list *osd_render(struct osd_state *osd, struct mp_osd_res res,
  
      int64_t start_time = mp_time_ns();
  
-+    if (osd->cine_sub_layout != osd->opts->cine_sub_layout ||
++    int parallax = atomic_load_explicit(&osd->global->cine_parallax, memory_order_relaxed);
++    if (osd->cine_parallax_seen != parallax ||
++        osd->cine_sub_layout != osd->opts->cine_sub_layout ||
 +        osd->cine_sub_packed != osd->opts->cine_sub_packed ||
 +        osd->cine_sub_depth != osd->opts->cine_sub_depth ||
 +        osd->cine_sub_par != osd->opts->cine_sub_par) {
++        osd->cine_parallax_seen = parallax;
 +        osd->cine_sub_layout = osd->opts->cine_sub_layout;
 +        osd->cine_sub_packed = osd->opts->cine_sub_packed;
 +        osd->cine_sub_depth = osd->opts->cine_sub_depth;
@@ -137,29 +245,36 @@ index 0a073bd..bed108e 100644
      struct sub_bitmap_list *list = talloc_zero(NULL, struct sub_bitmap_list);
      list->change_id = 1;
      list->w = res.w;
-@@ -397,8 +472,20 @@ struct sub_bitmap_list *osd_render(struct osd_state *osd, struct mp_osd_res res,
+@@ -397,8 +500,27 @@ struct sub_bitmap_list *osd_render(struct osd_state *osd, struct mp_osd_res res,
          char *stat_type_render = obj->is_sub ? "sub-render" : "osd-render";
          stats_time_start(osd->stats, stat_type_render);
  
 +        struct mp_osd_res subres = res;
 +        if (obj->is_sub && osd->opts->cine_sub_layout &&
 +            !osd->opts->cine_sub_packed) {
++            if (osd->opts->cine_sub_layout == 3) {
++                struct mp_rect r = cine_framepack_eye(res, 0);
++                subres = (struct mp_osd_res){
++                    .w = mp_rect_w(r), .h = mp_rect_h(r), .display_par = 1,
++                };
++            } else {
 +            int dx = osd->opts->cine_sub_layout == 1 ? 2 : 1;
 +            int dy = osd->opts->cine_sub_layout == 2 ? 2 : 1;
 +            subres.w /= dx; subres.h /= dy;
 +            subres.ml /= dx; subres.mr /= dx;
 +            subres.mt /= dy; subres.mb /= dy;
 +            subres.display_par = osd->opts->cine_sub_par;
++            }
 +        }
          struct sub_bitmaps *imgs =
 -            render_object(osd, obj, res, video_pts, formats);
 +            render_object(osd, obj, subres, video_pts, formats);
 +        if (obj->is_sub)
-+            cine_project_subs(imgs, res, osd->opts);
++            cine_project_subs(imgs, res, osd->opts, parallax);
  
          stats_time_end(osd->stats, stat_type_render);
  
-@@ -604,3 +691,8 @@ struct sub_bitmaps *sub_bitmaps_copy(struct sub_bitmap_copy_cache **p_cache,
+@@ -604,3 +726,8 @@ struct sub_bitmaps *sub_bitmaps_copy(struct sub_bitmap_copy_cache **p_cache,
  
      return res;
  }
@@ -181,13 +296,14 @@ index b62836e..d4e59bd 100644
 +
  #endif /* MPLAYER_SUB_H */
 diff --git a/sub/osd_state.h b/sub/osd_state.h
-index 57bd565..395b0e4 100644
+index 57bd565..b9a2010 100644
 --- a/sub/osd_state.h
 +++ b/sub/osd_state.h
-@@ -68,6 +68,10 @@ struct osd_external {
+@@ -68,6 +68,11 @@ struct osd_external {
  };
  
  struct osd_state {
++    int cine_parallax_seen;
 +    int cine_sub_layout;
 +    bool cine_sub_packed;
 +    float cine_sub_depth;
@@ -209,11 +325,77 @@ index 883dccd..76946c9 100644
  
      part->num_vertices = 0;
  
+diff --git a/video/out/gpu/video.c b/video/out/gpu/video.c
+index 814dee0..ee723bc 100644
+--- a/video/out/gpu/video.c
++++ b/video/out/gpu/video.c
+@@ -27,6 +27,7 @@
+ #include <libavutil/lfg.h>
+ 
+ #include "video.h"
++#include "common/global.h"
+ 
+ #include "misc/bstr.h"
+ #include "options/m_config.h"
+@@ -143,6 +144,7 @@ struct dr_buffer {
+ };
+ 
+ struct gl_video {
++    int cine_parallax_seen;
+     struct ra *ra;
+ 
+     struct mpv_global *global;
+@@ -2133,7 +2135,7 @@ static bool szexp_param_lookup(void *priv, struct bstr var, float *out)
+     for (int i = 0; i < ctx->shader->num_params; i++) {
+         const struct gl_user_shader_param *param = &ctx->shader->params[i];
+         if (bstr_equals(var, param->name)) {
+-            double value = param->value;
++        double value = param->value;
+             gpu_get_auto_param(ctx->p->image.mpi, param->name, &value);
+             *out = value;
+             return true;
+@@ -2212,6 +2214,8 @@ static void user_hook(struct gl_video *p, struct image img,
+ 
+         double value = param->value;
+         gpu_get_auto_param(p->image.mpi, param->name, &value);
++        if (bstr_equals0(param->name, "cine_parallax"))
++            value = atomic_load_explicit(&p->global->cine_parallax, memory_order_relaxed) / 1000000.0;
+ 
+         switch (param->type) {
+         case GL_USER_SHADER_PARAM_FLOAT:
+@@ -3549,6 +3553,11 @@ void gl_video_render_frame(struct gl_video *p, struct vo_frame *frame,
+                            const struct ra_fbo *fbo, int flags)
+ {
+     gl_video_update_options(p);
++    int parallax = atomic_load_explicit(&p->global->cine_parallax, memory_order_relaxed);
++    if (p->cine_parallax_seen != parallax) {
++        p->cine_parallax_seen = parallax;
++        p->output_tex_valid = false; // redraw paused frames, keep GPU resources
++    }
+ 
+     struct mp_rect target_rc = {0, 0, fbo->tex->params.w, fbo->tex->params.h};
+ 
 diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
-index b6d6930..9a9fd84 100644
+index b6d6930..4dc75cf 100644
 --- a/video/out/vo_gpu_next.c
 +++ b/video/out/vo_gpu_next.c
-@@ -536,6 +536,10 @@ static void update_overlays(struct vo *vo, struct mp_osd_res res,
+@@ -30,6 +30,7 @@
+ 
+ #include "config.h"
+ #include "common/common.h"
++#include "common/global.h"
+ #include "common/stats.h"
+ #include "misc/io_utils.h"
+ #include "options/m_config.h"
+@@ -117,6 +118,7 @@ struct hwdec_slot {
+ };
+ 
+ struct priv {
++    int cine_parallax_seen;
+     struct mp_log *log;
+     struct mpv_global *global;
+     struct stats_ctx *stats;
+@@ -536,6 +538,10 @@ static void update_overlays(struct vo *vo, struct mp_osd_res res,
          const struct sub_bitmaps *item = subs->items[n];
          if (!item->num_parts || !item->packed)
              continue;
@@ -224,7 +406,7 @@ index b6d6930..9a9fd84 100644
          struct osd_entry *entry = &state->entries[item->render_index];
          if (!upload_overlay_tex(vo, entry, item))
              break;
-@@ -553,7 +557,7 @@ static void update_overlays(struct vo *vo, struct mp_osd_res res,
+@@ -553,7 +559,7 @@ static void update_overlays(struct vo *vo, struct mp_osd_res res,
                                      : libass_overlay_color(p, item, src, ref_luma);
              // Emit pl_overlay per each distinct colorspace run
              if (start >= 0 && !pl_color_space_equal(&color, &part_color)) {
@@ -233,7 +415,7 @@ index b6d6930..9a9fd84 100644
                  add_run_overlay(p, state, entry, item, &color, start, coords);
                  start = -1;
              }
-@@ -575,7 +579,7 @@ static void update_overlays(struct vo *vo, struct mp_osd_res res,
+@@ -575,7 +581,7 @@ static void update_overlays(struct vo *vo, struct mp_osd_res res,
              MP_TARRAY_APPEND(p, entry->parts, entry->num_parts, part);
          }
          if (start >= 0) {
@@ -242,3 +424,29 @@ index b6d6930..9a9fd84 100644
              add_run_overlay(p, state, entry, item, &color, start, coords);
          }
      }
+@@ -1362,6 +1368,12 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+     pl_options pars = p->pars;
+     pl_gpu gpu = p->gpu;
+     update_options(vo);
++    int parallax = atomic_load_explicit(&p->global->cine_parallax, memory_order_relaxed);
++    if (p->cine_parallax_seen != parallax) {
++        p->cine_parallax_seen = parallax;
++        // A paused/mixed frame must be rerendered, without resetting the queue.
++        pl_renderer_flush_cache(p->rr);
++    }
+ 
+     struct pl_render_params params = pars->params;
+     const struct gl_video_opts *opts = p->opts_cache->opts;
+@@ -2779,8 +2791,11 @@ static void update_hook_opts_dynamic(struct priv *p, const struct pl_hook *hook,
+     for (int i = 0; i < hook->num_parameters; i++) {
+         double val;
+         const struct pl_hook_par *hp = &hook->parameters[i];
+-        if (!gpu_get_auto_param(mpi, bstr0(hp->name), &val))
++        if (strcmp(hp->name, "cine_parallax") == 0) {
++            val = atomic_load_explicit(&p->global->cine_parallax, memory_order_relaxed) / 1000000.0;
++        } else if (!gpu_get_auto_param(mpi, bstr0(hp->name), &val)) {
+             continue;
++        }
+ 
+         switch (hp->type) {
+         case PL_VAR_FLOAT: hp->data->f = val; break;

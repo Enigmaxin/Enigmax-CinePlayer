@@ -1,7 +1,7 @@
 -- Enigmax CinePlayer: input/timing for the bounded native stereo control panel.
 -- Rendering and hit testing share one Rust layout; no subtitle track is changed.
 local mp = require 'mp'
-local options={client='main'}
+local options={client='main',nohud=false}
 require('mp.options').read_options(options,'enigmax')
 local target=options.client
 -- Low-frequency resume checkpoints, independent of whether the controls are visible.
@@ -169,6 +169,7 @@ local function hide()
     areas();mp.commandv('script-message-to',target,'controls-hide')
 end
 local function show()
+    if options.nohud then return end
     if popup_open then return end
     if choosing() or mp.get_property_bool('idle-active',true) then return end
     last_activity=mp.get_time()

@@ -104,6 +104,8 @@ def main() -> None:
                 if path.suffix.lower() == '.a' and not rel.as_posix().startswith('native/vendor/ffmpeg/lib/'):
                     continue
                 archive.write(path, 'fuentes/EnigmaxCinePlayer/'+rel.as_posix())
+        changed_mpv = set(subprocess.check_output([str(args.git), '-C', str(args.pinned/'mpv'),
+            'diff', '--name-only', 'HEAD', '--'], text=True).splitlines())
         for name, sha in (('mpv','914a11c30c6a1710fe1f4333654696f2dfb3c3af'),('ffmpeg','1e65c6cd5d3d2d12cbb374460dbf08bedf54772a')):
             if subprocess.check_output([str(args.git),'--git-dir='+str((args.pinned/name/'.git').resolve()),'rev-parse','HEAD'],text=True).strip()!=sha:
                 raise ValueError('Pinned checkout changed')
@@ -111,7 +113,7 @@ def main() -> None:
             with tarfile.open(fileobj=io.BytesIO(data)) as snapshot:
                 for entry in snapshot:
                     if entry.isfile():
-                        changed = name == 'mpv' and entry.name in ('options/options.c','options/options.h','sub/osd.c','sub/osd.h','sub/osd_state.h','video/out/gpu/osd.c','video/out/vo_gpu_next.c')
+                        changed = name == 'mpv' and entry.name in changed_mpv
                         content = (args.pinned/name/entry.name).read_bytes() if changed else snapshot.extractfile(entry).read()
                         archive.writestr('fuentes/'+name+'/'+entry.name, content)
             archive.writestr('fuentes/'+name+'/.source-revision',sha+'\n')

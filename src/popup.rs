@@ -5,6 +5,12 @@ use cineplayer_core::{
     popup_geometry::Viewport,
 };
 pub const BACK: u32 = u32::MAX;
+#[derive(Clone, Copy, Debug)]
+pub struct Slider {
+    pub first: u32,
+    pub steps: u32,
+    pub index: u32,
+}
 
 #[derive(Clone, Debug)]
 pub struct Entry {
@@ -16,6 +22,7 @@ pub struct Entry {
     pub children: Vec<Entry>,
     pub controls: Option<[Option<u32>; 3]>,
     pub swatch: Option<[u8; 3]>,
+    pub slider: Option<Slider>,
 }
 impl Entry {
     pub fn action(id: u32, label: String) -> Self {
@@ -28,6 +35,7 @@ impl Entry {
             children: vec![],
             controls: None,
             swatch: None,
+            slider: None,
         }
     }
 }
@@ -101,7 +109,7 @@ fn geometry(w: i32, h: i32, count: usize, wide: bool) -> Result<Geometry, String
         (w / 3).clamp(240, 720)
     }
     .min(w - 2 * margin);
-    let header = (h / 14).clamp(24, 56);
+    let header = (h / 14).clamp(48, 64);
     let row = if wide {
         (h / 27).clamp(22, 38)
     } else {
@@ -186,7 +194,9 @@ fn finish_activation(
         e.enabled
             && (e.id == id
                 || e.controls
-                    .is_some_and(|buttons| buttons.contains(&Some(id))))
+                    .is_some_and(|buttons| buttons.contains(&Some(id)))
+                || e.slider
+                    .is_some_and(|s| id >= s.first && id <= s.first + s.steps))
     });
     page.items = entries;
     // Re-entering a child must show its latest check marks, not its initial copy.
@@ -262,6 +272,7 @@ fn show_sized(
     let mut canvas_size = (0, 0);
     let mut dirty = true;
     let mut mouse_down = false;
+    let mut slider_drag: Option<usize> = None;
     #[cfg(test)]
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(12);
     loop {
@@ -279,11 +290,7 @@ fn show_sized(
         let view = Viewport::new(w, h, mode).ok_or("La superficie del menú no está disponible")?;
         let depth = pages.len();
         let panel_back = wide && live.is_some();
-        let back_width = if live.is_some() && (depth > 1 || panel_back) {
-            100
-        } else {
-            40
-        };
+        let back_width = 144;
         let page = pages.last_mut().ok_or("Menú vacío")?;
         let mut g = geometry(w, h, page.items.len(), wide)?;
         // Adjustment panels keep the existing menu column and opener anchor;
@@ -317,20 +324,34 @@ fn show_sized(
                 8,
                 [34, 31, 27, 255],
             );
+            let can_back = depth > 1 || panel_back;
+            if can_back {
+                c.rounded(
+                    Rect {
+                        x: 7,
+                        y: 5,
+                        w: back_width - 14,
+                        h: g.header - 10,
+                    },
+                    6,
+                    [78, 70, 58, 255],
+                );
+                c.text_clipped(
+                    19,
+                    (g.header - g.font) / 2,
+                    back_width - 25,
+                    g.header,
+                    "‹  Volver",
+                );
+            }
             c.text_clipped(
-                14,
+                if can_back { back_width + 8 } else { 14 },
                 8,
-                g.rect.w - 60,
+                g.rect.w - 60 - if can_back { back_width } else { 0 },
                 g.header - 8,
                 &format!(
                     "{}{}",
-                    if (depth > 1 || panel_back) && live.is_some() {
-                        "‹ Volver · "
-                    } else if depth > 1 {
-                        "‹  "
-                    } else {
-                        ""
-                    },
+                    "",
                     page.title.split('\t').next().unwrap_or_default()
                 ),
             );
@@ -362,6 +383,43 @@ fn show_sized(
                 .take(g.visible)
             {
                 let y = g.header + (index - page.offset) as i32 * g.row;
+                if let Some(slider) = item.slider {
+                    let x = 25;
+                    let width = g.rect.w - 50;
+                    let cy = y + g.row / 2;
+                    c.rect(
+                        Rect {
+                            x,
+                            y: cy - 2,
+                            w: width,
+                            h: 4,
+                        },
+                        105,
+                    );
+                    c.rect(
+                        Rect {
+                            x: x + width / 2,
+                            y: cy - 8,
+                            w: 2,
+                            h: 16,
+                        },
+                        170,
+                    );
+                    let knob = x
+                        + (width as f64 * slider.index as f64 / slider.steps.max(1) as f64).round()
+                            as i32;
+                    c.rounded(
+                        Rect {
+                            x: knob - 6,
+                            y: cy - 11,
+                            w: 13,
+                            h: 22,
+                        },
+                        5,
+                        [170, 228, 212, 255],
+                    );
+                    continue;
+                }
                 if item.emphasized {
                     c.rounded(
                         Rect {
@@ -524,7 +582,7 @@ fn show_sized(
             }
             dirty = false;
             #[cfg(test)]
-            m.set("user-data/enigmax-popup-state",&serde_json::json!({"client":name,"w":w,"h":h,"mode":mode.code(),"x":g.rect.x,"y":g.rect.y,"width":g.rect.w,"height":g.rect.h,"header":g.header,"row":g.row,"visible":g.visible,"offset":page.offset,"depth":depth,"selected":page.selected,"ids":page.items.iter().map(|e|e.id).collect::<Vec<_>>(),"labels":page.items.iter().map(|e|&e.label).collect::<Vec<_>>(),"enabled":page.items.iter().map(|e|e.enabled).collect::<Vec<_>>(),"checked":page.items.iter().map(|e|e.checked).collect::<Vec<_>>(),"controls":page.items.iter().map(|e|e.controls).collect::<Vec<_>>()}).to_string())?;
+            m.set("user-data/enigmax-popup-state",&serde_json::json!({"client":name,"w":w,"h":h,"mode":mode.code(),"x":g.rect.x,"y":g.rect.y,"width":g.rect.w,"height":g.rect.h,"header":g.header,"row":g.row,"visible":g.visible,"offset":page.offset,"depth":depth,"selected":page.selected,"ids":page.items.iter().map(|e|e.id).collect::<Vec<_>>(),"labels":page.items.iter().map(|e|&e.label).collect::<Vec<_>>(),"enabled":page.items.iter().map(|e|e.enabled).collect::<Vec<_>>(),"checked":page.items.iter().map(|e|e.checked).collect::<Vec<_>>(),"controls":page.items.iter().map(|e|e.controls).collect::<Vec<_>>(),"sliders":page.items.iter().map(|e|e.slider.map(|s|[s.first,s.steps,s.index])).collect::<Vec<_>>()}).to_string())?;
         }
         if m.get("path") != source
             || track_identity(m) != tracks
@@ -562,6 +620,23 @@ fn show_sized(
         }
         if matches!(kind, "left" | "right")
             && live.is_some()
+            && let Some(slider) = pages
+                .last()
+                .and_then(|p| p.selected.and_then(|i| p.items[i].slider))
+        {
+            let index = if kind == "left" {
+                slider.index.saturating_sub(1)
+            } else {
+                (slider.index + 1).min(slider.steps)
+            };
+            if index != slider.index {
+                finish_activation(&mut pages, slider.first + index, &mut live)?;
+                dirty = true;
+            }
+            continue;
+        }
+        if matches!(kind, "left" | "right")
+            && live.is_some()
             && let Some(buttons) = pages
                 .last()
                 .and_then(|p| p.selected.and_then(|i| p.items.get(i)))
@@ -587,7 +662,7 @@ fn show_sized(
             if page
                 .selected
                 .and_then(|i| page.items.get(i))
-                .is_some_and(|e| e.controls.is_some())
+                .is_some_and(|e| e.controls.is_some() || e.slider.is_some())
             {
                 continue;
             }
@@ -669,6 +744,29 @@ fn show_sized(
                 page.offset + ((y - g.rect.y as f64 - g.header as f64) / g.row as f64) as usize;
             (index < page.items.len() && index < page.offset + g.visible).then_some(index)
         });
+        if kind == "down" && index.is_some_and(|i| page.items[i].slider.is_some()) {
+            slider_drag = index;
+            mouse_down = true;
+        }
+        if matches!(kind, "down" | "move" | "up")
+            && let Some(i) = slider_drag
+            && let Some(slider) = page.items.get(i).and_then(|e| e.slider)
+        {
+            if let Some((x, _)) = point {
+                let fraction =
+                    ((x - (g.rect.x + 25) as f64) / (g.rect.w - 50).max(1) as f64).clamp(0.0, 1.0);
+                let value = (fraction * slider.steps as f64).round() as u32;
+                if value != slider.index {
+                    finish_activation(&mut pages, slider.first + value, &mut live)?;
+                    dirty = true;
+                }
+            }
+            if kind == "up" {
+                slider_drag = None;
+                mouse_down = false;
+            }
+            continue;
+        }
         if kind == "move" && page.selected != index {
             page.selected = index;
             dirty = true;
@@ -1147,8 +1245,7 @@ mod tests {
         );
         m.set(
             "user-data/enigmax-popup-test",
-            &serde_json::json!({"sequence":[1233,"Avanzado","Algoritmo anaglifo",1042],"eye":0})
-                .to_string(),
+            &serde_json::json!({"sequence":[1233,"Algoritmo anaglifo",1042],"eye":0}).to_string(),
         )
         .unwrap();
         player::choose_view(&m, &mut state).unwrap();

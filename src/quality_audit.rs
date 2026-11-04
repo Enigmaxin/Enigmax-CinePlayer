@@ -52,6 +52,10 @@ fn advance(m: &mut Mpv, s: &mut State, seconds: f64) {
 fn setup(root: &Path) -> Mpv {
     let m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
     configure(&m, true, root).unwrap();
+    if let Ok(path) = std::env::var("ENIGMAX_EYE_TRACE") {
+        m.option("log-file", &path).unwrap();
+        m.option("msg-level", "all=v").unwrap();
+    }
     m.option("autofit", "960x540").unwrap();
     m.init().unwrap();
     m
@@ -112,10 +116,26 @@ fn eye_selection_preserves_packed_sdr_hdr_tracks_and_playback() {
                     tick(&mut m, &mut s);
                     assert!(
                         changed_at.elapsed() < Duration::from_secs(3),
-                        "Playback stopped at {file}/{id}: {before}, pause={:?}, seeking={:?}, pipeline={}",
+                        "Playback stopped at {file}/{id}: {before}, pause={:?}, seeking={:?}, pipeline={}, diagnostics={:?}",
                         m.get("pause"),
                         m.get("seeking"),
-                        s.pipeline
+                        s.pipeline,
+                        [
+                            "time-pos",
+                            "video-pts",
+                            "audio-pts",
+                            "core-idle",
+                            "eof-reached",
+                            "idle-active",
+                            "demuxer-cache-state",
+                            "vf",
+                            "hwdec-current",
+                            "current-vo",
+                            "video-frame-info",
+                            "vo-delayed-frame-count",
+                            "frame-drop-count"
+                        ]
+                        .map(|k| (k, m.get(k)))
                     );
                 }
                 assert_eq!(m.get("path"), path, "{file}/{id}");

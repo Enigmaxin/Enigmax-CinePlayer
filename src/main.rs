@@ -7,6 +7,8 @@ mod detection;
 mod display;
 mod mpv;
 mod mvc;
+#[cfg(test)]
+mod parallax_audit;
 mod playback_features;
 mod player;
 mod popup;
@@ -97,7 +99,18 @@ fn configure(m: &Mpv, probe: bool, dir: &std::path::Path) -> Result<(), String> 
         return Err("Falta el módulo de controles inferiores".into());
     }
     m.option("scripts", script.to_str().ok_or("Ruta Unicode inválida")?)?;
-    m.option("script-opts", &format!("enigmax-client={}", m.name()))?;
+    m.option(
+        "script-opts",
+        &format!(
+            "enigmax-client={},enigmax-nohud={}",
+            m.name(),
+            if probe && std::env::var_os("ENIGMAX_PROBE_WINDOW").is_some() {
+                "yes"
+            } else {
+                "no"
+            }
+        ),
+    )?;
     if probe {
         if let Some(path) = std::env::var_os("ENIGMAX_PROBE_LOG") {
             m.option("log-file", path.to_str().ok_or("Ruta de log inválida")?)?;
@@ -1261,6 +1274,7 @@ fn run() -> Result<(), String> {
                                     info(&m, &state);
                                     Ok(())
                                 }
+                                controls::Input::Parallax => player::action(&m, &mut state, 1550),
                                 controls::Input::Swap => player::action(&m, &mut state, 1024),
                                 controls::Input::Audio => choose_track(&m, &mut state, false),
                                 controls::Input::Subtitles => choose_track(&m, &mut state, true),
@@ -1422,7 +1436,10 @@ fn run() -> Result<(), String> {
                 m.command(&[
                     "screenshot-to-file",
                     path.to_str().ok_or("Ruta de captura inválida")?,
-                    if ui || startup_probe.is_some() {
+                    if ui
+                        || startup_probe.is_some()
+                        || std::env::var_os("ENIGMAX_PROBE_WINDOW").is_some()
+                    {
                         "window"
                     } else {
                         "subtitles"
@@ -2024,32 +2041,27 @@ mod tests {
         );
 
         let stereo = player::stereo_menu(&m, &s).unwrap().entries().unwrap();
-        let advanced = stereo.iter().find(|e| e.label == "Avanzado").unwrap();
+        assert_eq!(stereo.iter().filter(|e| e.id == 1550).count(), 1);
+        assert!(!items.iter().any(|e| e.id == 1550));
+        let stereo_root = items
+            .iter()
+            .find(|e| e.label.starts_with("Vídeo 3D"))
+            .unwrap();
+        assert_eq!(
+            stereo_root.children.iter().filter(|e| e.id == 1550).count(),
+            1
+        );
+        assert!(!stereo.iter().any(|e| e.label == "Avanzado"));
+        let advanced = &stereo;
         let brightness = advanced
-            .children
             .iter()
             .find(|e| e.label == "Ajuste de brillo por ojo y crosstalk…")
             .unwrap();
         assert_eq!(brightness.id, 1062);
         assert!(brightness.children.is_empty());
-        assert!(
-            !advanced
-                .children
-                .iter()
-                .any(|e| matches!(e.id, 1064 | 1066 | 1068))
-        );
-        assert!(
-            advanced
-                .children
-                .iter()
-                .any(|e| e.label == "Algoritmo anaglifo")
-        );
-        assert!(
-            !advanced
-                .children
-                .iter()
-                .any(|e| e.label == "Método de color")
-        );
+        assert!(!advanced.iter().any(|e| matches!(e.id, 1064 | 1066 | 1068)));
+        assert!(advanced.iter().any(|e| e.label == "Algoritmo anaglifo"));
+        assert!(!advanced.iter().any(|e| e.label == "Método de color"));
         assert!(
             !brightness
                 .children

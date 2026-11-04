@@ -1,6 +1,6 @@
-# Enigmax CinePlayer 1.0.2 — Windows 11 x64
+# Enigmax CinePlayer 1.0.3 — Windows 11 x64
 
-Cambios y límites de la versión vigente: **[validación de esta entrega](#validación-de-esta-entrega)**. Menús persistentes de brillo y aspecto de subtítulos, información reconocida y mediciones de fluidez. No se certifican todas las pantallas o receptores.
+Cambios y límites de la versión vigente: **[validación de esta entrega](#validación-de-esta-entrega)**. Paralaje en directo, geometría de subtítulos por ojo y navegación ampliada de menús. No se certifican todas las pantallas o receptores.
 
 ## Reproducción y subtítulos
 
@@ -9,7 +9,7 @@ Cambios y límites de la versión vigente: **[validación de esta entrega](#vali
 - Los ajustes se guardan atómicamente en `config/playback.json`. Los perfiles explícitamente guardados en `config/screens.json` recuperan salida SDR/automática, dispositivo de audio disponible, PCM/bitstream al cambiar de pantalla. No son una calibración colorimétrica automática ni perfiles ICC generados por el reproductor.
 - La lectura adaptativa usa datos comprimidos: reserva orientativa de tres segundos, ampliable a ocho ante espera de caché; máximo 128 MiB, o 32 MiB en mínimo consumo. No aumenta la cola de vídeo sin comprimir MVC. No garantiza resolver saturación o averías del disco. Los saltos MVC dentro del par actual y los cortos hacia delante reutilizan el decodificador, sin otra caché de imágenes.
 - **Igualar frecuencia de fotogramas:** desactivada por defecto, actúa en pantalla completa. Prioriza la frecuencia original y después un múltiplo entero exacto: por ejemplo, 25→50 Hz si 25 Hz no está disponible. Verifica la fracción real con CCD y distingue 24 de 23,976 Hz. Conserva resolución y velocidad del vídeo; trabaja en un hilo secundario y restaura el modo anterior. Sin modo compatible o información verificable no fuerza otro. No activa HDMI 3D; un cierre forzado o un fallo del controlador puede impedir la restauración.
-- **Posición de subtítulos:** lista de 50–110 % en pasos de cinco puntos. Marca la posición actual, aplica y cierra al elegir, igual que Tamaño. Respeta las posiciones explícitas de ASS/SSA.
+- **Posición de subtítulos:** control dentro de Aspecto de subtítulos, con valor visible, −/+ y Restablecer. Aplica sin cerrar el panel. Se oculta para ASS/SSA para conservar su autoría.
 - **Clic derecho:** menú nativo en cascada junto al puntero en 2D/anaglifo. SBS/OU y Frame Packing mantienen los menús por ojo. Los desplegables de la barra conservan su presentación anterior.
 - El cursor integrado se proyecta por ojo en SBS/OU y Frame Packing sobre los controles y menús. Anaglifo y 2D usan el cursor de Windows. La integración física con Virtual Desktop/Quest requiere validación adicional.
 - **Audio → Filtros:** Original, Modo nocturno y Claridad de voz. Los efectos son opcionales y se suspenden con bitstream para conservar el flujo original. Se han retirado los ajustes manuales de sincronización de audio y subtítulos, incluidos sus atajos.
@@ -33,13 +33,13 @@ La versión aparece en el título, en **Ayuda / F1** y en **Acerca de** dentro d
 
 Al abrir cada vídeo reconocido como 3D se pausa temporalmente y se pregunta cómo verlo: **2D sin gafas**, **anaglifo** con las gafas elegidas o **dos vistas originales** para una pantalla 3D. Se pregunta de nuevo al abrir otro archivo o reabrir el mismo; un cambio interno de transporte MVC conserva la elección. Al cerrar la pregunta sin elegir se utiliza 2D izquierdo.
 
-**Vídeo 3D / Ctrl+3** reúne las opciones habituales: **Ver en 2D**, **Ver con gafas de colores**, **Mostrar las dos vistas originales** e **Invertir profundidad**. Elegir las gafas activa directamente el anaglifo. Hay cinco parejas: rojo/cian, verde/magenta, ámbar/azul, rojo/azul y rojo/verde; estas dos últimas son monocromas. **Formato 3D** corrige la detección. **Avanzado** agrupa el ojo 2D, método de color, calibración y ASS 3D. **Calidad / consumo** está en el menú principal, bajo **Color / HDR**.
+**Vídeo 3D / Ctrl+3** reúne 3D Original, SBS Anamórfico, Anaglifo, 2D y Frame Packing experimental. **Formato 3D de entrada** corrige la detección. El ojo 2D, algoritmo anaglifo, brillo por ojo y crosstalk, y opciones ASS 3D están directamente en Vídeo 3D, sin Avanzado. **Paralaje / Convergencia** se abre desde Vídeo 3D o desde el botón ↔ de los controles; no se duplica en el menú principal. Calidad / consumo permanece en el menú principal, bajo Color / HDR.
 
 El modo automático reconoce etiquetas explícitas del nombre como Full-SBS, HSBS, Full-OU, HOU y MVC, metadatos inequívocos y títulos Blu-ray con vista dependiente. Un nombre genérico «SBS», «3D» o unos metadatos sin información suficiente sobre Full/Half abren primero la confirmación del formato. No se deduce Full/Half por la resolución ni se analiza toda la imagen; un archivo sin etiquetas ni metadatos puede requerir selección manual. Las preferencias de formato y presentación de la película anterior se reinician para evitar aplicarlas al siguiente vídeo 2D. El menú permite corregir el aspecto final de fuentes anamórficas o recortadas.
 
 Los controles inferiores y los menús propios permanecen en el plano de la pantalla, sin desplazamiento de profundidad. En SBS/OU y Frame Packing se proyectan en las mismas coordenadas de cada ojo; en anaglifo no hay separación horizontal entre los canales de color. La misma transformación se aplica a las pulsaciones, al progreso y al volumen. La barra aparece al mover el ratón y se oculta tras la inactividad. Un clic fuera de la barra pausa o reanuda, con una espera breve para distinguir el doble clic, que mantiene pantalla completa. Los botones y el deslizador conservan sus propias acciones. La barra se actualiza como máximo unas diez veces por segundo mientras está visible; la búsqueda con el deslizador se ejecuta al soltarlo.
 
-La composición GPU separa los ojos antes del escalado, trabaja en RGB lineal y no recodifica el archivo. La calibración permite ajustar las ganancias de cada ojo y compensación de fugas hasta 15 %. Los antiguos ajustes de convergencia del vídeo y profundidad añadida a los subtítulos se han retirado; los perfiles anteriores se admiten, pero esos valores se ignoran.
+La composición GPU separa los ojos antes del escalado, trabaja en RGB lineal y no recodifica el archivo. La calibración permite ajustar las ganancias de cada ojo y compensación de fugas hasta 15 %. El nuevo paralaje desplaza ambos ojos en sentidos opuestos, con los subtítulos, sin desplazar la interfaz. Su deslizador aplica al vuelo sin cerrar el panel, admite −2 % a +2 % y Restablecer. Se reinicia a cero al abrir cada archivo y no se guarda. La ruta CPU de anaglifo no compatible conserva el control inactivo sin cambiar el perfil. Los antiguos valores guardados de convergencia/profundidad siguen ignorándose.
 
 **Calidad / consumo:** Equilibrado usa spline36; Máxima calidad, EWA Lanczos; Mínimo consumo, bilineal y menor caché, sin cálculo del pico HDR por píxeles. Se conserva resolución, frecuencia y audio. Compatibilidad utiliza CPU/RGB de 8 bits únicamente para anaglifo; con subtítulos fusionados o calibración se conserva la GPU para mantenerlos. No es un modo de ahorro. La selección se guarda automáticamente en `config/quality.json`, independientemente del resto de ajustes, y se recupera al arrancar. Si no puede guardarse se informa del error y se restablece la selección anterior. La carpeta del programa debe permitir escritura para conservar ajustes. Consulta las mediciones y diferencias de calidad del informe vigente.
 
@@ -61,11 +61,11 @@ No se garantiza passthrough de metadatos HDR10+ ni salida nativa Dolby Vision, n
 
 WASAPI/PCM para altavoces o TV; selección de dispositivo y pistas en el menú. Passthrough opcional AC3/DTS o HDMI ampliado AC3/EAC3/DTS-HD/TrueHD, según receptor y controlador. No se ha comprobado con un receptor físico ni mediante escucha.
 
-SRT y ASS/SSA conservan el renderizado nativo, incluidos estilos y fuentes adjuntas. **Nuevo: los ASS con eventos estereoscópicos duplicados se detectan y se procesan junto con el vídeo.** Consulta el apartado siguiente. Los subtítulos convencionales se duplican por ojo en las salidas estereoscópicas, sin profundidad añadida. Las pistas PGS del Blu-ray se enumeran y seleccionan con su decodificador nativo; la validación visual de PGS sigue pendiente y no se detectan ni transforman PGS estereoscópicos duplicados. Los controles de posición no sustituyen las posiciones explícitas de un ASS.
+SRT y ASS/SSA conservan el renderizado nativo, incluidos estilos y fuentes adjuntas. **Nuevo: los ASS con eventos estereoscópicos duplicados se detectan y se procesan junto con el vídeo.** Consulta el apartado siguiente. Los subtítulos convencionales se duplican por ojo en las salidas estereoscópicas, sin profundidad añadida. Las pistas PGS del Blu-ray se enumeran y seleccionan con su decodificador nativo; la geometría de PGS se comprueba con patrones sintéticos, sin certificar todos los discos y no se detectan ni transforman PGS estereoscópicos duplicados. Los controles de posición no sustituyen las posiciones explícitas de un ASS.
 
 ## Subtítulos ASS 3D
 
-Activado por defecto: **M → Vídeo 3D → Avanzado → Subtítulos 3D → Automático**. Se comparan eventos simultáneos de la pista ASS seleccionada: mismo texto, tiempos, capa y estilo, con posiciones correspondientes en mitades opuestas. Se reconocen posiciones explícitas, movimientos sencillos y márgenes de estilos equivalentes. La identificación queda asociada a esa pista y se reinicia al cambiar de archivo o de subtítulo. No se mezclan dos pistas independientes ni se interpreta como 3D una pista solo por su nombre.
+Activado por defecto: **M → Vídeo 3D → Subtítulos 3D → Automático**. Se comparan eventos simultáneos de la pista ASS seleccionada: mismo texto, tiempos, capa y estilo, con posiciones correspondientes en mitades opuestas. Se reconocen posiciones explícitas, movimientos sencillos y márgenes de estilos equivalentes. La identificación queda asociada a esa pista y se reinicia al cambiar de archivo o de subtítulo. No se mezclan dos pistas independientes ni se interpreta como 3D una pista solo por su nombre.
 
 Cuando se confirma una pareja SBS u OU compatible con el formato de vídeo seleccionado:
 
@@ -191,7 +191,7 @@ La elección de calidad se guarda automáticamente. Los perfiles GPU cambian sin
 
 La preparación pesada se ejecuta en un trabajador acotado y conserva el archivo actual ante fallos. El puente transmite las etiquetas principales de color y SAR; permite subtítulos incrustados aunque no haya audio. Los menús se invalidan al cambiar de archivo y el actualizador solicita el cierre normal. Pruebas y limitaciones: VERIFICACION_0.2.21.md.
 
-## Validación de esta entrega
+## Historial de la entrega 1.0.2
 
 Consulta VERIFICACION_1.0.2.md en el paquete de fuentes para cambios, pruebas, mediciones y límites; el informe no se incluye en el ZIP portátil.
 
@@ -208,3 +208,15 @@ Accesos únicos a los paneles: **Pista de subtítulos → Aspecto de subtítulos
 La posición de subtítulos se oculta para ASS/SSA, sin explicación adicional en el panel. SRT y PGS conservan el control de posición y su restablecimiento; los botones se reactivan al cambiar a esas pistas. Los colores de SRT se muestran por nombre y marca de selección, sin muestras ni repetición del nombre elegido en la cabecera. Versión mantenida: 1.0.2.
 
 Los paneles de aspecto y calibración incluyen «Volver» en la cabecera. Aspecto regresa a Pista de subtítulos; calibración regresa a Avanzado. También se puede volver con Retroceso o Alt+Izquierda. Escape, la cruz y clic fuera cierran el panel. Los ajustes aplicados y guardados se conservan al volver y reabrir; se mantienen las entradas únicas, la ubicación y la versión 1.0.2.
+
+
+## Validación de esta entrega
+
+Consulta VERIFICACION_1.0.3.md para resultados y límites. Los patrones sintéticos permiten detectar deformación
+en PGS, SRT, ASS convencional y ASS 3D; no certifican todos los subtítulos existentes. Frame Packing sigue siendo
+una composición 1920×2205 y no activa HDMI 3D. Los subtítulos convencionales de esa salida se dibujan tras
+la composición, evitando rasterizarlos primero en la baja resolución de una fuente HOU. Los ASS 3D conservan
+la fusión previa y la posición de sus eventos por ojo. Volver es más grande en las cabeceras gráficas y en
+los submenús nativos en cascada. La única DLL del motor modificada es libmpv, con sus fuentes y parche incluidos.
+
+La selección 2D de un ojo de una fuente empaquetada usa un shader GPU, conservando las muestras del ojo elegido. Evita los cambios dinámicos de recorte del renderizador que se observaron junto a paradas en las pruebas. Añade un paso GPU sencillo; no equivale a coste cero. La cadena de filtros solo se modifica cuando cambia su contenido.

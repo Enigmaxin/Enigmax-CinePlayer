@@ -45,6 +45,15 @@ local function on_state(_,value)
                     if index then break end
                 end
             end
+            local slider_fraction
+            if not index and state.sliders then
+                for i=1,#state.ids do
+                    local slider=state.sliders[i]
+                    if type(slider)=='table' and wanted>=slider[1] and wanted<=slider[1]+slider[2] then
+                        index=i-1;slider_fraction=(wanted-slider[1])/slider[2];break
+                    end
+                end
+            end
             if not index then
                 -- A resize can publish the old page after the previous click.
                 -- Wait for the expected page instead of closing a valid transition.
@@ -62,6 +71,7 @@ local function on_state(_,value)
                 return
             end
             local x=index<0 and state.x+20 or state.x+state.width/2
+            if slider_fraction then x=state.x+25+slider_fraction*(state.width-50) end
             if button_slot then
                 local bw=math.max(24,math.min(44,state.row+6))
                 x=state.x+state.width-12-(3-button_slot)*(bw+6)+bw/2
