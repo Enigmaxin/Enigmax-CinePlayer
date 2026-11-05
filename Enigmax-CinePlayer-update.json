@@ -1,14 +1,14 @@
 {
   "format": 1,
-  "tag_name": "v1.0.4",
+  "tag_name": "v1.0.5",
   "draft": false,
   "prerelease": false,
   "assets": [
     {
-      "digest": "sha256:157894c4014f83717e7e7cc56bb7a39b064902e07454c81d1b62c9f4976f20dd",
-      "name": "Enigmax-CinePlayer-Portable-1.0.4-windows-x64.zip",
-      "size": 73828511,
-      "browser_download_url": "https://github.com/Enigmaxin/Enigmax-CinePlayer/releases/download/v1.0.4/Enigmax-CinePlayer-Portable-1.0.4-windows-x64.zip"
+      "name": "Enigmax-CinePlayer-Portable-1.0.5-windows-x64.zip",
+      "digest": "sha256:26fcc20c7721daf5320c243f42a788b36dab3ee43fca2639401cc18f598837d3",
+      "browser_download_url": "https://github.com/Enigmaxin/Enigmax-CinePlayer/releases/download/v1.0.5/Enigmax-CinePlayer-Portable-1.0.5-windows-x64.zip",
+      "size": 73907634
     }
   ]
 }
