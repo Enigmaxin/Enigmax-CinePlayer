@@ -5,6 +5,7 @@ mod cinema_dialog;
 mod controls;
 mod detection;
 mod display;
+mod i18n;
 mod mpv;
 mod mvc;
 #[cfg(test)]
@@ -295,7 +296,7 @@ fn runtime_error(m: &Mpv, dir: &std::path::Path, context: &str, error: &str) {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    let _ = std::fs::write(
+    let logged = std::fs::write(
         dir.join("config/ultimo-error-reproduccion.log"),
         format!(
             "Unix: {stamp}\n{text}\nArchivo: {}\nPosición: {}\n",
@@ -306,9 +307,18 @@ fn runtime_error(m: &Mpv, dir: &std::path::Path, context: &str, error: &str) {
                 .collect::<String>(),
             m.get("time-pos").unwrap_or_default()
         ),
-    );
+    )
+    .is_ok();
     if m.get("idle-active").as_deref() == Some("no") {
-        let _ = m.command_async(&["show-text", &text, "5000"], 0);
+        let notice = i18n::known_message(error).unwrap_or_else(|| {
+            i18n::tr(if logged {
+                "No se pudo completar la operación. Consulta el registro de reproducción."
+            } else {
+                "No se pudo completar la operación."
+            })
+        });
+        let display = format!("{}\n{notice}", i18n::tr(context));
+        let _ = m.command_async(&["show-text", &display, "5000"], 0);
     }
 }
 
@@ -351,12 +361,13 @@ fn track_menus(m: &Mpv, s: &State) -> Result<TrackMenus, String> {
             continue;
         };
         let id = 400 + i as u32;
-        let label = cineplayer_core::track_info::label(entry, &track);
+        let label =
+            cineplayer_core::track_info::label_with(entry, &track, |s| i18n::tr(s).into_owned());
         let selected = entry["selected"].as_bool().unwrap_or(false);
         if kind == "audio" {
-            tracks.item(id, &label, selected)?;
+            tracks.literal_item(id, &label, selected)?;
         } else {
-            subs.item(id, &label, selected)?;
+            subs.literal_item(id, &label, selected)?;
         }
         actions.push((
             id,
@@ -417,7 +428,7 @@ fn build_menu(m: &Mpv, s: &State, remaining: bool) -> Result<(windows::Menu, Men
     player::menu(&root, m, s, !remaining)?;
     let ar = windows::Menu::new()?;
     for (id, label, aspect) in [
-        (20, "Según el formato", None),
+        (20, "Original", None),
         (21, "16:9", Some(16.0 / 9.0)),
         (22, "4:3", Some(4.0 / 3.0)),
         (23, "1,85:1", Some(1.85)),
@@ -468,7 +479,7 @@ fn build_menu(m: &Mpv, s: &State, remaining: bool) -> Result<(windows::Menu, Men
                 .get(&format!("audio-device-list/{i}/description"))
                 .unwrap_or_else(|| name.clone());
             let id = 101 + i as u32;
-            devices.item(id, &label, s.device == name)?;
+            devices.literal_item(id, &label, s.device == name)?;
             actions.push((id, Action::Device(name)));
         }
     }
@@ -489,6 +500,17 @@ fn build_menu(m: &Mpv, s: &State, remaining: bool) -> Result<(windows::Menu, Men
     root.item(52, "Ventana al tamaño original\t1", false)?;
     root.item(53, "Información de reproducción", false)?;
     root.item(54, "Ayuda\tF1", false)?;
+    let configuration = windows::Menu::new()?;
+    let language = windows::Menu::new()?;
+    for (index, (_, name)) in i18n::LANGUAGES.iter().enumerate() {
+        language.literal_item(
+            i18n::FIRST_ID + index as u32,
+            name,
+            index == i18n::current(),
+        )?;
+    }
+    configuration.submenu("Idioma", language)?;
+    root.submenu("Configuración", configuration)?;
     let about = windows::Menu::new()?;
     about.label(APP_NAME_VERSION)?;
     about.item(56, "Información del programa…", false)?;
@@ -589,12 +611,26 @@ fn info(m: &Mpv, s: &State) {
     let video = cineplayer_core::information::video(&properties, &tracks);
     if !video.is_empty() {
         lines.push("VÍDEO".into());
-        lines.extend(video);
+        lines.extend(video.into_iter().map(|line| {
+            line.split(" · ")
+                .map(|part| {
+                    for label in ["perfil", "nivel", "Mastering máx."] {
+                        if let Some(value) =
+                            part.strip_prefix(label).and_then(|s| s.strip_prefix(' '))
+                        {
+                            return format!("{} {value}", i18n::tr(label));
+                        }
+                    }
+                    part.to_owned()
+                })
+                .collect::<Vec<_>>()
+                .join(" · ")
+        }));
         if s.input_layout(m).packed() {
             lines.push(format!(
                 "3D: {} → {}",
-                s.input_layout(m).label(),
-                s.prefs.output.label()
+                i18n::tr(s.input_layout(m).label()),
+                i18n::tr(s.prefs.output.label())
             ));
         }
     }
@@ -616,7 +652,7 @@ fn info(m: &Mpv, s: &State) {
                     ("demux-channel-count", "canales"),
                 ] {
                     if let Some(n) = t[key].as_u64().filter(|n| *n > 0) {
-                        details.push(format!("{n} {suffix}"));
+                        details.push(format!("{n} {}", i18n::tr(suffix)));
                     }
                 }
                 if let Some(n) = t["demux-bitrate"].as_u64().filter(|n| *n > 0) {
@@ -678,6 +714,10 @@ fn action(m: &Mpv, s: &mut State, a: Action) -> Result<(), String> {
                     return choose_track(m, s, true);
                 }
                 return Ok(());
+            }
+            i18n::FIRST_ID..=i18n::LAST_ID => {
+                i18n::save(&s.dir, (id - i18n::FIRST_ID) as usize)?;
+                return text(m, "Idioma actualizado");
             }
             7000..=7131 => return playback_features::action(m, s, id),
             1 => return open(m, s, false),
@@ -786,6 +826,9 @@ fn run() -> Result<(), String> {
     let probe = args.first().is_some_and(|v| v == "--probe");
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let dir = exe.parent().ok_or("Ruta de aplicación desconocida")?;
+    if !probe {
+        i18n::load(dir);
+    }
     // Declared before m so its HICONs outlive the mpv window on every exit path.
     let mut branding = windows::Branding::new()?;
     let mut controls = controls::Controls::default();
@@ -1091,7 +1134,10 @@ fn run() -> Result<(), String> {
             } else {
                 disc_detail
             };
-            let msg = format!("No se pudo reproducir el archivo (libmpv {err}). {detail}");
+            let msg = format!(
+                "{} (libmpv {err}). {detail}",
+                i18n::tr("No se pudo reproducir el archivo")
+            );
             if probe {
                 return Err(msg);
             } else if state.startup_choice {
@@ -1537,11 +1583,17 @@ fn run() -> Result<(), String> {
 fn main() {
     if let Err(e) = run() {
         let is_probe = std::env::args_os().nth(1).is_some_and(|v| v == "--probe");
+        let logged = std::env::current_exe()
+            .is_ok_and(|exe| std::fs::write(exe.with_file_name("ultimo-error.txt"), &e).is_ok());
         if !is_probe {
-            windows::message(&e, true);
-        }
-        if let Ok(exe) = std::env::current_exe() {
-            let _ = std::fs::write(exe.with_file_name("ultimo-error.txt"), &e);
+            let notice = i18n::known_message(&e).unwrap_or_else(|| {
+                i18n::tr(if logged {
+                    "No se pudo iniciar CinePlayer. Consulta el registro de inicio."
+                } else {
+                    "No se pudo iniciar CinePlayer."
+                })
+            });
+            windows::message(&notice, true);
         }
         std::process::exit(1);
     }
@@ -2055,11 +2107,16 @@ mod tests {
         let advanced = &stereo;
         let brightness = advanced
             .iter()
-            .find(|e| e.label == "Ajuste de brillo por ojo y crosstalk…")
+            .find(|e| e.label == "Ajuste de brillo por ojo")
             .unwrap();
         assert_eq!(brightness.id, 1062);
         assert!(brightness.children.is_empty());
-        assert!(!advanced.iter().any(|e| matches!(e.id, 1064 | 1066 | 1068)));
+        assert!(!advanced.iter().any(|e| matches!(e.id, 1064 | 1068)));
+        let index = advanced.iter().position(|e| e.id == 1062).unwrap();
+        assert_eq!(
+            (advanced[index + 1].id, advanced[index + 1].label.as_str()),
+            (1066, "Crosstalk")
+        );
         assert!(advanced.iter().any(|e| e.label == "Algoritmo anaglifo"));
         assert!(!advanced.iter().any(|e| e.label == "Método de color"));
         assert!(

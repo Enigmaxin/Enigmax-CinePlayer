@@ -47,6 +47,9 @@ pub fn language(code: &str) -> String {
     name.into()
 }
 pub fn label(row: &Value, track: &str) -> String {
+    label_with(row, track, str::to_owned)
+}
+pub fn label_with(row: &Value, track: &str, translate: impl Fn(&str) -> String) -> String {
     let mut lang = field(row, "lang");
     if lang.is_empty() {
         lang = field(row, "language");
@@ -57,9 +60,9 @@ pub fn label(row: &Value, track: &str) -> String {
         }
     }
     let title = field(row, "title");
-    let language = language(&lang);
+    let language = translate(&language(&lang));
     let heading = if title.is_empty() {
-        format!("{language} · Pista {track}")
+        format!("{language} · {} {track}", translate("Pista"))
     } else {
         format!("{language} · {title}")
     };
@@ -73,7 +76,7 @@ pub fn label(row: &Value, track: &str) -> String {
         "dvd_subtitle" | "dvdsub" => "VobSub".into(),
         "webvtt" => "WebVTT".into(),
         "mov_text" => "TX3G".into(),
-        "text" => "Texto".into(),
+        "text" => translate("Texto"),
         "ac3" => "Dolby Digital (AC-3)".into(),
         "eac3" => "Dolby Digital Plus (E-AC-3)".into(),
         "truehd" => "Dolby TrueHD".into(),
@@ -81,7 +84,7 @@ pub fn label(row: &Value, track: &str) -> String {
         "" => {
             let description = field(row, "codec-desc");
             if description.is_empty() {
-                "Códec sin especificar".into()
+                translate("Códec sin especificar")
             } else {
                 description
             }
@@ -93,7 +96,7 @@ pub fn label(row: &Value, track: &str) -> String {
             .as_u64()
             .or_else(|| row["audio-channels"].as_u64())
             .filter(|n| *n > 0 && *n <= 64)
-            .map(|n| format!(" · {n} canales"))
+            .map(|n| format!(" · {n} {}", translate("canales")))
             .or_else(|| {
                 row["audio-channels"]
                     .as_str()

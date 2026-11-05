@@ -327,7 +327,17 @@ impl Mpv {
             .map_err(|e| format!("{key}: {e}"))
     }
     pub fn command(&self, args: &[&str]) -> Result<(), String> {
-        let strings = args.iter().map(|s| c(s)).collect::<Result<Vec<_>, _>>()?;
+        let strings = args
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                if i == 1 && args.first() == Some(&"show-text") {
+                    c(&crate::i18n::tr(s))
+                } else {
+                    c(s)
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let mut pointers = strings.iter().map(|s| s.as_ptr()).collect::<Vec<_>>();
         pointers.push(ptr::null());
         self.check(unsafe { (self.command)(self.handle, pointers.as_ptr()) })
@@ -344,7 +354,17 @@ impl Mpv {
         Some(result)
     }
     pub fn command_async(&self, args: &[&str], cookie: u64) -> Result<(), String> {
-        let strings = args.iter().map(|s| c(s)).collect::<Result<Vec<_>, _>>()?;
+        let strings = args
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                if i == 1 && args.first() == Some(&"show-text") {
+                    c(&crate::i18n::tr(s))
+                } else {
+                    c(s)
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let mut pointers = strings.iter().map(|s| s.as_ptr()).collect::<Vec<_>>();
         pointers.push(ptr::null());
         self.check(unsafe { (self.command_async)(self.handle, cookie, pointers.as_ptr()) })

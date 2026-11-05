@@ -111,6 +111,7 @@ fn mvc_metadata_and_non_square_pixels_reach_the_real_renderer() {
         },
         ..Default::default()
     });
+    assert_eq!(s.effective(&m), Layout::Mvc);
     s.prefs.output = Output::Left;
     s.applied = None;
     apply(&m, &mut s).unwrap();
@@ -122,12 +123,27 @@ fn mvc_metadata_and_non_square_pixels_reach_the_real_renderer() {
         m.get("video-out-params/colorlevels").as_deref(),
         Some("full")
     );
-    let aspect = m
-        .get("video-aspect-override")
-        .unwrap()
-        .parse::<f64>()
-        .unwrap();
-    assert!((aspect - (3840.0 / 1080.0 * 16.0 / 15.0)).abs() < 1e-6);
+    // The fixture has two complete 1920×1080 views. SAR applies to each eye
+    // after cropping and to both views in original output.
+    let eye_aspect = 1920.0 / 1080.0 * 16.0 / 15.0;
+    for (output, expected) in [
+        (Output::Left, eye_aspect),
+        (Output::Right, eye_aspect),
+        (Output::Original, 2.0 * eye_aspect),
+        (Output::Anaglyph, eye_aspect),
+    ] {
+        s.prefs.output = output;
+        apply(&m, &mut s).unwrap();
+        let aspect = m
+            .get("video-aspect-override")
+            .unwrap()
+            .parse::<f64>()
+            .unwrap();
+        assert!(
+            (aspect - expected).abs() < 1e-6,
+            "{output:?}: aspect override {aspect}, expected {expected}"
+        );
+    }
     for transfer in [1, 4, 5, 7, 8, 13, 16, 18] {
         let tags = mvc::Metadata {
             matrix: 7,

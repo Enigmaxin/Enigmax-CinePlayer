@@ -468,6 +468,10 @@ fn subtitle_aspect_entries(m: &Mpv, id: u32) -> Result<Vec<crate::popup::Entry>,
         .map(|(id, label, checked)| {
             let mut entry = crate::popup::Entry::action(id, label);
             entry.checked = checked;
+            if let Some((_, hex)) = id.checked_sub(7120).and_then(|i| COLORS.get(i as usize)) {
+                let rgb = u32::from_str_radix(&hex[1..], 16).expect("RGB palette");
+                entry.swatch = Some([(rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8]);
+            }
             entry
         })
         .collect())
@@ -476,13 +480,12 @@ fn apply_subtitle_aspect(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> 
     if (1140..=1152).contains(&id) && !subtitle_position_supported(m) {
         return Ok(());
     }
-    if !subtitle_aspect_entries(m, id)?.iter().any(|e| e.id == id) {
-        return Err("Ajuste de subtítulos inválido".into());
-    }
-    if subtitle_aspect_entries(m, id)?
+    let entries = subtitle_aspect_entries(m, id)?;
+    let option = entries
         .iter()
-        .any(|e| e.id == id && e.checked)
-    {
+        .find(|entry| entry.id == id)
+        .ok_or("Ajuste de subtítulos inválido")?;
+    if option.checked {
         return Ok(());
     }
     if (1140..=1152).contains(&id) {
@@ -495,20 +498,61 @@ pub fn edit_subtitle_aspect(m: &Mpv, s: &mut State, id: u32) -> Result<bool, Str
     if !(7140..=7142).contains(&id) {
         apply_subtitle_aspect(m, s, id)?;
     }
-    let result = crate::popup::show_live_panel(
+    let result = visual_panel(
         m,
+        s,
         "Aspecto de subtítulos",
-        subtitle_panel_entries(m)?,
-        &mut |choice| {
+        std::time::Duration::ZERO,
+        |m, _| subtitle_panel_entries(m),
+        |m, s, choice| {
             if choice == 7131 {
-                action(m, s, choice)?;
+                action(m, s, choice)
             } else {
-                apply_subtitle_aspect(m, s, choice)?;
+                apply_subtitle_aspect(m, s, choice)
             }
-            subtitle_panel_entries(m)
         },
     )?;
     Ok(result == crate::popup::BACK)
+}
+pub(crate) fn visual_panel(
+    m: &Mpv,
+    s: &mut State,
+    title: &str,
+    preview_interval: std::time::Duration,
+    entries: impl Fn(&Mpv, &State) -> Result<Vec<crate::popup::Entry>, String>,
+    mut change: impl FnMut(&Mpv, &mut State, u32) -> Result<(), String>,
+) -> Result<u32, String> {
+    let mut saved = (s.prefs.clone(), s.features.prefs.clone());
+    let mut last_preview: Option<Instant> = None;
+    let result =
+        crate::popup::show_adjustment_panel(m, title, entries(m, s)?, &mut |id, commit| {
+            if !commit && last_preview.is_some_and(|t| t.elapsed() < preview_interval) {
+                return entries(m, s);
+            }
+            let automatic = std::mem::replace(&mut s.automatic, false);
+            let changed = change(m, s, id);
+            s.automatic = automatic;
+            changed?;
+            if commit {
+                if s.prefs != saved.0 || s.features.prefs != saved.1 {
+                    s.save_visual()?;
+                    saved = (s.prefs.clone(), s.features.prefs.clone());
+                }
+                last_preview = None;
+            } else {
+                last_preview = Some(Instant::now());
+            }
+            entries(m, s)
+        });
+    if s.prefs != saved.0 || s.features.prefs != saved.1 {
+        s.prefs = saved.0;
+        s.features.prefs = saved.1;
+        s.features.invalidate();
+        s.applied = None;
+        s.features.apply(m, s.passthrough)?;
+        crate::player::apply(m, s)?;
+    }
+    result
 }
 fn subtitle_panel_entries(m: &Mpv) -> Result<Vec<crate::popup::Entry>, String> {
     use crate::popup::Entry;
@@ -580,8 +624,27 @@ fn subtitle_panel_entries(m: &Mpv) -> Result<Vec<crate::popup::Entry>, String> {
     );
     colour.enabled = false;
     let mut result = vec![size];
+    if srt {
+        let scale = number(m, "sub-scale");
+        result.push(crate::popup::slider_row(
+            7143,
+            7100,
+            7,
+            SUB_SCALES
+                .iter()
+                .enumerate()
+                .min_by(|a, b| (a.1 - scale).abs().total_cmp(&(b.1 - scale).abs()))
+                .map_or(2, |(i, _)| i as u32),
+        ));
+    }
     if supported {
         result.push(position);
+        result.push(crate::popup::slider_row(
+            7144,
+            1140,
+            12,
+            ((current - 50.0) / 5.0).round().clamp(0.0, 12.0) as u32,
+        ));
     }
     result.push(colour);
     result.extend(palette);
@@ -693,7 +756,7 @@ fn editions(m: &Mpv) -> Result<(), String> {
                 v["title"]
                     .as_str()
                     .map(str::to_owned)
-                    .unwrap_or_else(|| format!("Edición {}", i + 1)),
+                    .unwrap_or_else(|| format!("{} {}", crate::i18n::tr("Edición"), i + 1)),
             )
         })
         .collect::<Vec<_>>();
@@ -975,9 +1038,9 @@ mod tests {
                 spin(&mut m, &mut s, 0.15);
                 let entries = subtitle_panel_entries(&m).unwrap();
                 let position = entries.iter().find(|e| e.id == 7142);
-                assert!(
-                    entries.iter().all(|e| e.swatch.is_none()),
-                    "Repeated colour swatch"
+                assert_eq!(
+                    entries.iter().filter(|e| e.swatch.is_some()).count(),
+                    if *kind == "srt" { COLORS.len() } else { 0 }
                 );
                 let source = m.get("video-dec-params");
                 let audio = m.get("aid");
@@ -1077,7 +1140,10 @@ mod tests {
                     .collect::<Vec<_>>(),
                 vec![7120 + i as u32]
             );
-            assert!(entries.iter().all(|e| e.swatch.is_none()));
+            assert_eq!(
+                entries.iter().filter(|e| e.swatch.is_some()).count(),
+                COLORS.len()
+            );
         }
         assert_eq!(m.get("path"), path);
         assert_eq!(s.generation, generation);
@@ -1395,7 +1461,7 @@ mod live_subtitle_tests {
         m.set("pause", "no").unwrap();
         for mode in ["mono", "sbs", "ou", "framepack", "anaglyph"] {
             m.set("user-data/enigmax-projection", mode).unwrap();
-            let mut plan = json!({"sequence":[7103,7104,7121,1149,1148,7102,7124,1150,7131,"@escape"],"delay":0.04,"eye":1,"panel":mode});
+            let mut plan = json!({"sequence":[7107,7104,7121,1140,1148,7102,7124,1150,7131,"@escape"],"delay":0.04,"eye":1,"panel":mode});
             if mode == "mono" {
                 plan["capture"] = root
                     .join("verificacion/1.0.2/panel-subtitulos.png")

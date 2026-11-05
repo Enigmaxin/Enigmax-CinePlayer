@@ -16,10 +16,6 @@ const HELPER: &str = concat!(
     include_str!("update_apply.ps1")
 );
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-#[link(name = "user32")]
-unsafe extern "system" {
-    fn MessageBoxW(hwnd: *mut c_void, text: *const u16, title: *const u16, flags: u32) -> i32;
-}
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn CreateMutexW(attributes: *mut c_void, owner: i32, name: *const u16) -> *mut c_void;
@@ -33,10 +29,12 @@ fn dialog(text: &str, question: bool) -> bool {
     show(text, if question { 0x124 } else { 0x10 })
 }
 fn show(text: &str, flags: u32) -> bool {
-    let text = wide(text);
-    let title = wide("Enigmax CinePlayer — Actualizaciones");
-    // Yes/No, default No. This worker owns its dialog; playback keeps running.
-    unsafe { MessageBoxW(std::ptr::null_mut(), text.as_ptr(), title.as_ptr(), flags) == 6 }
+    crate::windows::notice(
+        "Enigmax CinePlayer — Actualizaciones",
+        "",
+        text,
+        flags == 0x124,
+    )
 }
 fn powershell(script: &Path) -> Result<Command, String> {
     let system = std::env::var_os("SystemRoot").ok_or("Falta SystemRoot")?;
@@ -90,14 +88,14 @@ fn check(manual: bool, shutdown: &crate::mpv::Shutdown) -> Result<(), String> {
         if manual {
             show(
                 &format!(
-                    "La comprobación está en espera. Próximo intento dentro de {} minutos.\nÚltimo estado: {}\n\nDescargas: https://github.com/Enigmaxin/Enigmax-CinePlayer/releases",
+                    "La comprobación está en espera.\nPróximo intento (min): {}\nÚltimo estado: {}\n\nDescargas: https://github.com/Enigmaxin/Enigmax-CinePlayer/releases",
                     wait.div_ceil(60),
                     match cache.status.as_str() {
                         "ok" => "Comprobación correcta",
                         "no-release" => "No hay una versión con manifiesto publicado",
                         "limited" => "Límite temporal de peticiones",
                         "http-error" => "Error del servidor",
-                        other => other,
+                        _ => "Comprobación iniciada o conexión interrumpida",
                     }
                 ),
                 0x40,
@@ -146,7 +144,7 @@ fn check(manual: bool, shutdown: &crate::mpv::Shutdown) -> Result<(), String> {
         cache.record(now, status, retry);
         save_cache(&config, &cache_path, &cache)?;
         let info = format!(
-            "{message}\nHTTP: {}. Próximo intento dentro de {} minutos.\nDescargas: https://github.com/Enigmaxin/Enigmax-CinePlayer/releases",
+            "{message}\nHTTP: {}\nPróximo intento (min): {}\nDescargas: https://github.com/Enigmaxin/Enigmax-CinePlayer/releases",
             root["http"],
             cache.wait(now, true).div_ceil(60)
         );
@@ -179,7 +177,7 @@ fn check(manual: bool, shutdown: &crate::mpv::Shutdown) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     if !dialog(
         &format!(
-            "Hay una nueva versión: {} (actual: {}).\n\nSe descargarán {:.1} MB. Tras verificar el ZIP portátil, se cerrará el reproductor, se actualizarán el EXE y sus bibliotecas en esta misma carpeta conservando los ajustes y se reiniciará. Cierra las otras instancias antes de actualizar.\n\n¿Quieres actualizar ahora?",
+            "Nueva versión: {}\nVersión instalada: {}\nDescarga (MB): {:.1}\n\nTras verificar el ZIP portátil, CinePlayer se cerrará, se actualizará en esta carpeta y se reiniciará. Se conservarán los ajustes. Cierra las demás instancias antes de actualizar.\n\n¿Quieres actualizar ahora?",
             release.version,
             APP_VERSION,
             release.size as f64 / 1_000_000.0
@@ -191,7 +189,19 @@ fn check(manual: bool, shutdown: &crate::mpv::Shutdown) -> Result<(), String> {
     let manifest = serde_json::json!({
         "url":release.url,"size":release.size,"sha256":release.sha256,
         "version":release.version.to_string(),"exe":exe,
-        "pid":std::process::id()
+        "pid":std::process::id(),
+        "statusLog": config.join("updater-apply-error.log"),
+        "ui": {
+            "title": crate::i18n::tr("Enigmax CinePlayer — Descargando actualización"),
+            "progress": crate::i18n::tr("Descargando versión"),
+            "cancel": crate::i18n::tr("Cancelar"),
+            "ok": crate::i18n::tr("Aceptar"),
+            "logHint": crate::i18n::tr("Detalles técnicos en el registro de actualización."),
+            "recovery": crate::i18n::tr("Recuperación pendiente. Conserva esta carpeta:"),
+            "errorTitle": crate::i18n::tr("Enigmax CinePlayer — Actualización"),
+            "errorClosed": crate::i18n::tr("No se pudo completar la actualización. Puedes abrir de nuevo el reproductor si la recuperación ha terminado."),
+            "errorOpen": crate::i18n::tr("No se ha aplicado la actualización. El reproductor sigue abierto.")
+        }
     });
     let manifest_path = temp.path().join("update.json");
     std::fs::write(
@@ -219,19 +229,20 @@ fn check(manual: bool, shutdown: &crate::mpv::Shutdown) -> Result<(), String> {
             return Ok(());
         }
         if let Some(status) = helper.try_wait().map_err(|e| e.to_string())? {
-            if status.success() {
+            // Exit code 2 means the helper has already shown a localized
+            // notice and recorded the technical details.
+            if status.success() || status.code() == Some(2) {
                 return Ok(());
             }
-            if status.code() != Some(2) {
-                dialog(
-                    "No se pudo iniciar o completar el auxiliar de actualización. El reproductor sigue abierto. Comprueba los permisos y las políticas de PowerShell.",
-                    false,
-                );
-            }
-            return Err(
-                "El auxiliar no pudo completar la actualización; el reproductor sigue abierto."
-                    .into(),
+            let _ = std::fs::write(
+                config.join("updater-status.log"),
+                format!("Update helper exited with {status}"),
             );
+            dialog(
+                "No se pudo iniciar o completar el auxiliar de actualización. El reproductor sigue abierto. Comprueba los permisos y las políticas de PowerShell.",
+                false,
+            );
+            return Ok(());
         }
         if Instant::now() > deadline {
             let _ = helper.kill();
@@ -267,7 +278,7 @@ fn launch(manual: bool, shutdown: crate::mpv::Shutdown) {
                     let _ = std::fs::create_dir_all(dir.join("config"));
                     let _ = std::fs::write(dir.join("config/updater-status.log"), &error);
                 }
-                if manual {dialog(&format!("No se pudo completar la comprobación: {error}\n\nSe reintentará automáticamente más tarde.\nDescargas: https://github.com/Enigmaxin/Enigmax-CinePlayer/releases"),false);}
+                if manual {dialog("No se pudo completar la comprobación.\nDetalles técnicos en el registro de actualización.\n\nSe reintentará automáticamente más tarde.\nDescargas: https://github.com/Enigmaxin/Enigmax-CinePlayer/releases",false);}
             }
             unsafe {
                 CloseHandle(mutex);

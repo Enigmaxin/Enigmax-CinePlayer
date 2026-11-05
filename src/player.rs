@@ -173,12 +173,17 @@ impl State {
     }
     /// Keep a saved position across base-view/MVC reloads until it is observed.
     pub fn restore_position(&mut self, m: &Mpv) -> Result<(), String> {
-        if self.pending_load {
+        // The outgoing Blu-ray transport remains readable while MVC is being
+        // prepared. Its clock cannot complete a resume on the incoming stream.
+        if self.pending_load || self.opening.is_some() {
             return Ok(());
         }
         let Some(target) = self.resume.as_deref().and_then(|v| v.parse::<f64>().ok()) else {
             return self.start_after_resume(m);
         };
+        if !self.active_mvc_transport(m) {
+            return Ok(());
+        }
         self.resume_started
             .get_or_insert_with(std::time::Instant::now);
         if self
@@ -193,20 +198,27 @@ impl State {
                 "No se pudo recuperar la posición. Puedes continuar desde aquí.",
                 "5000",
             ])?;
+            self.restore_tracks(m)?;
             return self.start_after_resume(m);
         }
         if !target.is_finite() || target < 0.0 {
             self.resume = None;
             return Ok(());
         }
-        if m.get("time-pos")
-            .and_then(|v| v.parse::<f64>().ok())
-            .is_some_and(|v| (v - target).abs() < 0.5)
+        if (self.resume_requested || target == 0.0)
+            && m.get("seeking").as_deref() != Some("yes")
+            && m.get("time-pos")
+                .and_then(|v| v.parse::<f64>().ok())
+                .is_some_and(|v| (v - target).abs() < 0.5)
         {
             self.resume = None;
             self.resume_requested = false;
             self.resume_started = None;
-        } else if !self.resume_requested && m.get("seekable").as_deref() == Some("yes") {
+            self.restore_tracks(m)?;
+        } else if !self.resume_requested
+            && m.get("idle-active").as_deref() == Some("no")
+            && m.get("seekable").as_deref() == Some("yes")
+        {
             m.seek(target, true)?;
             self.resume_requested = true;
             self.resume_started = Some(std::time::Instant::now());
@@ -618,7 +630,18 @@ pub fn load(m: &Mpv, s: &mut State, path: &str, title: Option<i32>) -> Result<()
         } else {
             path.clone()
         };
-        let opts = mvc_options(info, &audio, &s.external_subs);
+        let mut opts = mvc_options(info, &audio, &s.external_subs);
+        // Let mpv seek while initializing the new raw video and its external
+        // Blu-ray audio together. A command issued during FILE_LOADED can race
+        // the initial track setup and be replaced by its seek to zero.
+        if same_source
+            && let Some(start) = s.resume.as_deref().and_then(|v| v.parse::<f64>().ok())
+            && start.is_finite()
+            && start > 0.0
+        {
+            opts.push_str(&format!(",start={start}"));
+            s.resume_requested = true;
+        }
         m.command(&["loadfile", &uri, "replace", "-1", &opts])?;
         s.raw = Some(info);
     } else {
@@ -700,11 +723,7 @@ fn begin_loading(
         startup: false,
         history_asked: false,
     });
-    m.command(&[
-        "show-text",
-        "Preparando vídeo… Puedes abrir otro archivo o cerrar.",
-        "2000",
-    ])?;
+    m.command(&["show-text", "Abriendo vídeo…", "2000"])?;
     Ok(())
 }
 pub fn loading(s: &State) -> bool {
@@ -752,7 +771,6 @@ pub fn poll_loading(m: &Mpv, s: &mut State) -> Result<(), String> {
                     let result = load(m, s, &task.path, task.title);
                     if result.is_ok() {
                         s.resume = position;
-                        s.resume_requested = false;
                         if let Some(p) = paused {
                             m.set("pause", &p)?;
                         }
@@ -1274,7 +1292,7 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
         format!(
             "Ahora: {} · {}",
             if s.prefs.output == Output::Anaglyph {
-                format!("3D {}", s.prefs.glasses.label())
+                format!("3D {}", crate::i18n::tr(s.prefs.glasses.label()))
             } else if s.prefs.output == Output::Original
                 && s.prefs.delivery != stereo::Delivery::Native
             {
@@ -1285,7 +1303,7 @@ pub fn stereo_menu(m: &Mpv, s: &State) -> Result<windows::Menu, String> {
                 }
                 .into()
             } else {
-                s.prefs.output.label().into()
+                crate::i18n::tr(s.prefs.output.label()).into_owned()
             },
             layout_label(detected)
         )
@@ -1348,7 +1366,8 @@ fn append_stereo_controls(advanced: &windows::Menu, s: &State) -> Result<(), Str
     }
     advanced.submenu("Algoritmo anaglifo", algorithm)?;
 
-    advanced.item(1062, "Ajuste de brillo por ojo y crosstalk…", false)?;
+    advanced.item(1062, "Ajuste de brillo por ojo", false)?;
+    advanced.item(1066, "Crosstalk", false)?;
     let subs = windows::Menu::new()?;
     for (i, mode) in cineplayer_core::ass3d::Mode::ALL.iter().enumerate() {
         subs.item(1100 + i as u32, mode.label(), s.prefs.ass_mode == *mode)?;
@@ -1407,26 +1426,33 @@ fn set_calibration(m: &Mpv, s: &mut State, control: u32, choice: u32) -> Result<
     }
     Ok(())
 }
-fn calibration_editor(m: &Mpv, s: &mut State, control: u32) -> Result<(), String> {
+fn calibration_editor(m: &Mpv, s: &mut State, mut control: u32) -> Result<(), String> {
     if !matches!(control, 1062 | 1064 | 1066) {
         return Err("Ajuste de brillo inválido".into());
     }
     loop {
-        let result = crate::popup::show_live_panel(
+        let crosstalk = control == 1066;
+        let result = crate::playback_features::visual_panel(
             m,
-            "Ajuste de brillo por ojo y crosstalk · anaglifo",
-            calibration_panel_entries(&s.prefs)?,
-            &mut |choice| {
+            s,
+            if crosstalk {
+                "Crosstalk"
+            } else {
+                "Ajuste de brillo por ojo"
+            },
+            std::time::Duration::from_millis(100),
+            |_, s| calibration_panel_entries(&s.prefs, crosstalk),
+            |m, s, choice| {
                 if choice == 1068 {
-                    action(m, s, choice)?;
+                    set_calibration(m, s, 1062, 1310)?;
+                    set_calibration(m, s, 1064, 1310)
                 } else {
                     let index = choice.checked_sub(1300).ok_or("Porcentaje inválido")? / 40;
                     let control = *[1062, 1064, 1066]
                         .get(index as usize)
                         .ok_or("Ajuste de brillo inválido")?;
-                    set_calibration(m, s, control, 1300 + (choice - 1300) % 40)?;
+                    set_calibration(m, s, control, 1300 + (choice - 1300) % 40)
                 }
-                calibration_panel_entries(&s.prefs)
             },
         )?;
         if result != crate::popup::BACK {
@@ -1437,6 +1463,7 @@ fn calibration_editor(m: &Mpv, s: &mut State, control: u32) -> Result<(), String
             return Ok(());
         }
         if matches!(selected, 1062 | 1064 | 1066) {
+            control = selected;
             continue;
         }
         return action(m, s, selected);
@@ -1533,7 +1560,10 @@ fn parallax_editor(m: &Mpv, s: &mut State) -> Result<(), String> {
         }
     }
 }
-fn calibration_panel_entries(p: &Settings) -> Result<Vec<crate::popup::Entry>, String> {
+fn calibration_panel_entries(
+    p: &Settings,
+    crosstalk: bool,
+) -> Result<Vec<crate::popup::Entry>, String> {
     let mut rows = Vec::new();
     for (index, (control, label)) in [
         (1062, "Brillo izquierdo"),
@@ -1543,6 +1573,9 @@ fn calibration_panel_entries(p: &Settings) -> Result<Vec<crate::popup::Entry>, S
     .into_iter()
     .enumerate()
     {
+        if (control == 1066) != crosstalk {
+            continue;
+        }
         let value = match control {
             1062 => p.left_gain,
             1064 => p.right_gain,
@@ -1570,11 +1603,24 @@ fn calibration_panel_entries(p: &Settings) -> Result<Vec<crate::popup::Entry>, S
             Some(1300 + offset + if control == 1066 { 0 } else { 10 }),
         ]);
         rows.push(row);
+        let (steps, step) = if crosstalk {
+            (15, value.round().clamp(0.0, 15.0) as u32)
+        } else {
+            (20, ((value - 50.0) / 5.0).round().clamp(0.0, 20.0) as u32)
+        };
+        rows.push(crate::popup::slider_row(
+            1560 + index as u32,
+            1300 + offset,
+            steps,
+            step,
+        ));
     }
-    rows.push(crate::popup::Entry::action(
-        1068,
-        "Restablecer toda la calibración".into(),
-    ));
+    if !crosstalk {
+        rows.push(crate::popup::Entry::action(
+            1068,
+            "Restablecer brillo por ojo".into(),
+        ));
+    }
     Ok(rows)
 }
 pub fn quality_menu(s: &State) -> Result<windows::Menu, String> {
@@ -1614,7 +1660,12 @@ pub fn menu(root: &windows::Menu, m: &Mpv, s: &State, include_stereo: bool) -> R
                 )?;
             }
             titles.submenu(
-                &format!("Títulos {}–{}", page * 20 + 1, page * 20 + chunk.len()),
+                &format!(
+                    "{} {}–{}",
+                    crate::i18n::tr("Títulos"),
+                    page * 20 + 1,
+                    page * 20 + chunk.len()
+                ),
                 group,
             )?;
         }
@@ -1705,7 +1756,7 @@ pub fn ask_view(m: &Mpv, s: &mut State) -> Result<(), String> {
             }
         }
         loop {
-            let id = view_dialog(m, s)?;
+            let id = view_dialog(m, s, true)?;
             if id == 1232 {
                 let format = layout_menu(s)?.show(m)?;
                 if format != 0 {
@@ -1720,7 +1771,11 @@ pub fn ask_view(m: &Mpv, s: &mut State) -> Result<(), String> {
                 }
                 return action(m, s, option);
             }
-            let id = if id == 1230 { choose_glasses(m)? } else { id };
+            let id = if id == 1230 {
+                choose_glasses(m, true)?
+            } else {
+                id
+            };
             if id == 1231 {
                 continue;
             }
@@ -1730,14 +1785,14 @@ pub fn ask_view(m: &Mpv, s: &mut State) -> Result<(), String> {
     let restore = m.set("pause", &paused);
     result.and(restore)
 }
-fn view_dialog(m: &Mpv, s: &State) -> Result<u32, String> {
+fn view_dialog(m: &Mpv, s: &State, native: bool) -> Result<u32, String> {
     use crate::cinema_dialog::{self, Choice};
     cinema_dialog::show(
         m,
         "¿Cómo quieres reproducirlo?",
         &format!(
             "Formato detectado: {} · Pulsa un modo para reproducir",
-            layout_label(s.input_layout(m))
+            crate::i18n::tr(layout_label(s.input_layout(m)))
         ),
         &[
             Choice {
@@ -1772,9 +1827,10 @@ fn view_dialog(m: &Mpv, s: &State) -> Result<u32, String> {
             },
         ],
         false,
+        native,
     )
 }
-pub fn choose_glasses(m: &Mpv) -> Result<u32, String> {
+fn choose_glasses(m: &Mpv, native: bool) -> Result<u32, String> {
     use crate::cinema_dialog::{self, Choice};
     cinema_dialog::show(
         m,
@@ -1813,6 +1869,7 @@ pub fn choose_glasses(m: &Mpv) -> Result<u32, String> {
             },
         ],
         true,
+        native,
     )
 }
 /// Reopen the visual flow during playback, retaining pause and previous mode on cancel.
@@ -1822,7 +1879,7 @@ pub fn choose_view(m: &Mpv, s: &mut State) -> Result<(), String> {
     m.set("pause", "yes")?;
     let result = (|| {
         loop {
-            let id = view_dialog(m, s)?;
+            let id = view_dialog(m, s, false)?;
             if id == 1232 {
                 let format = layout_menu(s)?.show(m)?;
                 if format != 0 {
@@ -1837,7 +1894,11 @@ pub fn choose_view(m: &Mpv, s: &mut State) -> Result<(), String> {
                 }
                 return action(m, s, option);
             }
-            let id = if id == 1230 { choose_glasses(m)? } else { id };
+            let id = if id == 1230 {
+                choose_glasses(m, false)?
+            } else {
+                id
+            };
             if id == 1231 {
                 continue;
             }
@@ -1852,7 +1913,7 @@ fn action_impl(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
     if id == 1230 {
         let paused = m.get("pause").unwrap_or_else(|| "no".into());
         m.set("pause", "yes")?;
-        let result = choose_glasses(m).and_then(|selected| {
+        let result = choose_glasses(m, false).and_then(|selected| {
             if selected == 1231 {
                 choose_view(m, s)
             } else if selected == 0 {
@@ -2065,6 +2126,11 @@ impl State {
         }
         Ok(())
     }
+
+    fn active_mvc_transport(&self, m: &Mpv) -> bool {
+        self.raw.is_none()
+            || m.get("path").as_deref() == Some(format!("cine-mvc://{}", self.generation).as_str())
+    }
     pub fn cancel_startup(&mut self, m: &Mpv) -> Result<(), String> {
         if self.startup_choice || self.startup_play {
             self.startup_choice = false;
@@ -2192,7 +2258,14 @@ impl State {
         m.set("demuxer-max-back-bytes", "0")
     }
     pub fn restore_tracks(&mut self, m: &Mpv) -> Result<(), String> {
-        if self.pending_load || !self.tracks_restore {
+        if self.pending_load
+            || !self.tracks_restore
+            || self.opening.is_some()
+            || !self.active_mvc_transport(m)
+            // Initializing MVC can reset the external audio selection while
+            // seeking. Apply the saved tracks after that seek completes.
+            || (self.raw.is_some() && self.resume.is_some())
+        {
             return Ok(());
         }
         let Some(list) = m
@@ -2218,7 +2291,12 @@ impl State {
         Ok(())
     }
     pub fn capture_tracks(&mut self, m: &Mpv) {
-        if !self.automatic || self.pending_load || self.tracks_restore || self.history_key.is_none()
+        if !self.automatic
+            || self.pending_load
+            || self.tracks_restore
+            || self.history_key.is_none()
+            || self.opening.is_some()
+            || !self.active_mvc_transport(m)
         {
             return;
         }
@@ -2654,6 +2732,7 @@ mod state_tests {
     }
     fn iso_pump(m: &mut Mpv, s: &mut State, done: impl Fn(&Mpv, &State) -> bool) {
         let until = Instant::now() + Duration::from_secs(25);
+        let trace = std::env::var_os("ENIGMAX_TEST_ISO_LOG").is_some();
         while Instant::now() < until {
             let e = m.wait(0.03);
             let (id, cookie) = (e.id, e.userdata);
@@ -2684,7 +2763,20 @@ mod state_tests {
             if id == 8 || id == 17 {
                 apply(m, s).unwrap();
             }
+            let old = trace.then(|| (s.resume.clone(), s.resume_requested));
             s.restore_position(m).unwrap();
+            if let Some((target, requested)) = old
+                && (target != s.resume || requested != s.resume_requested)
+            {
+                println!(
+                    "resume event {id}: {target:?}/{requested} → {:?}/{} path={:?} pos={:?} seeking={:?}",
+                    s.resume,
+                    s.resume_requested,
+                    m.get("path"),
+                    m.get("time-pos"),
+                    m.get("seeking")
+                );
+            }
             s.capture_tracks(m);
             s.remember_ready(m).unwrap();
             if !loading(s) && done(m, s) {
@@ -2692,7 +2784,7 @@ mod state_tests {
             }
         }
         panic!(
-            "ISO timeout path={:?} time={:?} resume={:?} pending={} title={} seekable={:?} requested={} pause={:?}",
+            "ISO timeout path={:?} time={:?} resume={:?} pending={} title={} seekable={:?} requested={} pause={:?} aid={:?} sid={:?} history_key={:?} tracks_restore={} track_choice={:?} mvc={:?}",
             m.get("path"),
             m.get("time-pos"),
             s.resume,
@@ -2700,12 +2792,22 @@ mod state_tests {
             s.title,
             m.get("seekable"),
             s.resume_requested,
-            m.get("pause")
+            m.get("pause"),
+            m.get("aid"),
+            m.get("sid"),
+            s.history_key,
+            s.tracks_restore,
+            s.track_choice,
+            m.mvc().ok().map(|registry| registry.error())
         );
     }
     fn iso_engine(root: &Path) -> Mpv {
         let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
         crate::configure(&m, true, root).unwrap();
+        if let Ok(path) = std::env::var("ENIGMAX_TEST_ISO_LOG") {
+            m.option("log-file", &path).unwrap();
+            m.option("msg-level", "all=debug").unwrap();
+        }
         m.option("pause", "yes").unwrap();
         m.init().unwrap();
         m.register_mvc(Box::new(mvc::Registry::new(
@@ -2750,7 +2852,13 @@ mod state_tests {
             .to_string();
         m.set("aid", &audio).unwrap();
         m.set("sid", "no").unwrap();
-        s.capture_tracks(&m);
+        // Selection changes may reset the audio chain. Observe the selected
+        // tracks after mpv publishes its new state before saving the snapshot.
+        iso_pump(&mut m, &mut s, |m, s| {
+            m.get("aid").as_deref() == Some(audio.as_str())
+                && m.get("sid").as_deref() == Some("no")
+                && s.track_choice.is_some()
+        });
         let chosen = s.track_choice.clone().unwrap();
         s.history_asked = true;
         m.seek(123.5, true).unwrap();
@@ -3260,7 +3368,7 @@ mod calibration_tests {
                 );
                 assert!(set_calibration(&m, &mut s, control, 1400).is_err());
             }
-            let mut plan = serde_json::json!({"sequence":[1311,1351,1381,1312,1352,1382,1310,1350,1380,1068,"@escape"],"delay":0.04,"eye":1,"panel":format!("{layout:?}/{output:?}")});
+            let mut plan = serde_json::json!({"sequence":[1318,1358,1312,1352,1310,1350,1068,"@escape"],"delay":0.04,"eye":1,"panel":format!("{layout:?}/{output:?}")});
             if layout == Layout::Mono {
                 plan["capture"] = root
                     .join("verificacion/1.0.2/panel-brillo.png")
@@ -3271,6 +3379,13 @@ mod calibration_tests {
             m.set("user-data/enigmax-popup-test", &plan.to_string())
                 .unwrap();
             calibration_editor(&m, &mut s, 1062).unwrap();
+            m.set(
+                "user-data/enigmax-popup-test",
+                &serde_json::json!({"sequence":[1393,1382,1380,"@escape"],"delay":0.04,"eye":1})
+                    .to_string(),
+            )
+            .unwrap();
+            calibration_editor(&m, &mut s, 1066).unwrap();
             assert_eq!(
                 (s.prefs.left_gain, s.prefs.right_gain, s.prefs.crosstalk),
                 (1.0, 1.0, 0.0)

@@ -39,6 +39,15 @@ impl Entry {
         }
     }
 }
+pub(crate) fn slider_row(id: u32, first: u32, steps: u32, index: u32) -> Entry {
+    let mut entry = Entry::action(id, String::new());
+    entry.slider = Some(Slider {
+        first,
+        steps,
+        index,
+    });
+    entry
+}
 pub fn projection(m: &Mpv) -> Projection {
     match m.user_data("user-data/enigmax-projection").as_deref() {
         Some("sbs") => Projection::Sbs,
@@ -160,7 +169,7 @@ pub fn show_anchored(
 ) -> Result<u32, String> {
     show_sized(m, title, entries, false, Some(button), None, None)
 }
-type LiveAction<'a> = Option<&'a mut dyn FnMut(u32) -> Result<Vec<Entry>, String>>;
+type LiveAction<'a> = Option<&'a mut dyn FnMut(u32, bool) -> Result<Vec<Entry>, String>>;
 /// A focused editor: updates only after a selection, without reopening the menu.
 #[cfg(test)]
 pub fn show_live(
@@ -169,7 +178,15 @@ pub fn show_live(
     entries: Vec<Entry>,
     callback: &mut dyn FnMut(u32) -> Result<Vec<Entry>, String>,
 ) -> Result<u32, String> {
-    show_sized(m, title, entries, false, None, Some(callback), None)
+    show_sized(
+        m,
+        title,
+        entries,
+        false,
+        None,
+        Some(&mut |id, _| callback(id)),
+        None,
+    )
 }
 /// Compact, event-driven adjustment panel with inline controls.
 pub fn show_live_panel(
@@ -178,6 +195,15 @@ pub fn show_live_panel(
     entries: Vec<Entry>,
     callback: &mut dyn FnMut(u32) -> Result<Vec<Entry>, String>,
 ) -> Result<u32, String> {
+    show_adjustment_panel(m, title, entries, &mut |id, _| callback(id))
+}
+/// The callback's second argument is true when the selection is committed.
+pub fn show_adjustment_panel(
+    m: &Mpv,
+    title: &str,
+    entries: Vec<Entry>,
+    callback: &mut dyn FnMut(u32, bool) -> Result<Vec<Entry>, String>,
+) -> Result<u32, String> {
     show_sized(m, title, entries, true, None, Some(callback), None)
 }
 fn finish_activation(
@@ -185,10 +211,18 @@ fn finish_activation(
     id: u32,
     live: &mut LiveAction<'_>,
 ) -> Result<Option<u32>, String> {
+    update_activation(pages, id, true, live)
+}
+fn update_activation(
+    pages: &mut [Page],
+    id: u32,
+    commit: bool,
+    live: &mut LiveAction<'_>,
+) -> Result<Option<u32>, String> {
     let Some(callback) = live.as_mut() else {
         return Ok(Some(id));
     };
-    let entries = callback(id)?;
+    let entries = callback(id, commit)?;
     let page = pages.last_mut().ok_or("Menú vacío")?;
     page.selected = entries.iter().position(|e| {
         e.enabled
@@ -290,7 +324,6 @@ fn show_sized(
         let view = Viewport::new(w, h, mode).ok_or("La superficie del menú no está disponible")?;
         let depth = pages.len();
         let panel_back = wide && live.is_some();
-        let back_width = 144;
         let page = pages.last_mut().ok_or("Menú vacío")?;
         let mut g = geometry(w, h, page.items.len(), wide)?;
         // Adjustment panels keep the existing menu column and opener anchor;
@@ -307,6 +340,7 @@ fn show_sized(
         {
             g.rect.x = anchor.x.clamp(8, (w - g.rect.w - 8).max(8));
         }
+        let back_width = (g.rect.w / 4).clamp(58, 144);
         page.offset = page.offset.min(page.items.len().saturating_sub(g.visible));
         if dirty {
             if canvas_size != (g.rect.w, g.rect.h) {
@@ -752,14 +786,15 @@ fn show_sized(
             && let Some(i) = slider_drag
             && let Some(slider) = page.items.get(i).and_then(|e| e.slider)
         {
+            let mut value = slider.index;
             if let Some((x, _)) = point {
                 let fraction =
                     ((x - (g.rect.x + 25) as f64) / (g.rect.w - 50).max(1) as f64).clamp(0.0, 1.0);
-                let value = (fraction * slider.steps as f64).round() as u32;
-                if value != slider.index {
-                    finish_activation(&mut pages, slider.first + value, &mut live)?;
-                    dirty = true;
-                }
+                value = (fraction * slider.steps as f64).round() as u32;
+            }
+            if kind == "up" || value != slider.index {
+                update_activation(&mut pages, slider.first + value, kind == "up", &mut live)?;
+                dirty = true;
             }
             if kind == "up" {
                 slider_drag = None;
@@ -868,7 +903,7 @@ mod tests {
             vec![Entry::action(99, "Otro".into()), group],
         )];
         assert_eq!(activate(&mut pages, 1), None);
-        let mut callback = |id| {
+        let mut callback = |id, _| {
             let mut entries = vec![
                 Entry::action(1, "Uno".into()),
                 Entry::action(2, "Dos".into()),

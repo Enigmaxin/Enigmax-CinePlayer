@@ -63,6 +63,7 @@ unsafe extern "system" {
     fn SetTextColor(dc: Handle, color: u32) -> u32;
     fn TextOutW(dc: Handle, x: i32, y: i32, text: *const u16, count: i32) -> i32;
     fn GdiFlush() -> i32;
+    fn GetTextExtentPoint32W(dc: Handle, text: *const u16, count: i32, size: *mut [i32; 2]) -> i32;
 }
 pub(crate) struct Canvas {
     dc: Handle,
@@ -70,6 +71,8 @@ pub(crate) struct Canvas {
     old_bitmap: Handle,
     font: Handle,
     old_font: Handle,
+    font_size: i32,
+    compact_font: std::cell::Cell<Handle>,
     bits: *mut u8,
     width: i32,
     height: i32,
@@ -143,6 +146,8 @@ impl Canvas {
             old_bitmap,
             font,
             old_font,
+            font_size,
+            compact_font: std::cell::Cell::new(ptr::null_mut()),
             bits: bits.cast(),
             width: w,
             height: h,
@@ -216,7 +221,7 @@ impl Canvas {
         }
     }
     pub(crate) fn text(&self, x: i32, y: i32, text: &str) {
-        let s = text.encode_utf16().collect::<Vec<_>>();
+        let s = crate::i18n::tr(text).encode_utf16().collect::<Vec<_>>();
         unsafe { TextOutW(self.dc, x, y, s.as_ptr(), s.len() as i32) };
     }
     fn centered(&self, r: Rect, text: &str) {
@@ -236,8 +241,9 @@ impl Canvas {
         if w <= 0 || h <= 0 || text.is_empty() {
             return;
         }
-        let s = text.encode_utf16().collect::<Vec<_>>();
+        let s = crate::i18n::tr(text).encode_utf16().collect::<Vec<_>>();
         let mut r = [x, y, (x + w).min(self.width), (y + h).min(self.height)];
+        let old = self.fit_font(&s, r[2] - r[0]);
         unsafe {
             DrawTextW(
                 self.dc,
@@ -246,6 +252,48 @@ impl Canvas {
                 &mut r,
                 0x20 | 0x800 | 0x8000,
             );
+            if !old.is_null() {
+                SelectObject(self.dc, old);
+            }
+        }
+    }
+    fn fit_font(&self, text: &[u16], width: i32) -> Handle {
+        let mut size = [0; 2];
+        if self.font_size <= 10
+            || unsafe {
+                GetTextExtentPoint32W(self.dc, text.as_ptr(), text.len() as i32, &mut size)
+            } == 0
+            || size[0] <= width
+        {
+            return ptr::null_mut();
+        }
+        let mut font = self.compact_font.get();
+        if font.is_null() {
+            let face: Vec<_> = "Segoe UI".encode_utf16().chain(Some(0)).collect();
+            font = unsafe {
+                CreateFontW(
+                    -(self.font_size * 3 / 4).max(10),
+                    0,
+                    0,
+                    0,
+                    400,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    4,
+                    0,
+                    face.as_ptr(),
+                )
+            };
+            self.compact_font.set(font);
+        }
+        if font.is_null() {
+            ptr::null_mut()
+        } else {
+            unsafe { SelectObject(self.dc, font) }
         }
     }
 }
@@ -257,6 +305,9 @@ impl Drop for Canvas {
             SelectObject(self.dc, self.old_font);
             DeleteObject(self.bitmap);
             DeleteObject(self.font);
+            if !self.compact_font.get().is_null() {
+                DeleteObject(self.compact_font.get());
+            }
             DeleteDC(self.dc);
         }
     }
@@ -435,7 +486,7 @@ impl Controls {
                 w: w - 32,
                 h: 64,
             },
-            "Arrastra tu vídeo aquí",
+            &crate::i18n::tr("Arrastra tu vídeo aquí"),
         );
         self.upload(m, 63, 0, (h - 64) / 2, &mut c)?;
         m.command(&["overlay-remove", "64"])
@@ -528,11 +579,11 @@ impl Controls {
             );
             c.centered(
                 r,
-                if i == 0 {
+                &crate::i18n::tr(if i == 0 {
                     "Continuar reproducción"
                 } else {
                     "Empezar de nuevo"
-                },
+                }),
             );
         }
         let view = cineplayer_core::popup_geometry::Viewport::new(w, h, self.mode)
@@ -576,7 +627,11 @@ impl Controls {
     }
     pub fn sync(&mut self, m: &Mpv, s: &State) -> Result<(), String> {
         let title = if s.features.status.starts_with("Esperando datos") {
-            format!("{} · Esperando datos del archivo", s.display_title)
+            format!(
+                "{} · {}",
+                s.display_title,
+                crate::i18n::tr("Esperando datos del archivo")
+            )
         } else {
             s.display_title.clone()
         };
@@ -608,7 +663,12 @@ impl Controls {
             }
         };
         self.glasses = s.prefs.glasses;
-        let config = format!("{}:{}", self.mode.code(), self.glasses as u8);
+        let config = format!(
+            "{}:{}:{}",
+            self.mode.code(),
+            self.glasses as u8,
+            crate::i18n::current()
+        );
         if self.config != config {
             m.command(&[
                 "script-message-to",
@@ -951,8 +1011,8 @@ impl Controls {
             let label = match f.volume_feedback {
                 2 => "Sonido silenciado".to_owned(),
                 3 => format!("Sonido activado · {:.0} %", f.volume),
-                1 => format!("Volumen ↑ {:.0} %", f.volume),
-                _ => format!("Volumen ↓ {:.0} %", f.volume),
+                1 => format!("{} ↑ {:.0} %", crate::i18n::tr("Volumen"), f.volume),
+                _ => format!("{} ↓ {:.0} %", crate::i18n::tr("Volumen"), f.volume),
             };
             let font = (l.panel * 22 / 100)
                 .clamp(14, 36)

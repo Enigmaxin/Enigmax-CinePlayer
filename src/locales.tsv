@@ -1,0 +1,409 @@
+Configuración	Settings	Configurações	Paramètres	Einstellungen	Impostazioni
+Idioma	Language	Idioma	Langue	Sprache	Lingua
+Idioma actualizado	Language updated	Idioma atualizado	Langue mise à jour	Sprache geändert	Lingua aggiornata
+Abrir vídeo…	Open video…	Abrir vídeo…	Ouvrir une vidéo…	Video öffnen…	Apri video…
+Abrir vídeo	Open video	Abrir vídeo	Ouvrir une vidéo	Video öffnen	Apri video
+Añadir subtítulos…	Add subtitles…	Adicionar legendas…	Ajouter des sous-titres…	Untertitel hinzufügen…	Aggiungi sottotitoli…
+Añadir subtítulos	Add subtitles	Adicionar legendas	Ajouter des sous-titres	Untertitel hinzufügen	Aggiungi sottotitoli
+Relación de aspecto final	Output aspect ratio	Proporção de saída	Format d’image de sortie	Ausgabeseitenverhältnis	Rapporto d’aspetto in uscita
+Automático (HDR si Windows y pantalla lo permiten)	Automatic (HDR if supported by Windows and display)	Automático (HDR se o Windows e a tela permitirem)	Automatique (HDR si Windows et l’écran le permettent)	Automatisch (HDR bei Unterstützung durch Windows und Bildschirm)	Automatico (HDR se supportato da Windows e dallo schermo)
+Convertir siempre a SDR	Always convert to SDR	Sempre converter para SDR	Toujours convertir en SDR	Immer in SDR umwandeln	Converti sempre in SDR
+Calidad / consumo	Quality / resource usage	Qualidade / consumo	Qualité / ressources	Qualität / Ressourcen	Qualità / consumo
+TV / altavoces: decodificar a PCM	TV / speakers: decode to PCM	TV / alto-falantes: decodificar para PCM	TV / enceintes : décoder en PCM	TV / Lautsprecher: in PCM dekodieren	TV / altoparlanti: decodifica in PCM
+Salida Óptica/Coaxial	Optical/Coaxial Output	Saída Óptica/Coaxial	Sortie optique/coaxiale	Optischer/Koaxialer Ausgang	Uscita ottica/coassiale
+Salida Bitstream HDMI	HDMI Bitstream Output	Saída Bitstream HDMI	Sortie bitstream HDMI	HDMI-Bitstream-Ausgabe	Uscita bitstream HDMI
+Salida de audio	Audio output	Saída de áudio	Sortie audio	Audioausgabe	Uscita audio
+Dispositivo predeterminado de Windows	Windows default device	Dispositivo padrão do Windows	Périphérique Windows par défaut	Windows-Standardgerät	Dispositivo predefinito di Windows
+Dispositivo de sonido	Audio device	Dispositivo de som	Périphérique audio	Audiogerät	Dispositivo audio
+Pista de audio	Audio track	Faixa de áudio	Piste audio	Audiospur	Traccia audio
+Pista de subtítulos	Subtitle track	Faixa de legendas	Piste de sous-titres	Untertitelspur	Traccia sottotitoli
+Pausa / continuar	Pause / resume	Pausar / continuar	Pause / reprendre	Pause / Fortsetzen	Pausa / riprendi
+Espacio	Space	Espaço	Espace	Leertaste	Spazio
+Pantalla completa	Fullscreen	Tela cheia	Plein écran	Vollbild	Schermo intero
+Ventana al tamaño original	Window at original size	Janela no tamanho original	Fenêtre à la taille d’origine	Fenster in Originalgröße	Finestra alla dimensione originale
+Información de reproducción	Playback information	Informações de reprodução	Informations de lecture	Wiedergabeinformationen	Informazioni di riproduzione
+Ayuda	Help	Ajuda	Aide	Hilfe	Aiuto
+Información del programa…	Program information…	Informações do programa…	Informations sur le logiciel…	Programminformationen…	Informazioni sul programma…
+Buscar actualizaciones…	Check for updates…	Buscar atualizações…	Rechercher des mises à jour…	Nach Updates suchen…	Verifica aggiornamenti…
+Acerca de	About	Sobre	À propos	Über	Informazioni
+Cerrar	Close	Fechar	Fermer	Schließen	Chiudi
+Cancelar	Cancel	Cancelar	Annuler	Abbrechen	Annulla
+Volver	Back	Voltar	Retour	Zurück	Indietro
+← Volver	← Back	← Voltar	← Retour	← Zurück	← Indietro
+‹  Volver	‹  Back	‹  Voltar	‹  Retour	‹  Zurück	‹  Indietro
+Subtítulos	Subtitles	Legendas	Sous-titres	Untertitel	Sottotitoli
+Sin subtítulos	Subtitles off	Sem legendas	Sans sous-titres	Keine Untertitel	Nessun sottotitolo
+Este archivo no contiene pistas de audio	This file has no audio tracks	Este arquivo não tem faixas de áudio	Ce fichier ne contient aucune piste audio	Diese Datei enthält keine Audiospuren	Questo file non contiene tracce audio
+Capítulos	Chapters	Capítulos	Chapitres	Kapitel	Capitoli
+Este vídeo no contiene capítulos	This video has no chapters	Este vídeo não tem capítulos	Cette vidéo ne contient aucun chapitre	Dieses Video enthält keine Kapitel	Questo video non contiene capitoli
+Capítulo anterior	Previous chapter	Capítulo anterior	Chapitre précédent	Vorheriges Kapitel	Capitolo precedente
+Capítulo siguiente	Next chapter	Próximo capítulo	Chapitre suivant	Nächstes Kapitel	Capitolo successivo
+Ir a un capítulo	Go to chapter	Ir para um capítulo	Aller à un chapitre	Zu Kapitel springen	Vai a un capitolo
+Información de audio y vídeo	Audio and video information	Informações de áudio e vídeo	Informations audio et vidéo	Audio- und Videoinformationen	Informazioni audio e video
+Intercambiar ojos izquierdo / derecho	Swap left and right eyes	Trocar olhos esquerdo e direito	Permuter les vues gauche et droite	Linkes und rechtes Auge tauschen	Scambia occhio sinistro e destro
+Arrastra tu vídeo aquí	Drop your video here	Arraste seu vídeo aqui	Déposez votre vidéo ici	Video hierher ziehen	Trascina qui il video
+Abre un vídeo para comenzar	Open a video to start	Abra um vídeo para começar	Ouvrez une vidéo pour commencer	Zum Start ein Video öffnen	Apri un video per iniziare
+Continuar reproducción	Resume playback	Continuar reprodução	Reprendre la lecture	Wiedergabe fortsetzen	Riprendi riproduzione
+Empezar de nuevo	Start over	Recomeçar	Recommencer	Von vorn beginnen	Ricomincia
+Esperando datos	Waiting for data	Aguardando dados	En attente de données	Warte auf Daten	In attesa di dati
+Sonido silenciado	Muted	Som silenciado	Son coupé	Stumm	Audio disattivato
+Sonido activado	Unmuted	Som ativado	Son rétabli	Ton wieder an	Audio riattivato
+Volumen	Volume	Volume	Volume	Lautstärke	Volume
+Vídeo 3D	3D video	Vídeo 3D	Vidéo 3D	3D-Video	Video 3D
+Vídeo 2D	2D video	Vídeo 2D	Vidéo 2D	2D-Video	Video 2D
+Enigmax CinePlayer — Vídeo 3D	Enigmax CinePlayer — 3D video	Enigmax CinePlayer — Vídeo 3D	Enigmax CinePlayer — Vidéo 3D	Enigmax CinePlayer — 3D-Video	Enigmax CinePlayer — Video 3D
+Formato 3D de entrada	3D input format	Formato 3D de entrada	Format 3D d’entrée	3D-Eingabeformat	Formato 3D in ingresso
+Todas las opciones 3D	All 3D options	Todas as opções 3D	Toutes les options 3D	Alle 3D-Optionen	Tutte le opzioni 3D
+¿Cómo quieres reproducirlo?	How would you like to play it?	Como deseja reproduzir?	Comment voulez-vous le lire ?	Wie möchtest du es wiedergeben?	Come vuoi riprodurlo?
+Formato detectado	Detected format	Formato detectado	Format détecté	Erkanntes Format	Formato rilevato
+Pulsa un modo para reproducir	Select a mode to play	Selecione um modo para reproduzir	Sélectionnez un mode de lecture	Wiedergabemodus wählen	Seleziona una modalità di riproduzione
+3D Original	Original 3D	3D original	3D d’origine	Original-3D	3D originale
+Reproducir en SBS Anamórfico	Play in anamorphic SBS	Reproduzir em SBS anamórfico	Lire en SBS anamorphique	Anamorphes SBS wiedergeben	Riproduci in SBS anamorfico
+SBS Anamórfico	Anamorphic SBS	SBS anamórfico	SBS anamorphique	Anamorphes SBS	SBS anamorfico
+Reproducir en Anaglifo	Play in anaglyph	Reproduzir em anáglifo	Lire en anaglyphe	Anaglyphisch wiedergeben	Riproduci in anaglifo
+Reproducir en 2D	Play in 2D	Reproduzir em 2D	Lire en 2D	In 2D wiedergeben	Riproduci in 2D
+Gafas de colores	Color-filter glasses	Óculos com filtros coloridos	Lunettes à filtres colorés	Farbfilterbrille	Occhiali con filtri colorati
+Elige tus gafas de colores	Choose your color-filter glasses	Escolha seus óculos com filtros coloridos	Choisissez vos lunettes à filtres colorés	Farbfilterbrille auswählen	Scegli gli occhiali con filtri colorati
+Pulsa tus gafas para reproducir; Volver regresa a los modos 3D	Choose your glasses to play. Back returns to the 3D modes.	Selecione os óculos para reproduzir. Voltar retorna aos modos 3D.	Choisissez vos lunettes pour lancer la lecture. Retour ouvre les modes 3D.	Wähle deine Brille für die Wiedergabe. Zurück führt zu den 3D-Modi.	Scegli gli occhiali per avviare la riproduzione. Indietro torna alle modalità 3D.
+Frame Packing: composición experimental; no activa HDMI 3D.	Frame Packing: experimental layout. HDMI 3D is not activated.	Frame Packing: composição experimental. Não ativa HDMI 3D.	Frame Packing : composition expérimentale. N’active pas le HDMI 3D.	Frame Packing: experimentelles Layout. HDMI-3D wird nicht aktiviert.	Frame Packing: composizione sperimentale. Non attiva HDMI 3D.
+(Experimental)	(Experimental)	(Experimental)	(Expérimental)	(Experimentell)	(Sperimentale)
+Rojo / cian	Red / cyan	Vermelho / ciano	Rouge / cyan	Rot / Cyan	Rosso / ciano
+Verde / magenta	Green / magenta	Verde / magenta	Vert / magenta	Grün / Magenta	Verde / magenta
+Ámbar / azul	Amber / blue	Âmbar / azul	Ambre / bleu	Bernstein / Blau	Ambra / blu
+Rojo / azul	Red / blue	Vermelho / azul	Rouge / bleu	Rot / Blau	Rosso / blu
+Rojo / verde	Red / green	Vermelho / verde	Rouge / vert	Rot / Grün	Rosso / verde
+Rojo / azul (monocromo)	Red / blue (monochrome)	Vermelho / azul (monocromático)	Rouge / bleu (monochrome)	Rot / Blau (monochrom)	Rosso / blu (monocromatico)
+Rojo / verde (monocromo)	Red / green (monochrome)	Vermelho / verde (monocromático)	Rouge / vert (monochrome)	Rot / Grün (monochrom)	Rosso / verde (monocromatico)
+Automático	Automatic	Automático	Automatique	Automatisch	Automatico
+Automático / metadatos	Automatic / metadata	Automático / metadados	Automatique / métadonnées	Automatisch / Metadaten	Automatico / metadati
+2D / cuadro único	2D / single frame	2D / quadro único	2D / image unique	2D / Einzelbild	2D / fotogramma singolo
+Full SBS — lado a lado	Full SBS — side by side	Full SBS — lado a lado	Full SBS — côte à côte	Full SBS — nebeneinander	Full SBS — affiancato
+Half SBS — lado a lado	Half SBS — side by side	Half SBS — lado a lado	Half SBS — côte à côte	Half SBS — nebeneinander	Half SBS — affiancato
+Full OU — arriba / abajo	Full OU — top and bottom	Full OU — acima e abaixo	Full OU — haut et bas	Full OU — übereinander	Full OU — sopra e sotto
+Half OU — arriba / abajo	Half OU — top and bottom	Half OU — acima e abaixo	Half OU — haut et bas	Half OU — übereinander	Half OU — sopra e sotto
+Original / las dos vistas	Original / both views	Original / ambas as vistas	Original / les deux vues	Original / beide Ansichten	Originale / entrambe le viste
+Paralaje / Convergencia…	Parallax / convergence…	Paralaxe / convergência…	Parallaxe / convergence…	Parallaxe / Konvergenz…	Parallasse / convergenza…
+Paralaje / Convergencia	Parallax / convergence	Paralaxe / convergência	Parallaxe / convergence	Parallaxe / Konvergenz	Parallasse / convergenza
+Paralaje	Parallax	Paralaxe	Parallaxe	Parallaxe	Parallasse
+Guardar como predeterminado	Save as default	Salvar como padrão	Enregistrer par défaut	Als Standard speichern	Salva come predefinito
+Guardar perfil para este archivo	Save profile for this file	Salvar perfil para este arquivo	Enregistrer un profil pour ce fichier	Profil für diese Datei speichern	Salva il profilo per questo file
+Cargar perfil de este archivo	Load this file’s profile	Carregar perfil deste arquivo	Charger le profil de ce fichier	Profil dieser Datei laden	Carica il profilo di questo file
+Restablecer opciones 3D	Reset 3D options	Redefinir opções 3D	Réinitialiser les options 3D	3D-Optionen zurücksetzen	Ripristina le opzioni 3D
+Ajustes guardados	Saved settings	Configurações salvas	Réglages enregistrés	Gespeicherte Einstellungen	Impostazioni salvate
+Izquierdo (habitual)	Left (default)	Esquerdo (padrão)	Gauche (par défaut)	Links (Standard)	Sinistro (predefinito)
+Derecho	Right	Direito	Droite	Rechts	Destro
+Ojo que mostrar en 2D	Eye to show in 2D	Olho a exibir em 2D	Œil à afficher en 2D	In 2D angezeigtes Auge	Occhio da mostrare in 2D
+Algoritmo anaglifo	Anaglyph algorithm	Algoritmo de anáglifo	Algorithme anaglyphe	Anaglyphenalgorithmus	Algoritmo anaglifo
+Ajuste de brillo por ojo	Per-eye brightness	Brilho por olho	Luminosité par œil	Helligkeit je Auge	Luminosità per occhio
+Brillo izquierdo	Left-eye brightness	Brilho do olho esquerdo	Luminosité de l’œil gauche	Helligkeit links	Luminosità occhio sinistro
+Brillo derecho	Right-eye brightness	Brilho do olho direito	Luminosité de l’œil droit	Helligkeit rechts	Luminosità occhio destro
+Restablecer brillo por ojo	Reset per-eye brightness	Redefinir brilho por olho	Réinitialiser la luminosité par œil	Helligkeit je Auge zurücksetzen	Ripristina luminosità per occhio
+Información de detección ASS	ASS detection information	Informações de detecção ASS	Informations de détection ASS	Informationen zur ASS-Erkennung	Informazioni sul rilevamento ASS
+Subtítulos 3D	3D subtitles	Legendas 3D	Sous-titres 3D	3D-Untertitel	Sottotitoli 3D
+Títulos Blu-ray (sin menús BD-J)	Blu-ray titles (without BD-J menus)	Títulos Blu-ray (sem menus BD-J)	Titres Blu-ray (sans menus BD-J)	Blu-ray-Titel (ohne BD-J-Menüs)	Titoli Blu-ray (senza menu BD-J)
+Posible vídeo 3D: confirma el formato del archivo	Possible 3D video: confirm the file format	Possível vídeo 3D: confirme o formato do arquivo	Vidéo potentiellement 3D : confirmez le format du fichier	Mögliches 3D-Video: Dateiformat bestätigen	Possibile video 3D: conferma il formato del file
+Elige el formato 3D que tiene tu archivo	Choose the 3D format of your file	Escolha o formato 3D do arquivo	Choisissez le format 3D de votre fichier	3D-Format der Datei wählen	Scegli il formato 3D del file
+Falta seleccionar el formato 3D del archivo	Select the file’s 3D format first	Selecione primeiro o formato 3D do arquivo	Sélectionnez d’abord le format 3D du fichier	Zuerst das 3D-Format der Datei wählen	Seleziona prima il formato 3D del file
+¿Quieres continuar donde lo dejaste?	Would you like to pick up where you left off?	Deseja continuar de onde parou?	Voulez-vous reprendre là où vous vous êtes arrêté ?	An der letzten Position fortsetzen?	Vuoi riprendere da dove avevi interrotto?
+Última posición	Last position	Última posição	Dernière position	Letzte Position	Ultima posizione
+Reanudar reproducción	Resume playback	Retomar reprodução	Reprendre la lecture	Wiedergabe fortsetzen	Riprendi riproduzione
+Continuar desde la posición guardada	Continue from the saved position	Continuar da posição salva	Continuer depuis la position enregistrée	Ab gespeicherter Position fortsetzen	Continua dalla posizione salvata
+Reproducir desde el principio	Play from the beginning	Reproduzir do início	Lire depuis le début	Von Anfang an wiedergeben	Riproduci dall’inizio
+Dubois / color optimizado	Dubois / optimized color	Dubois / cor otimizada	Dubois / couleurs optimisées	Dubois / optimierte Farben	Dubois / colore ottimizzato
+Medio color	Half color	Meia cor	Demi-couleur	Halbfarbe	Mezzo colore
+Color directo	Direct color	Cor direta	Couleurs directes	Direkte Farben	Colore diretto
+Equilibrado · GPU	Balanced · GPU	Equilibrado · GPU	Équilibré · GPU	Ausgewogen · GPU	Bilanciato · GPU
+Máxima calidad · GPU	Maximum quality · GPU	Qualidade máxima · GPU	Qualité maximale · GPU	Maximale Qualität · GPU	Qualità massima · GPU
+Compatibilidad · anaglifo por CPU	Compatibility · CPU anaglyph	Compatibilidade · anáglifo por CPU	Compatibilité · anaglyphe sur CPU	Kompatibilität · CPU-Anaglyphe	Compatibilità · anaglifo su CPU
+Mínimo consumo · equipos modestos	Low resource usage · entry-level PCs	Consumo mínimo · PCs básicos	Ressources minimales · PC modestes	Minimaler Verbrauch · einfache PCs	Consumo minimo · PC meno potenti
+Lectura adaptativa (caché comprimida limitada)	Adaptive reading (limited compressed cache)	Leitura adaptativa (cache compactado limitado)	Lecture adaptative (cache compressé limité)	Adaptives Lesen (begrenzter komprimierter Cache)	Lettura adattiva (cache compressa limitata)
+Igualar frecuencia de fotogramas	Match frame rate	Igualar taxa de quadros	Adapter la fréquence d’affichage	Bildfrequenz abgleichen	Adatta frequenza dei fotogrammi
+Cursor estereoscópico	Stereoscopic cursor	Cursor estereoscópico	Curseur stéréoscopique	Stereoskopischer Mauszeiger	Cursore stereoscopico
+Desentrelazado automático	Automatic deinterlacing	Desentrelaçamento automático	Désentrelacement automatique	Automatisches Deinterlacing	Deinterlacciamento automatico
+Reproducción	Playback	Reprodução	Lecture	Wiedergabe	Riproduzione
+Modo nocturno (PCM)	Night mode (PCM)	Modo noturno (PCM)	Mode nuit (PCM)	Nachtmodus (PCM)	Modalità notte (PCM)
+Claridad de voz: realce suave (PCM)	Voice clarity: gentle boost (PCM)	Clareza de voz: realce suave (PCM)	Clarté des voix : léger renforcement (PCM)	Sprachverständlichkeit: sanfte Anhebung (PCM)	Chiarezza vocale: lieve enfasi (PCM)
+Filtros	Filters	Filtros	Filtres	Filter	Filtri
+Suspendidos: la salida bitstream conserva el audio original	Suspended: bitstream output preserves the original audio	Suspensos: a saída bitstream preserva o áudio original	Suspendus : la sortie bitstream préserve l’audio d’origine	Ausgesetzt: Bitstream-Ausgabe bewahrt den Originalton	Sospesi: l’uscita bitstream preserva l’audio originale
+Aspecto de subtítulos…	Subtitle appearance…	Aparência das legendas…	Apparence des sous-titres…	Untertiteldarstellung…	Aspetto dei sottotitoli…
+Aspecto de subtítulos	Subtitle appearance	Aparência das legendas	Apparence des sous-titres	Untertiteldarstellung	Aspetto dei sottotitoli
+Tamaño	Size	Tamanho	Taille	Größe	Dimensione
+Tamaño: original ASS/PGS	Size: original ASS/PGS	Tamanho: original ASS/PGS	Taille : d’origine ASS/PGS	Größe: ASS/PGS-Original	Dimensione: originale ASS/PGS
+Posición	Position	Posição	Position	Position	Posizione
+Color de subtítulos	Subtitle color	Cor das legendas	Couleur des sous-titres	Untertitelfarbe	Colore dei sottotitoli
+Restablecer todos los ajustes de subtítulos	Reset all subtitle settings	Redefinir todas as configurações de legendas	Réinitialiser tous les réglages de sous-titres	Alle Untertiteleinstellungen zurücksetzen	Ripristina tutte le impostazioni dei sottotitoli
+Blanco	White	Branco	Blanc	Weiß	Bianco
+Amarillo	Yellow	Amarelo	Jaune	Gelb	Giallo
+Cian	Cyan	Ciano	Cyan	Cyan	Ciano
+Verde	Green	Verde	Vert	Grün	Verde
+Rosa	Pink	Rosa	Rose	Rosa	Rosa
+Gris claro	Light gray	Cinza claro	Gris clair	Hellgrau	Grigio chiaro
+ARCHIVO	FILE	ARQUIVO	FICHIER	DATEI	FILE
+VÍDEO	VIDEO	VÍDEO	VIDÉO	VIDEO	VIDEO
+AUDIOS	AUDIO TRACKS	FAIXAS DE ÁUDIO	PISTES AUDIO	AUDIOSPUREN	TRACCE AUDIO
+SUBTÍTULOS	SUBTITLES	LEGENDAS	SOUS-TITRES	UNTERTITEL	SOTTOTITOLI
+Sin pistas	No tracks	Sem faixas	Aucune piste	Keine Spuren	Nessuna traccia
+Salida	Output	Saída	Sortie	Ausgabe	Uscita
+Primarias	Primaries	Primárias	Primaires	Primärfarben	Primari
+Transferencia	Transfer	Transferência	Transfert	Transferfunktion	Trasferimento
+Matriz	Matrix	Matriz	Matrice	Matrix	Matrice
+Rango	Range	Faixa	Plage	Pegelbereich	Intervallo
+Píxeles	Pixels	Pixels	Pixels	Pixel	Pixel
+Decodificación	Decoding	Decodificação	Décodage	Dekodierung	Decodifica
+Renderizador	Renderer	Renderizador	Moteur de rendu	Renderer	Renderer
+Fotogramas descartados	Dropped frames	Quadros descartados	Images perdues	Verworfene Bilder	Fotogrammi scartati
+Transferencia tras filtros	Transfer after filters	Transferência após filtros	Transfert après filtres	Transferfunktion nach Filtern	Trasferimento dopo i filtri
+Transferencia de salida	Output transfer	Transferência de saída	Transfert de sortie	Ausgabe-Transferfunktion	Trasferimento in uscita
+Primarias de salida	Output primaries	Primárias de saída	Primaires de sortie	Ausgabeprimärfarben	Primari in uscita
+Información	Information	Informações	Informations	Informationen	Informazioni
+No disponible	Unavailable	Indisponível	Indisponible	Nicht verfügbar	Non disponibile
+Subtítulos (SRT, ASS, SSA, SUP)	Subtitles (SRT, ASS, SSA, SUP)	Legendas (SRT, ASS, SSA, SUP)	Sous-titres (SRT, ASS, SSA, SUP)	Untertitel (SRT, ASS, SSA, SUP)	Sottotitoli (SRT, ASS, SSA, SUP)
+Todos los archivos	All files	Todos os arquivos	Tous les fichiers	Alle Dateien	Tutti i file
+Vídeos MKV / MP4 / Blu-ray ISO	MKV / MP4 / Blu-ray ISO videos	Vídeos MKV / MP4 / Blu-ray ISO	Vidéos MKV / MP4 / Blu-ray ISO	MKV / MP4 / Blu-ray-ISO-Videos	Video MKV / MP4 / Blu-ray ISO
+Vídeos	Videos	Vídeos	Vidéos	Videos	Video
+Enigmax CinePlayer — Actualizaciones	Enigmax CinePlayer — Updates	Enigmax CinePlayer — Atualizações	Enigmax CinePlayer — Mises à jour	Enigmax CinePlayer — Updates	Enigmax CinePlayer — Aggiornamenti
+Abriendo vídeo	Opening video	Abrindo vídeo	Ouverture de la vidéo	Video wird geöffnet	Apertura del video
+Crosstalk	Crosstalk	Diafonia	Diaphonie	Übersprechen	Diafonia
+Original	Original	Original	D’origine	Original	Originale
+Marfil	Ivory	Marfim	Ivoire	Elfenbein	Avorio
+Color: personalizado	Color: custom	Cor: personalizada	Couleur : personnalisée	Farbe: benutzerdefiniert	Colore: personalizzato
+Color: original ASS/PGS	Color: original ASS/PGS	Cor: original ASS/PGS	Couleur : d’origine ASS/PGS	Farbe: ASS/PGS-Original	Colore: originale ASS/PGS
+Color	Color	Cor	Couleur	Farbe	Colore
+Automático · detectar eventos duplicados	Automatic · detect paired events	Automático · detectar eventos pareados	Automatique · détecter les événements appariés	Automatisch · Ereignispaare erkennen	Automatico · rileva gli eventi accoppiati
+Subtítulos 2D · no transformar	2D subtitles · keep original layout	Legendas 2D · manter o layout original	Sous-titres 2D · conserver la disposition d’origine	2D-Untertitel · Originallayout beibehalten	Sottotitoli 2D · mantieni la disposizione originale
+Forzar ASS 3D SBS	Force ASS 3D SBS	Forçar ASS 3D SBS	Forcer ASS 3D SBS	ASS 3D SBS erzwingen	Forza ASS 3D SBS
+Forzar ASS 3D OU	Force ASS 3D OU	Forçar ASS 3D OU	Forcer ASS 3D OU	ASS 3D OU erzwingen	Forza ASS 3D OU
+ASS 3D desactivado por el usuario	ASS 3D disabled by the user	ASS 3D desativado pelo usuário	ASS 3D désactivé par l’utilisateur	ASS 3D vom Benutzer deaktiviert	ASS 3D disattivato dall’utente
+Sin pista ASS válida seleccionada	No valid ASS track selected	Nenhuma faixa ASS válida selecionada	Aucune piste ASS valide sélectionnée	Keine gültige ASS-Spur ausgewählt	Nessuna traccia ASS valida selezionata
+ASS sin par estereoscópico confirmado	No confirmed stereoscopic pair in the ASS track	Nenhum par estereoscópico confirmado na faixa ASS	Aucune paire stéréoscopique confirmée dans la piste ASS	Kein bestätigtes Stereopaar in der ASS-Spur	Nessuna coppia stereoscopica confermata nella traccia ASS
+duplicación detectada	paired events detected	eventos pareados detectados	événements appariés détectés	Ereignispaare erkannt	eventi accoppiati rilevati
+selección manual	manual selection	seleção manual	sélection manuelle	Manuelle Auswahl	selezione manuale
+lienzo	canvas	área de referência	zone de référence	Referenzfläche	area di riferimento
+Abriendo vídeo…	Opening video…	Abrindo vídeo…	Ouverture de la vidéo…	Video wird geöffnet…	Apertura del video…
+Esperando datos del archivo	Waiting for file data	Aguardando dados do arquivo	En attente des données du fichier	Warte auf Dateidaten	In attesa dei dati del file
+Apertura del archivo	Opening file	Abertura do arquivo	Ouverture du fichier	Datei öffnen	Apertura del file
+Preparación del vídeo	Preparing video	Preparação do vídeo	Préparation de la vidéo	Video vorbereiten	Preparazione del video
+Búsqueda	Seeking	Busca	Recherche de position	Positionssprung	Ricerca posizione
+Cambio de pista	Switching tracks	Troca de faixa	Changement de piste	Spurwechsel	Cambio traccia
+Control de reproducción	Playback control	Controle de reprodução	Commande de lecture	Wiedergabesteuerung	Controllo della riproduzione
+Opciones de reproducción	Playback options	Opções de reprodução	Options de lecture	Wiedergabeoptionen	Opzioni di riproduzione
+Detección estructural 3D	Structural 3D detection	Detecção estrutural de 3D	Détection structurelle 3D	Strukturelle 3D-Erkennung	Rilevamento strutturale 3D
+Lectura adaptativa	Adaptive reading	Leitura adaptativa	Lecture adaptative	Adaptives Lesen	Lettura adattiva
+Presentación de vídeo	Video presentation	Apresentação de vídeo	Affichage vidéo	Videoausgabe	Presentazione video
+Reproductor de vídeo para Windows 11 (x64)	Video player for Windows 11 (x64)	Reprodutor de vídeo para Windows 11 (x64)	Lecteur vidéo pour Windows 11 (x64)	Videoplayer für Windows 11 (x64)	Lettore video per Windows 11 (x64)
+Motor de reproducción	Playback engine	Motor de reprodução	Moteur de lecture	Wiedergabe-Engine	Motore di riproduzione
+Salida SDR	SDR output	Saída SDR	Sortie SDR	SDR-Ausgabe	Uscita SDR
+Color automático: revisa HDR en Windows	Automatic color: check HDR in Windows	Cor automática: verifique o HDR no Windows	Couleur automatique : vérifiez le HDR dans Windows	Automatische Farbausgabe: HDR in Windows prüfen	Colore automatico: controlla l’HDR in Windows
+Audio decodificado a PCM	Audio decoded to PCM	Áudio decodificado para PCM	Audio décodé en PCM	Audio in PCM dekodiert	Audio decodificato in PCM
+Arrastra un vídeo aquí o pulsa Ctrl+O	Drop a video here or press Ctrl+O	Arraste um vídeo aqui ou pressione Ctrl+O	Déposez une vidéo ici ou appuyez sur Ctrl+O	Video hierher ziehen oder Strg+O drücken	Trascina qui un video o premi Ctrl+O
+Ctrl+O: abrir vídeo	Ctrl+O: open video	Ctrl+O: abrir vídeo	Ctrl+O : ouvrir une vidéo	Strg+O: Video öffnen	Ctrl+O: apri video
+Clic derecho / M: menú general	Right-click / M: main menu	Botão direito / M: menu principal	Clic droit / M : menu principal	Rechtsklick / M: Hauptmenü	Clic destro / M: menu principale
+Ctrl+3: vídeo 3D	Ctrl+3: 3D video	Ctrl+3: vídeo 3D	Ctrl+3 : vidéo 3D	Strg+3: 3D-Video	Ctrl+3: video 3D
+Espacio: pausa	Space: pause	Espaço: pausar	Espace : mettre en pause	Leertaste: Pause	Spazio: pausa
+F / doble clic: pantalla completa	F / double-click: fullscreen	F / clique duplo: tela cheia	F / double-clic : plein écran	F / Doppelklick: Vollbild	F / doppio clic: schermo intero
+−10 / +10 y flechas: buscar	−10 / +10 and arrow keys: seek	−10 / +10 e setas: avançar ou retroceder	−10 / +10 et flèches : avancer ou reculer	−10 / +10 und Pfeiltasten: springen	−10 / +10 e frecce: avanti o indietro
+1: tamaño original	1: original size	1: tamanho original	1 : taille d’origine	1: Originalgröße	1: dimensione originale
+Q: cerrar	Q: close	Q: fechar	Q : fermer	Q: schließen	Q: chiudi
+Flechas: avanzar/retroceder	Arrow keys: seek backward or forward	Setas: avançar ou retroceder	Flèches : avancer ou reculer	Pfeiltasten: vor- oder zurückspringen	Frecce: avanti o indietro
+1: ventana al tamaño original	1: window at original size	1: janela no tamanho original	1 : fenêtre à la taille d’origine	1: Fenster in Originalgröße	1: finestra alla dimensione originale
+F1: ayuda	F1: help	F1: ajuda	F1 : aide	F1: Hilfe	F1: aiuto
+Títulos	Titles	Títulos	Titres	Titel	Titoli
+repeticiones	repeats	repetições	répétitions	Wiederholungen	ripetizioni
+Edición / montaje	Edition / cut	Edição / montagem	Édition / montage	Fassung / Schnitt	Edizione / montaggio
+El cambio puede reiniciar la posición de reproducción.	Switching may restart playback.	A mudança pode reiniciar a reprodução.	Le changement peut relancer la lecture depuis le début.	Beim Wechsel kann die Wiedergabe von vorn beginnen.	Il cambio può riavviare la riproduzione.
+Efectos de audio suspendidos: bitstream intacto seleccionado	Audio effects suspended: untouched bitstream selected	Efeitos de áudio suspensos: bitstream intacto selecionado	Effets audio suspendus : sortie bitstream intacte sélectionnée	Audioeffekte ausgesetzt: unveränderte Bitstream-Ausgabe gewählt	Effetti audio sospesi: uscita bitstream intatta selezionata
+HDR · PQ · metadatos dinámicos	HDR · PQ · dynamic metadata	HDR · PQ · metadados dinâmicos	HDR · PQ · métadonnées dynamiques	HDR · PQ · Dynamische Metadaten	HDR · PQ · metadati dinamici
+perfil	profile	perfil	profil	Profil	profilo
+HDR10+ · metadatos dinámicos detectados	HDR10+ · dynamic metadata detected	HDR10+ · metadados dinâmicos detectados	HDR10+ · métadonnées dynamiques détectées	HDR10+ · Dynamische Metadaten erkannt	HDR10+ · metadati dinamici rilevati
+Mastering máx.	Mastering peak	Pico de masterização	Pic de mastering	Mastering-Spitzenwert	Picco di mastering
+canales	channels	canais	canaux	Kanäle	canali
+Archivo	File	Arquivo	Fichier	Datei	File
+Caché	Cache	Cache	Cache	Cache	Cache
+Espera de caché	Waiting for cache	Aguardando o cache	Attente du cache	Warte auf Cache	In attesa della cache
+Descartes	Dropped frames	Quadros descartados	Images perdues	Verworfene Bilder	Fotogrammi scartati
+Decodificador	Decoder	Decodificador	Décodeur	Decoder	Decodificatore
+Render	Renderer	Renderizador	Moteur de rendu	Renderer	Renderer
+Entrada	Input	Entrada	Entrée	Eingabe	Ingresso
+Frecuencia automática	Automatic refresh rate	Taxa de atualização automática	Fréquence d’affichage automatique	Automatische Bildwiederholrate	Frequenza di aggiornamento automatica
+Pantalla	Display	Tela	Écran	Bildschirm	Schermo
+Vídeo	Video	Vídeo	Vidéo	Video	Video
+No hay un último vídeo disponible	No previous video is available	Nenhum vídeo anterior disponível	Aucune vidéo précédente disponible	Kein zuletzt abgespieltes Video verfügbar	Nessun video precedente disponibile
+No se encontró un título Blu-ray reproducible	No playable Blu-ray title found	Nenhum título Blu-ray reproduzível encontrado	Aucun titre Blu-ray lisible trouvé	Kein abspielbarer Blu-ray-Titel gefunden	Nessun titolo Blu-ray riproducibile trovato
+No se pudo recuperar la posición. Puedes continuar desde aquí.	Could not restore the position. You can continue from here.	Não foi possível restaurar a posição. Você pode continuar daqui.	Impossible de restaurer la position. Vous pouvez reprendre ici.	Position konnte nicht wiederhergestellt werden. Die Wiedergabe kann hier fortgesetzt werden.	Impossibile ripristinare la posizione. Puoi continuare da qui.
+Disco: lectura UDF directa de flujo verificado; composición GPU	Disc: direct UDF reading of verified stream. GPU compositing.	Disco: leitura UDF direta de fluxo verificado. Composição por GPU.	Disque : lecture UDF directe du flux vérifié. Composition par GPU.	Disc: verifizierter Stream direkt per UDF gelesen. GPU-Komposition.	Disco: lettura UDF diretta del flusso verificato. Composizione GPU.
+Decodificación nativa; composición GPU	Native decoding. GPU compositing.	Decodificação nativa. Composição por GPU.	Décodage natif. Composition par GPU.	Native Dekodierung. GPU-Komposition.	Decodifica nativa. Composizione GPU.
+Vídeo 2D: no hay composición anaglifa activa	2D video: anaglyph compositing is inactive	Vídeo 2D: composição anáglifa inativa	Vidéo 2D : composition anaglyphe inactive	2D-Video: Anaglyphenkomposition inaktiv	Video 2D: composizione anaglifica inattiva
+Anaglifo CPU de compatibilidad · RGB 8 bits	Compatibility CPU anaglyph · 8-bit RGB	Anáglifo de compatibilidade por CPU · RGB de 8 bits	Anaglyphe sur CPU en mode compatibilité · RVB 8 bits	Kompatibilitätsmodus mit CPU-Anaglyphe · 8-Bit-RGB	Anaglifo di compatibilità su CPU · RGB a 8 bit
+HDR → SDR por CPU; composición anaglifa GPU	HDR → SDR on CPU. GPU anaglyph compositing.	HDR → SDR por CPU. Composição anáglifa por GPU.	HDR → SDR sur CPU. Composition anaglyphe par GPU.	HDR → SDR auf der CPU. Anaglyphenkomposition auf der GPU.	HDR → SDR su CPU. Composizione anaglifica su GPU.
+subtítulos por ojo con profundidad GPU	per-eye subtitles with GPU depth	legendas por olho com profundidade por GPU	sous-titres par œil avec profondeur calculée par GPU	Untertitel je Auge mit GPU-Tiefenberechnung	sottotitoli per occhio con profondità su GPU
+Frame Packing 1920×2205 (composición)	Frame Packing 1920×2205 (layout)	Frame Packing 1920×2205 (composição)	Frame Packing 1920×2205 (composition)	Frame Packing 1920×2205 (Layout)	Frame Packing 1920×2205 (composizione)
+Paralaje disponible en salidas 3D. En anaglifo con perfil Compatibilidad permanece desactivado.	Parallax is available for 3D output. It is disabled for anaglyph in the Compatibility preset.	A paralaxe está disponível em saídas 3D. No anáglifo com o perfil Compatibilidade, fica desativada.	La parallaxe est disponible en sortie 3D. Elle est désactivée en anaglyphe avec le profil Compatibilité.	Parallaxe ist bei 3D-Ausgabe verfügbar. Im Kompatibilitätsprofil bleibt sie bei Anaglyphen deaktiviert.	La parallasse è disponibile in uscita 3D. In anaglifo con il profilo Compatibilità rimane disattivata.
+Abre un archivo antes de guardar su perfil	Open a file before saving its profile	Abra um arquivo antes de salvar seu perfil	Ouvrez un fichier avant d’enregistrer son profil	Vor dem Speichern des Profils eine Datei öffnen	Apri un file prima di salvarne il profilo
+Enigmax CinePlayer — Descargando actualización	Enigmax CinePlayer — Downloading update	Enigmax CinePlayer — Baixando atualização	Enigmax CinePlayer — Téléchargement de la mise à jour	Enigmax CinePlayer — Update wird heruntergeladen	Enigmax CinePlayer — Download dell’aggiornamento
+Descargando versión	Downloading version	Baixando versão	Téléchargement de la version	Download der Version	Download della versione
+Enigmax CinePlayer — Actualización	Enigmax CinePlayer — Update	Enigmax CinePlayer — Atualização	Enigmax CinePlayer — Mise à jour	Enigmax CinePlayer — Update	Enigmax CinePlayer — Aggiornamento
+No se ha aplicado la actualización. El reproductor sigue abierto.	The update was not applied. The player is still open.	A atualização não foi aplicada. O reprodutor continua aberto.	La mise à jour n’a pas été appliquée. Le lecteur reste ouvert.	Das Update wurde nicht angewendet. Der Player ist weiterhin geöffnet.	L’aggiornamento non è stato applicato. Il lettore rimane aperto.
+No se pudo completar la actualización. Puedes abrir de nuevo el reproductor si la recuperación ha terminado.	The update could not be completed. You can reopen the player once recovery is complete.	Não foi possível concluir a atualização. Você pode reabrir o reprodutor após a recuperação.	La mise à jour a échoué. Vous pouvez rouvrir le lecteur une fois la récupération terminée.	Das Update konnte nicht abgeschlossen werden. Nach der Wiederherstellung kann der Player erneut geöffnet werden.	Impossibile completare l’aggiornamento. Puoi riaprire il lettore al termine del ripristino.
+Comprobación completada correctamente.	Update check completed.	Verificação concluída.	Vérification terminée.	Updateprüfung abgeschlossen.	Verifica completata.
+No hay una versión estable más reciente.	You have the latest stable version.	Você já tem a versão estável mais recente.	Vous avez la dernière version stable.	Die aktuelle stabile Version ist installiert.	Hai la versione stabile più recente.
+Versión instalada	Installed version	Versão instalada	Version installée	Installierte Version	Versione installata
+Descargas	Downloads	Downloads	Téléchargements	Downloads	Download
+¿Quieres actualizar ahora?	Update now?	Atualizar agora?	Mettre à jour maintenant ?	Jetzt aktualisieren?	Aggiornare ora?
+Comprobación correcta	Check successful	Verificação bem-sucedida	Vérification réussie	Prüfung erfolgreich	Verifica riuscita
+No hay una versión con manifiesto publicado	No release with a published manifest	Nenhuma versão com manifesto publicado	Aucune version avec un manifeste publié	Keine Version mit veröffentlichtem Manifest	Nessuna versione con un manifesto pubblicato
+Límite temporal de peticiones	Temporary rate limit	Limite temporário de requisições	Limite temporaire de requêtes	Vorübergehendes Anfragelimit	Limite temporaneo di richieste
+Error del servidor	Server error	Erro do servidor	Erreur du serveur	Serverfehler	Errore del server
+Último estado	Last status	Último estado	Dernier état	Letzter Status	Ultimo stato
+No se pudo completar la comprobación	Could not complete the check	Não foi possível concluir a verificação	Impossible de terminer la vérification	Prüfung konnte nicht abgeschlossen werden	Impossibile completare la verifica
+Se reintentará automáticamente más tarde.	The player will retry automatically later.	O reprodutor tentará novamente mais tarde.	Le lecteur réessaiera automatiquement plus tard.	Der Player versucht es später automatisch erneut.	Il lettore riproverà automaticamente più tardi.
+Ahora	Now	Agora	En cours	Aktuell	Ora
+Sincronización	Synchronization	Sincronização	Synchronisation	Synchronisierung	Sincronizzazione
+No existe el archivo	File not found	Arquivo não encontrado	Fichier introuvable	Datei nicht gefunden	File non trovato
+No existe	Not found	Não encontrado	Introuvable	Nicht gefunden	Non trovato
+No se pudo guardar la calidad	Could not save the quality preset	Não foi possível salvar o perfil de qualidade	Impossible d’enregistrer le profil de qualité	Qualitätsprofil konnte nicht gespeichert werden	Impossibile salvare il profilo di qualità
+No se ha confirmado un par 3D. Si es SBS/OU, selecciona su formato en el menú.	No 3D pair was confirmed. If the video is SBS or OU, choose its format in the menu.	Nenhum par 3D foi confirmado. Se o vídeo for SBS ou OU, selecione o formato no menu.	Aucune paire 3D n’a été confirmée. Pour une vidéo SBS ou OU, choisissez son format dans le menu.	Kein 3D-Paar bestätigt. Bei einem SBS- oder OU-Video das Format im Menü wählen.	Nessuna coppia 3D confermata. Se il video è SBS o OU, seleziona il formato nel menu.
+Paralaje disponible en salidas 3D compatibles; no se cambia el perfil Compatibilidad	Parallax is available for compatible 3D output. The Compatibility preset remains selected.	A paralaxe está disponível nas saídas 3D compatíveis. O perfil Compatibilidade permanece selecionado.	La parallaxe est disponible sur les sorties 3D compatibles. Le profil Compatibilité reste sélectionné.	Parallaxe ist bei kompatibler 3D-Ausgabe verfügbar. Das Kompatibilitätsprofil bleibt ausgewählt.	La parallasse è disponibile nelle uscite 3D compatibili. Il profilo Compatibilità resta selezionato.
+ASS 3D: se mantiene la composición GPU para procesar texto y vídeo juntos.	ASS 3D: GPU compositing remains active to process subtitles and video together.	ASS 3D: a composição por GPU permanece ativa para processar legendas e vídeo juntos.	ASS 3D : la composition par GPU reste active pour traiter ensemble les sous-titres et la vidéo.	ASS 3D: Die GPU-Komposition bleibt aktiv, um Untertitel und Video gemeinsam zu verarbeiten.	ASS 3D: la composizione GPU rimane attiva per elaborare insieme sottotitoli e video.
+Compatibilidad: GPU necesaria para conservar subtítulos/calibración 3D	Compatibility: GPU required to preserve 3D subtitles and calibration	Compatibilidade: GPU necessária para preservar legendas e calibração 3D	Compatibilité : GPU requis pour conserver les sous-titres et l’étalonnage 3D	Kompatibilität: GPU für 3D-Untertitel und Kalibrierung erforderlich	Compatibilità: GPU necessaria per conservare sottotitoli e calibrazione 3D
+Compatibilidad	Compatibility	Compatibilidade	Compatibilité	Kompatibilität	Compatibilità
+Esperando datos: posible lectura insuficiente; no demuestra una avería	Waiting for data: reads may be too slow. This does not confirm a fault.	Aguardando dados: a leitura pode estar lenta. Isso não confirma uma falha.	En attente de données : la lecture peut être trop lente. Cela ne confirme pas une panne.	Warte auf Daten: Möglicherweise ist das Lesen zu langsam. Das bestätigt keinen Defekt.	In attesa di dati: la lettura potrebbe essere lenta. Questo non conferma un guasto.
+Se han descartado cuadros de decodificación; consulta la evolución	Frames were dropped during decoding. Check whether the count keeps rising.	Houve descarte de quadros na decodificação. Confira se a contagem continua subindo.	Des images ont été perdues au décodage. Vérifiez si le compteur continue d’augmenter.	Bei der Dekodierung wurden Bilder verworfen. Prüfen, ob der Zähler weiter steigt.	Alcuni fotogrammi sono stati scartati in decodifica. Controlla se il contatore continua a salire.
+Se han descartado cuadros de presentación; consulta la evolución	Frames were dropped during presentation. Check whether the count keeps rising.	Houve descarte de quadros na apresentação. Confira se a contagem continua subindo.	Des images ont été perdues à l’affichage. Vérifiez si le compteur continue d’augmenter.	Bei der Ausgabe wurden Bilder verworfen. Prüfen, ob der Zähler weiter steigt.	Alcuni fotogrammi sono stati scartati durante la visualizzazione. Controlla se il contatore continua a salire.
+Sin descartes acumulados ni espera de caché detectados	No dropped frames or cache waits detected	Nenhum quadro descartado nem espera de cache detectados	Aucune image perdue ni attente du cache détectée	Keine verworfenen Bilder oder Cache-Wartezeiten erkannt	Nessun fotogramma scartato né attesa della cache rilevati
+Los contadores son acumulados; no identifican por sí solos la causa física.	Counters are cumulative and do not identify the underlying cause.	Os contadores são cumulativos e não identificam a causa subjacente.	Les compteurs sont cumulatifs et ne permettent pas d’identifier la cause du problème.	Die Zähler sind kumulativ und zeigen die eigentliche Ursache nicht an.	I contatori sono cumulativi e non individuano la causa del problema.
+El archivo no declara ediciones; para Blu-ray utiliza Títulos Blu-ray	This file declares no editions. For Blu-ray, use Blu-ray titles.	Este arquivo não declara edições. Para Blu-ray, use Títulos Blu-ray.	Ce fichier ne déclare aucune édition. Pour un Blu-ray, utilisez Titres Blu-ray.	Die Datei enthält keine Fassungen. Für Blu-ray den Menüpunkt Blu-ray-Titel verwenden.	Il file non dichiara edizioni. Per Blu-ray, usa Titoli Blu-ray.
+Tamaño y color requieren una pista SRT	Size and color require an SRT track	Tamanho e cor exigem uma faixa SRT	La taille et la couleur nécessitent une piste SRT	Größe und Farbe erfordern eine SRT-Spur	Dimensione e colore richiedono una traccia SRT
+La comprobación está en espera.	The update check is on hold.	A verificação está em espera.	La vérification est en attente.	Die Updateprüfung wartet.	La verifica è in attesa.
+Próximo intento (min)	Next attempt (min)	Próxima tentativa (min)	Prochaine tentative (min)	Nächster Versuch (min)	Prossimo tentativo (min)
+Nueva versión	New version	Nova versão	Nouvelle version	Neue Version	Nuova versione
+Descarga (MB)	Download (MB)	Download (MB)	Téléchargement (Mo)	Download (MB)	Download (MB)
+Tras verificar el ZIP portátil, CinePlayer se cerrará, se actualizará en esta carpeta y se reiniciará. Se conservarán los ajustes. Cierra las demás instancias antes de actualizar.	After verifying the portable ZIP, CinePlayer will close, update in this folder, and restart. Settings will be kept. Close other instances before updating.	Após verificar o ZIP portátil, o CinePlayer será fechado, atualizado nesta pasta e reiniciado. As configurações serão mantidas. Feche as outras instâncias antes de atualizar.	Une fois le ZIP portable vérifié, CinePlayer se fermera, se mettra à jour dans ce dossier et redémarrera. Les réglages seront conservés. Fermez les autres instances avant la mise à jour.	Nach Prüfung der portablen ZIP-Datei wird CinePlayer beendet, in diesem Ordner aktualisiert und neu gestartet. Die Einstellungen bleiben erhalten. Vor dem Update andere Instanzen schließen.	Dopo aver verificato lo ZIP portatile, CinePlayer si chiuderà, si aggiornerà in questa cartella e si riavvierà. Le impostazioni saranno conservate. Chiudi le altre istanze prima di aggiornare.
+No hay una versión publicada con manifiesto de actualización.	No release has a published update manifest.	Nenhuma versão tem um manifesto de atualização publicado.	Aucune version ne dispose d’un manifeste de mise à jour publié.	Keine Version mit veröffentlichtem Update-Manifest verfügbar.	Nessuna versione dispone di un manifesto di aggiornamento pubblicato.
+GitHub ha limitado las peticiones. Se respetará el plazo de espera indicado por el servidor.	GitHub has limited requests. The player will wait for the time specified by the server.	O GitHub limitou as requisições. O reprodutor aguardará o prazo indicado pelo servidor.	GitHub a limité les requêtes. Le lecteur respectera le délai indiqué par le serveur.	GitHub hat die Anfragen begrenzt. Der Player wartet die vom Server vorgegebene Zeit ab.	GitHub ha limitato le richieste. Il lettore attenderà il tempo indicato dal server.
+El servidor no pudo completar la comprobación de actualizaciones.	The server could not complete the update check.	O servidor não conseguiu concluir a verificação de atualizações.	Le serveur n’a pas pu terminer la vérification des mises à jour.	Der Server konnte die Updateprüfung nicht abschließen.	Il server non ha potuto completare la verifica degli aggiornamenti.
+No se pudo iniciar la comprobación de actualizaciones.	Could not start checking for updates.	Não foi possível iniciar a verificação de atualizações.	Impossible de lancer la vérification des mises à jour.	Die Updateprüfung konnte nicht gestartet werden.	Impossibile avviare la verifica degli aggiornamenti.
+Ya hay una comprobación o actualización en curso. Vuelve a intentarlo cuando termine.	An update check or update is in progress. Try again when it finishes.	Já há uma verificação ou atualização em andamento. Tente novamente quando terminar.	Une vérification ou une mise à jour est en cours. Réessayez quand elle sera terminée.	Eine Updateprüfung oder ein Update läuft bereits. Nach Abschluss erneut versuchen.	È in corso una verifica o un aggiornamento. Riprova al termine.
+No se pudo iniciar o completar el auxiliar de actualización. El reproductor sigue abierto. Comprueba los permisos y las políticas de PowerShell.	The update helper did not start or finish. The player is still open. Check permissions and PowerShell policies.	O auxiliar de atualização não iniciou ou não concluiu. O reprodutor continua aberto. Verifique as permissões e políticas do PowerShell.	L’assistant de mise à jour n’a pas démarré ou a échoué. Le lecteur reste ouvert. Vérifiez les autorisations et les stratégies PowerShell.	Das Update-Hilfsprogramm wurde nicht gestartet oder konnte nicht fertig werden. Der Player ist weiterhin geöffnet. Berechtigungen und PowerShell-Richtlinien prüfen.	Il programma di aggiornamento non si è avviato o non ha terminato. Il lettore rimane aperto. Controlla i permessi e i criteri di PowerShell.
+El auxiliar no pudo completar la actualización; el reproductor sigue abierto.	The update helper could not finish. The player is still open.	O auxiliar não conseguiu concluir a atualização. O reprodutor continua aberto.	L’assistant n’a pas pu terminer la mise à jour. Le lecteur reste ouvert.	Das Update konnte nicht abgeschlossen werden. Der Player ist weiterhin geöffnet.	Il programma di aggiornamento non ha potuto terminare. Il lettore rimane aperto.
+Tiempo de actualización agotado	The update timed out	Tempo de atualização esgotado	Le délai de mise à jour a expiré	Zeitlimit für das Update überschritten	Tempo di aggiornamento scaduto
+Español	Spanish	Espanhol	Espagnol	Spanisch	Spagnolo
+Español (España)	Spanish (Spain)	Espanhol (Espanha)	Espagnol (Espagne)	Spanisch (Spanien)	Spagnolo (Spagna)
+Español (México)	Spanish (Mexico)	Espanhol (México)	Espagnol (Mexique)	Spanisch (Mexiko)	Spagnolo (Messico)
+Español (Latinoamérica)	Spanish (Latin America)	Espanhol (América Latina)	Espagnol (Amérique latine)	Spanisch (Lateinamerika)	Spagnolo (America Latina)
+Inglés	English	Inglês	Anglais	Englisch	Inglese
+Francés	French	Francês	Français	Französisch	Francese
+Alemán	German	Alemão	Allemand	Deutsch	Tedesco
+Italiano	Italian	Italiano	Italien	Italienisch	Italiano
+Portugués	Portuguese	Português	Portugais	Portugiesisch	Portoghese
+Japonés	Japanese	Japonês	Japonais	Japanisch	Giapponese
+Chino	Chinese	Chinês	Chinois	Chinesisch	Cinese
+Coreano	Korean	Coreano	Coréen	Koreanisch	Coreano
+Ruso	Russian	Russo	Russe	Russisch	Russo
+Árabe	Arabic	Árabe	Arabe	Arabisch	Arabo
+Catalán	Catalan	Catalão	Catalan	Katalanisch	Catalano
+Euskera	Basque	Basco	Basque	Baskisch	Basco
+Gallego	Galician	Galego	Galicien	Galicisch	Galiziano
+Neerlandés	Dutch	Holandês	Néerlandais	Niederländisch	Olandese
+Polaco	Polish	Polonês	Polonais	Polnisch	Polacco
+Sueco	Swedish	Sueco	Suédois	Schwedisch	Svedese
+Danés	Danish	Dinamarquês	Danois	Dänisch	Danese
+Finés	Finnish	Finlandês	Finnois	Finnisch	Finlandese
+Noruego	Norwegian	Norueguês	Norvégien	Norwegisch	Norvegese
+Checo	Czech	Tcheco	Tchèque	Tschechisch	Ceco
+Húngaro	Hungarian	Húngaro	Hongrois	Ungarisch	Ungherese
+Turco	Turkish	Turco	Turc	Türkisch	Turco
+Idioma sin especificar	Language unspecified	Idioma não especificado	Langue non précisée	Sprache nicht angegeben	Lingua non specificata
+Pista	Track	Faixa	Piste	Spur	Traccia
+Texto	Text	Texto	Texte	Text	Testo
+Códec sin especificar	Codec unspecified	Codec não especificado	Codec non précisé	Codec nicht angegeben	Codec non specificato
+Sí	Yes	Sim	Oui	Ja	Sì
+No	No	Não	Non	Nein	No
+activada	enabled	ativada	activée	aktiviert	attiva
+desactivada	disabled	desativada	désactivée	deaktiviert	disattivata
+Edición	Edition	Edição	Édition	Fassung	Edizione
+Modo	Mode	Modo	Mode	Modus	Modalità
+Disco	Disc	Disco	Disque	Disc	Disco
+Tono HDR a SDR	HDR to SDR tone mapping	Mapeamento de tons HDR para SDR	Mappage tonal HDR vers SDR	HDR-zu-SDR-Tonemapping	Tone mapping da HDR a SDR
+Half OU	Half OU	Half OU	Half OU	Half OU	Half OU
+Ojo izquierdo	Left eye	Olho esquerdo	Œil gauche	Linkes Auge	Occhio sinistro
+Ojo derecho	Right eye	Olho direito	Œil droit	Rechtes Auge	Occhio destro
+2D · ojo izquierdo	2D · left eye	2D · olho esquerdo	2D · œil gauche	2D · linkes Auge	2D · occhio sinistro
+2D · ojo derecho	2D · right eye	2D · olho direito	2D · œil droit	2D · rechtes Auge	2D · occhio destro
+Formato 3D inválido	Invalid 3D format	Formato 3D inválido	Format 3D non valide	Ungültiges 3D-Format	Formato 3D non valido
+Formato inválido	Invalid format	Formato inválido	Format non valide	Ungültiges Format	Formato non valido
+Ajuste 3D fuera de rango	3D setting out of range	Ajuste 3D fora do intervalo	Réglage 3D hors limites	3D-Einstellung außerhalb des Bereichs	Regolazione 3D fuori intervallo
+Ajuste de brillo inválido	Invalid brightness setting	Ajuste de brilho inválido	Réglage de luminosité non valide	Ungültige Helligkeitseinstellung	Regolazione di luminosità non valida
+Porcentaje inválido	Invalid percentage	Porcentagem inválida	Pourcentage non valide	Ungültiger Prozentwert	Percentuale non valida
+Paralaje fuera de rango	Parallax out of range	Paralaxe fora do intervalo	Parallaxe hors limites	Parallaxe außerhalb des Bereichs	Parallasse fuori intervallo
+Ajuste de subtítulos inválido	Invalid subtitle setting	Ajuste de legenda inválido	Réglage des sous-titres non valide	Ungültige Untertiteleinstellung	Regolazione dei sottotitoli non valida
+Aspecto o posición de subtítulos fuera de rango	Subtitle appearance or position out of range	Aparência ou posição das legendas fora do intervalo	Apparence ou position des sous-titres hors limites	Untertiteldarstellung oder Position außerhalb des Bereichs	Aspetto o posizione dei sottotitoli fuori intervallo
+El vídeo todavía no tiene dimensiones válidas	The video does not have valid dimensions yet	O vídeo ainda não tem dimensões válidas	Les dimensions de la vidéo ne sont pas encore disponibles	Die Videogröße ist noch nicht verfügbar	Le dimensioni del video non sono ancora disponibili
+El cuadro 3D debe dividirse en dos mitades enteras	The 3D frame must split into two equal halves	O quadro 3D deve ser dividido em duas metades iguais	L’image 3D doit se diviser en deux moitiés égales	Das 3D-Bild muss sich in zwei gleich große Hälften teilen lassen	Il fotogramma 3D deve dividersi in due metà uguali
+Selecciona el formato 3D antes de activar el anaglifo	Select the 3D format before enabling anaglyph	Selecione o formato 3D antes de ativar o anáglifo	Sélectionnez le format 3D avant d’activer l’anaglyphe	Vor Aktivierung des Anaglyphenmodus das 3D-Format wählen	Seleziona il formato 3D prima di attivare l’anaglifo
+No se pudo abrir el selector de cine	Could not open the playback mode selector	Não foi possível abrir o seletor do modo de reprodução	Impossible d’ouvrir le sélecteur de mode de lecture	Wiedergabemodus-Auswahl konnte nicht geöffnet werden	Impossibile aprire la selezione della modalità di riproduzione
+No se pudo reproducir el archivo	Could not play the file	Não foi possível reproduzir o arquivo	Impossible de lire le fichier	Datei konnte nicht wiedergegeben werden	Impossibile riprodurre il file
+No se pudo abrir el selector visual	Could not open the dialog	Não foi possível abrir a caixa de diálogo	Impossible d’ouvrir la boîte de dialogue	Dialog konnte nicht geöffnet werden	Impossibile aprire la finestra di dialogo
+No se pudo crear el menú de Windows	Could not create the Windows menu	Não foi possível criar o menu do Windows	Impossible de créer le menu Windows	Windows-Menü konnte nicht erstellt werden	Impossibile creare il menu di Windows
+Windows no pudo activar el menú del reproductor	Windows could not activate the player menu	O Windows não pôde ativar o menu do reprodutor	Windows n’a pas pu activer le menu du lecteur	Windows konnte das Player-Menü nicht aktivieren	Windows non ha potuto attivare il menu del lettore
+Error del menú	Menu error	Erro no menu	Erreur de menu	Menüfehler	Errore del menu
+No se pudo cargar	Could not load	Não foi possível carregar	Impossible de charger	Laden fehlgeschlagen	Impossibile caricare
+Ruta Unicode inválida	Invalid Unicode path	Caminho Unicode inválido	Chemin Unicode non valide	Ungültiger Unicode-Pfad	Percorso Unicode non valido
+Abre un único vídeo cada vez	Open one video at a time	Abra um vídeo por vez	Ouvrez une seule vidéo à la fois	Jeweils nur ein Video öffnen	Apri un solo video alla volta
+No se pudo preparar el archivo	Could not prepare the file	Não foi possível preparar o arquivo	Impossible de préparer le fichier	Datei konnte nicht vorbereitet werden	Impossibile preparare il file
+El motor no pudo completar la operación	The playback engine could not complete the operation	O motor de reprodução não pôde concluir a operação	Le moteur de lecture n’a pas pu terminer l’opération	Die Wiedergabe-Engine konnte den Vorgang nicht abschließen	Il motore di riproduzione non ha potuto completare l’operazione
+Puede haber terminado la reproducción o cambiado el archivo.	Playback may have ended or the file may have changed.	A reprodução pode ter terminado ou o arquivo pode ter mudado.	La lecture a pu se terminer ou le fichier a pu changer.	Die Wiedergabe könnte beendet oder die Datei gewechselt worden sein.	La riproduzione potrebbe essere terminata o il file potrebbe essere cambiato.
+Comando	Command	Comando	Commande	Befehl	Comando
+Canal	Channel	Canal	Canal	Kanal	Canale
+Aceptar	OK	OK	OK	OK	OK
+Desactivados	Off	Desativadas	Désactivés	Aus	Disattivati
+Anaglifo	Anaglyph	Anáglifo	Anaglyphe	Anaglyph	Anaglifo
+Monocromo	Monochrome	Monocromático	Monochrome	Monochrom	Monocromatico
+HOU — arriba / abajo	HOU — top and bottom	HOU — acima e abaixo	HOU — haut et bas	HOU — übereinander	HOU — sopra e sotto
+Passthrough: requiere HDMI/SPDIF y receptor compatibles	Passthrough requires a compatible HDMI or S/PDIF link and receiver.	O passthrough requer conexão HDMI ou S/PDIF e receptor compatíveis.	Le passthrough exige une liaison HDMI ou S/PDIF et un ampli compatibles.	Passthrough erfordert eine kompatible HDMI- oder S/PDIF-Verbindung und einen kompatiblen Receiver.	Il passthrough richiede un collegamento HDMI o S/PDIF e un ricevitore compatibili.
+modo conservado / restaurado	mode retained or restored	modo mantido ou restaurado	mode conservé ou rétabli	Modus beibehalten oder wiederhergestellt	modalità mantenuta o ripristinata
+sin frecuencia compatible a resolución nativa	no compatible refresh rate at native resolution	nenhuma taxa compatível na resolução nativa	aucune fréquence compatible à la résolution native	keine kompatible Bildwiederholrate bei nativer Auflösung	nessuna frequenza compatibile alla risoluzione nativa
+frecuencia verificada por Windows	refresh rate verified by Windows	taxa verificada pelo Windows	fréquence vérifiée par Windows	Bildwiederholrate von Windows bestätigt	frequenza verificata da Windows
+cambio reservado por otra instancia o acceso no disponible	change reserved by another instance or access unavailable	mudança reservada por outra instância ou acesso indisponível	changement réservé par une autre instance ou accès indisponible	Änderung durch andere Instanz reserviert oder kein Zugriff	modifica riservata da un’altra istanza o accesso non disponibile
+no se pudo verificar la restauración de la frecuencia anterior	could not verify restoration of the previous refresh rate	não foi possível verificar a restauração da taxa anterior	impossible de vérifier le rétablissement de la fréquence précédente	Wiederherstellung der vorherigen Bildwiederholrate konnte nicht geprüft werden	impossibile verificare il ripristino della frequenza precedente
+el controlador rechazó el cambio	the driver rejected the change	o driver recusou a mudança	le pilote a refusé le changement	der Treiber hat die Änderung abgelehnt	il driver ha rifiutato la modifica
+verificados por Windows	verified by Windows	verificados pelo Windows	vérifiés par Windows	von Windows bestätigt	verificati da Windows
+Restablecer	Reset	Redefinir	Réinitialiser	Zurücksetzen	Ripristina
+Enigmax CinePlayer — Menús	Enigmax CinePlayer — Menus	Enigmax CinePlayer — Menus	Enigmax CinePlayer — Menus	Enigmax CinePlayer — Menüs	Enigmax CinePlayer — Menu
+Dolby Vision · perfil	Dolby Vision · profile	Dolby Vision · perfil	Dolby Vision · profil	Dolby Vision · Profil	Dolby Vision · profilo
+No se pudo identificar la pantalla del reproductor	Could not identify the player display	Não foi possível identificar a tela do reprodutor	Impossible d’identifier l’écran du lecteur	Bildschirm des Players konnte nicht ermittelt werden	Impossibile identificare lo schermo del lettore
+Apertura de subtítulos	Opening subtitles	Abrindo legendas	Ouverture des sous-titres	Untertitel werden geöffnet	Apertura dei sottotitoli
+Perfil de pantalla / pistas	Display profile / tracks	Perfil de tela / faixas	Profil d’écran / pistes	Bildschirmprofil / Spuren	Profilo dello schermo / tracce
+Icono de ventana	Window icon	Ícone da janela	Icône de fenêtre	Fenstersymbol	Icona della finestra
+Acción del usuario	User action	Ação do usuário	Action de l’utilisateur	Benutzeraktion	Azione dell’utente
+Controles	Controls	Controles	Commandes	Steuerung	Controlli
+No se pudo aplicar el icono	Could not apply the icon	Não foi possível aplicar o ícone	Impossible d’appliquer l’icône	Symbol konnte nicht angewendet werden	Impossibile applicare l’icona
+No se pudo cargar el icono de Enigmax CinePlayer	Could not load the Enigmax CinePlayer icon	Não foi possível carregar o ícone do Enigmax CinePlayer	Impossible de charger l’icône d’Enigmax CinePlayer	Enigmax-CinePlayer-Symbol konnte nicht geladen werden	Impossibile caricare l’icona di Enigmax CinePlayer
+No se pudo crear la ventana del menú	Could not create the menu window	Não foi possível criar a janela do menu	Impossible de créer la fenêtre du menu	Menüfenster konnte nicht erstellt werden	Impossibile creare la finestra del menu
+No se pudo registrar runtime	Could not register the runtime	Não foi possível registrar o ambiente de execução	Impossible d’enregistrer l’environnement d’exécution	Laufzeitumgebung konnte nicht registriert werden	Impossibile registrare l’ambiente di esecuzione
+Respuesta de actualización no válida	Invalid update response	Resposta de atualização inválida	Réponse de mise à jour non valide	Ungültige Update-Antwort	Risposta di aggiornamento non valida
+nivel	level	nível	niveau	Stufe	livello
+MaxCLL	MaxCLL	MaxCLL	MaxCLL	MaxCLL	MaxCLL
+MaxFALL	MaxFALL	MaxFALL	MaxFALL	MaxFALL	MaxFALL
+Falta el módulo de controles inferiores	The playback controls module is missing	Falta o módulo de controles de reprodução	Le module de commandes de lecture est manquant	Das Modul für die Wiedergabesteuerung fehlt	Manca il modulo dei controlli di riproduzione
+Falta la preparación MVC	MVC preparation is missing	Falta a preparação do MVC	La préparation du MVC est manquante	Die MVC-Vorbereitung fehlt	Manca la preparazione MVC
+Ruta de aplicación desconocida	Application path unknown	Caminho do aplicativo desconhecido	Chemin de l’application inconnu	Anwendungspfad unbekannt	Percorso dell’applicazione sconosciuto
+La ventana del reproductor no es válida	The player window is invalid	A janela do reprodutor é inválida	La fenêtre du lecteur n’est pas valide	Ungültiges Player-Fenster	La finestra del lettore non è valida
+Falta la ventana del menú	The menu window is missing	Falta a janela do menu	La fenêtre de menu est manquante	Das Menüfenster fehlt	Manca la finestra del menu
+No se pudo localizar el cursor	Could not locate the cursor	Não foi possível localizar o cursor	Impossible de localiser le curseur	Mauszeiger konnte nicht lokalisiert werden	Impossibile individuare il cursore
+No se pudo añadir una opción al menú	Could not add a menu item	Não foi possível adicionar um item ao menu	Impossible d’ajouter une option au menu	Menüeintrag konnte nicht hinzugefügt werden	Impossibile aggiungere una voce al menu
+No se pudo añadir el submenú	Could not add the submenu	Não foi possível adicionar o submenu	Impossible d’ajouter le sous-menu	Untermenü konnte nicht hinzugefügt werden	Impossibile aggiungere il sottomenu
+No se pudo mostrar el estado del menú	Could not display the menu status	Não foi possível exibir o estado do menu	Impossible d’afficher l’état du menu	Menüstatus konnte nicht angezeigt werden	Impossibile mostrare lo stato del menu
+No se pudo identificar la ventana del menú	Could not identify the menu window	Não foi possível identificar a janela do menu	Impossible d’identifier la fenêtre de menu	Menüfenster konnte nicht ermittelt werden	Impossibile identificare la finestra del menu
+No se pudo leer la opción	Could not read the menu item	Não foi possível ler o item do menu	Impossible de lire l’option du menu	Menüeintrag konnte nicht gelesen werden	Impossibile leggere la voce del menu
+Menú vacío	Empty menu	Menu vazio	Menu vide	Leeres Menü	Menu vuoto
+Falta la carpeta del programa	The application folder is missing	Falta a pasta do aplicativo	Le dossier de l’application est manquant	Der Anwendungsordner fehlt	Manca la cartella dell’applicazione
+Actualizar	Update	Atualizar	Mettre à jour	Aktualisieren	Aggiorna
+Error	Error	Erro	Erreur	Fehler	Errore
+Comprobación iniciada o conexión interrumpida	Check started or connection interrupted	Verificação iniciada ou conexão interrompida	Vérification lancée ou connexion interrompue	Prüfung gestartet oder Verbindung unterbrochen	Verifica avviata o connessione interrotta
+No se pudo completar la comprobación.	Could not complete the update check.	Não foi possível concluir a verificação de atualizações.	Impossible de terminer la vérification des mises à jour.	Updateprüfung konnte nicht abgeschlossen werden.	Impossibile completare la verifica degli aggiornamenti.
+Detalles técnicos en el registro de actualización.	See the update log for technical details.	Consulte o registro de atualização para ver os detalhes técnicos.	Consultez le journal de mise à jour pour les détails techniques.	Technische Details stehen im Updateprotokoll.	Consulta il registro degli aggiornamenti per i dettagli tecnici.
+Recuperación pendiente. Conserva esta carpeta:	Recovery pending. Keep this folder:	Recuperação pendente. Mantenha esta pasta:	Récupération en attente. Conservez ce dossier :	Wiederherstellung ausstehend. Diesen Ordner behalten:	Ripristino in sospeso. Conserva questa cartella:
+No se pudo completar la operación.	Could not complete the operation.	Não foi possível concluir a operação.	Impossible de terminer l’opération.	Vorgang konnte nicht abgeschlossen werden.	Impossibile completare l’operazione.
+No se pudo completar la operación. Consulta el registro de reproducción.	Could not complete the operation. See the playback log.	Não foi possível concluir a operação. Consulte o registro de reprodução.	Impossible de terminer l’opération. Consultez le journal de lecture.	Vorgang konnte nicht abgeschlossen werden. Details stehen im Wiedergabeprotokoll.	Impossibile completare l’operazione. Consulta il registro di riproduzione.
+No se pudo iniciar CinePlayer.	CinePlayer could not start.	Não foi possível iniciar o CinePlayer.	Impossible de démarrer CinePlayer.	CinePlayer konnte nicht gestartet werden.	Impossibile avviare CinePlayer.
+No se pudo iniciar CinePlayer. Consulta el registro de inicio.	CinePlayer could not start. See the startup log.	Não foi possível iniciar o CinePlayer. Consulte o registro de inicialização.	Impossible de démarrer CinePlayer. Consultez le journal de démarrage.	CinePlayer konnte nicht gestartet werden. Details stehen im Startprotokoll.	Impossibile avviare CinePlayer. Consulta il registro di avvio.

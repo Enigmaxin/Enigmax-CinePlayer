@@ -8,7 +8,7 @@ use std::{
 };
 type Handle = *mut c_void;
 unsafe extern "C" {
-    fn cine_menu_begin(menu: Handle, host: Handle, owner: Handle);
+    fn cine_menu_begin(menu: Handle, host: Handle, owner: Handle, back: *const u16);
     fn cine_menu_end();
 }
 // commctrl.h surrounds both task-dialog structures with pshpack1.h.
@@ -83,9 +83,36 @@ pub fn choose(
         }
         return crate::popup::show(m, heading, entries);
     }
+    let parent = m
+        .get("window-id")
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(0);
+    let _ = m.command(&["script-message-to", "enigmax_controls", "popup", "yes"]);
+    let result = task_dialog(
+        parent as Handle,
+        "Enigmax CinePlayer",
+        heading,
+        content,
+        choices,
+        choices.first().map_or(0, |v| v.0),
+        true,
+    );
+    let _ = m.command(&["script-message-to", "enigmax_controls", "popup", "no"]);
+    result.map(|selected| if selected == 2 { 0 } else { selected as u32 })
+}
+
+fn task_dialog(
+    parent: Handle,
+    title: &str,
+    heading: &str,
+    content: &str,
+    choices: &[(i32, &str)],
+    default_button: i32,
+    command_links: bool,
+) -> Result<i32, String> {
     let texts = choices
         .iter()
-        .map(|(_, text)| wide(text))
+        .map(|(_, text)| wide(&crate::i18n::tr(text)))
         .collect::<Vec<_>>();
     let buttons = choices
         .iter()
@@ -95,17 +122,14 @@ pub fn choose(
             text: text.as_ptr(),
         })
         .collect::<Vec<_>>();
-    let title = wide("Enigmax CinePlayer");
-    let heading = wide(heading);
-    let content = wide(content);
+    let title = wide(&crate::i18n::tr(title));
+    let heading = wide(&crate::i18n::tr(heading));
+    let content = wide(&crate::i18n::tr(content));
     let config = TaskConfig {
         size: std::mem::size_of::<TaskConfig>() as u32,
-        parent: m
-            .get("window-id")
-            .and_then(|v| v.parse::<usize>().ok())
-            .unwrap_or(0) as Handle,
+        parent,
         instance: ptr::null_mut(),
-        flags: 0x10 | 0x8 | 0x1000,
+        flags: 0x8 | if command_links { 0x10 | 0x1000 } else { 0 },
         common: 0,
         title: title.as_ptr(),
         icon: ptr::null_mut(),
@@ -113,7 +137,7 @@ pub fn choose(
         content: content.as_ptr(),
         count: buttons.len() as u32,
         buttons: buttons.as_ptr(),
-        default_button: choices.first().map(|v| v.0).unwrap_or(0),
+        default_button,
         radio_count: 0,
         radios: ptr::null(),
         default_radio: 0,
@@ -127,18 +151,16 @@ pub fn choose(
         callback_data: 0,
         width: 320,
     };
-    let _ = m.command(&["script-message-to", "enigmax_controls", "popup", "yes"]);
     let mut selected = 0;
     // Standard Windows modal ownership; all strings and buttons outlive the call.
     let status =
         unsafe { TaskDialogIndirect(&config, &mut selected, ptr::null_mut(), ptr::null_mut()) };
-    let _ = m.command(&["script-message-to", "enigmax_controls", "popup", "no"]);
     if status < 0 {
         Err(format!(
             "No se pudo abrir el selector visual: HRESULT {status:#x}"
         ))
     } else {
-        Ok(if selected == 2 { 0 } else { selected as u32 })
+        Ok(selected)
     }
 }
 
@@ -421,14 +443,41 @@ impl Drop for Library {
 }
 
 pub fn message(text: &str, error: bool) {
-    unsafe {
-        MessageBoxW(
-            ptr::null_mut(),
-            wide(text).as_ptr(),
-            wide("Enigmax CinePlayer").as_ptr(),
-            if error { 0x10 } else { 0x40 },
-        )
+    notice(
+        "Enigmax CinePlayer",
+        if error { "Error" } else { "Información" },
+        text,
+        false,
+    );
+}
+pub fn notice(title: &str, heading: &str, text: &str, question: bool) -> bool {
+    let buttons: &[(i32, &str)] = if question {
+        &[(6, "Actualizar"), (2, "Cancelar")]
+    } else {
+        &[(1, "Aceptar")]
     };
+    match task_dialog(
+        ptr::null_mut(),
+        title,
+        heading,
+        text,
+        buttons,
+        if question { 2 } else { 1 },
+        false,
+    ) {
+        Ok(button) => button == 6,
+        Err(_) => {
+            // Windows common controls can be unavailable during startup failure.
+            unsafe {
+                MessageBoxW(
+                    ptr::null_mut(),
+                    wide(&crate::i18n::tr(text)).as_ptr(),
+                    wide(&crate::i18n::tr(title)).as_ptr(),
+                    if question { 0x124 } else { 0x40 },
+                ) == 6
+            }
+        }
+    }
 }
 
 /// Owned icon resources. Keep this alive until after libmpv destroys its window.
@@ -545,6 +594,7 @@ pub fn overlay_message(m: &crate::mpv::Mpv, text: &str, error: bool) {
     let font = ((h / 13).clamp(22, 64) / 3).clamp(11, 24);
     let chars = ((width - 60) / (font * 3 / 5).max(1)).max(10) as usize;
     let mut entries = Vec::new();
+    let text = crate::i18n::tr(text);
     for line in text.lines() {
         let line = line.chars().take(4096).collect::<Vec<_>>();
         for chunk in line.chunks(chars) {
@@ -580,6 +630,9 @@ impl Menu {
         }
     }
     pub fn item(&self, id: u32, text: &str, checked: bool) -> Result<(), String> {
+        self.literal_item(id, &crate::i18n::tr(text), checked)
+    }
+    pub(crate) fn literal_item(&self, id: u32, text: &str, checked: bool) -> Result<(), String> {
         // Ampersands in media/track/device names must not become keyboard mnemonics.
         let text = wide(&text.replace('&', "&&"));
         let ok = unsafe {
@@ -598,7 +651,7 @@ impl Menu {
     }
     /// Read-only status line; Windows excludes it from keyboard navigation.
     pub fn label(&self, text: &str) -> Result<(), String> {
-        let text = wide(&text.replace('&', "&&"));
+        let text = wide(&crate::i18n::tr(text).replace('&', "&&"));
         if unsafe { AppendMenuW(self.0, 1, 0, text.as_ptr()) } == 0 {
             Err("No se pudo mostrar el estado del menú".into())
         } else {
@@ -606,7 +659,14 @@ impl Menu {
         }
     }
     pub fn submenu(&self, text: &str, child: Menu) -> Result<(), String> {
-        let ok = unsafe { AppendMenuW(self.0, 0x10, child.0 as usize, wide(text).as_ptr()) };
+        let ok = unsafe {
+            AppendMenuW(
+                self.0,
+                0x10,
+                child.0 as usize,
+                wide(&crate::i18n::tr(text)).as_ptr(),
+            )
+        };
         if ok == 0 {
             return Err("No se pudo añadir el submenú".into());
         }
@@ -739,8 +799,9 @@ impl Menu {
                     MsgWaitForMultipleObjectsEx(0, ptr::null(), 10, 0x04FF, 0x4);
                 }
             }
+            let back = wide(&crate::i18n::tr("‹  Volver"));
             unsafe {
-                cine_menu_begin(self.0, host.0, owner);
+                cine_menu_begin(self.0, host.0, owner, back.as_ptr());
                 SetLastError(0);
             }
             let id = unsafe {
@@ -829,9 +890,10 @@ mod menu_tests {
         child.item(8, "Rojo/cian", false).unwrap();
         root.submenu("3D", child).unwrap();
         let before = unsafe { GetGuiResources(GetCurrentProcess(), 0) };
+        let back = wide(&crate::i18n::tr("‹  Volver"));
         for _ in 0..100 {
             unsafe {
-                cine_menu_begin(root.0, host.0, host.0);
+                cine_menu_begin(root.0, host.0, host.0, back.as_ptr());
             }
             let mut s = [0u16; 80];
             let n = unsafe { GetMenuStringW(root.0, 7, s.as_mut_ptr(), 80, 0) };
@@ -882,16 +944,16 @@ unsafe extern "system" {
 }
 pub fn open_file(owner: usize, subtitles: bool) -> Result<Option<PathBuf>, String> {
     let mut buffer = vec![0u16; 32768];
-    let filter = wide(if subtitles {
+    let filter = wide(&crate::i18n::tr(if subtitles {
         "Subtítulos (SRT, ASS, SSA, SUP)\0*.srt;*.ass;*.ssa;*.sup\0Todos los archivos\0*.*\0"
     } else {
         "Vídeos MKV / MP4 / Blu-ray ISO\0*.mkv;*.mp4;*.iso;*.m2ts\0Vídeos\0*.mkv;*.mp4;*.iso;*.m2ts;*.avi;*.mov;*.webm\0Todos los archivos\0*.*\0"
-    });
-    let title = wide(if subtitles {
+    }));
+    let title = wide(&crate::i18n::tr(if subtitles {
         "Añadir subtítulos"
     } else {
         "Abrir vídeo"
-    });
+    }));
     // SAFETY: OPENFILENAMEW permits zero for all unused pointer/optional fields.
     let mut data: OpenFileName = unsafe { std::mem::zeroed() };
     data.size = std::mem::size_of::<OpenFileName>() as u32;

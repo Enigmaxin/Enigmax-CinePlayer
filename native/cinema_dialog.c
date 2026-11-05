@@ -17,6 +17,7 @@ typedef struct { int id; const wchar_t *title, *description; int image; } CineCh
 typedef struct {
     HWND window, owner, buttons[5], close, back, options;
     const wchar_t *heading, *subtitle;
+    const wchar_t *const *labels;
     const CineChoice *choices;
     int count, result, width, height, glasses, hover;
     float scale;
@@ -28,8 +29,25 @@ typedef struct {
 
 static int px(CineDialog *d, float v) { return (int)(v * d->scale + 0.5f); }
 static void text(HDC dc, HFONT font, RECT r, const wchar_t *s, COLORREF color, UINT flags) {
+    if(!s || !s[0] || r.right<=r.left || r.bottom<=r.top)return;
     HGDIOBJ old=SelectObject(dc,font); SetBkMode(dc,TRANSPARENT); SetTextColor(dc,color);
-    DrawTextW(dc,s,-1,&r,flags|DT_NOPREFIX); SelectObject(dc,old);
+    LOGFONTW info={0}; GetObjectW(font,sizeof(info),&info);
+    HFONT smaller=NULL;
+    UINT measure=(flags & ~(DT_END_ELLIPSIS|DT_VCENTER))|DT_CALCRECT|DT_NOPREFIX;
+    for(;;) {
+        RECT required=r;
+        DrawTextW(dc,s,-1,&required,measure);
+        if((required.bottom<=r.bottom && required.right<=r.right) || info.lfHeight>=-8)break;
+        info.lfHeight++;
+        HFONT candidate=CreateFontIndirectW(&info);
+        if(!candidate)break;
+        SelectObject(dc,candidate);
+        if(smaller)DeleteObject(smaller);
+        smaller=candidate;
+    }
+    DrawTextW(dc,s,-1,&r,flags|DT_NOPREFIX);
+    SelectObject(dc,old);
+    if(smaller)DeleteObject(smaller);
 }
 static void tint(HDC dc, RECT r, COLORREF color, BYTE alpha) {
     HDC source=CreateCompatibleDC(dc); HBITMAP bitmap=CreateCompatibleBitmap(dc,1,1);
@@ -121,10 +139,10 @@ static void layout(CineDialog *d) {
     RECT r; GetClientRect(d->window,&r); d->width=max(1,r.right); d->height=max(1,r.bottom);
     d->scale=min(d->width/1200.0f,d->height/840.0f);
     free_fonts(d); d->heading_font=font(max(18,px(d,34)),600);
-    d->title_font=font(max(12,px(d,21)),600); d->body_font=font(max(11,px(d,16)),400);
+    d->title_font=font(max(10,px(d,21)),600); d->body_font=font(max(9,px(d,16)),400);
     d->brand_font=font(max(11,px(d,16)),500);
     int margin=px(d,24),gap=px(d,16),top=px(d,152),cw=(d->width-2*margin-2*gap)/3;
-    int upper=px(d,352),lower=px(d,230),bottom=top+upper+gap;
+    int upper=px(d,352),lower=px(d,213),bottom=top+upper+gap;
     for(int i=0;i<d->count;i++) {
         int x,y,w,h;
         if(i<3) { x=margin+i*(cw+gap); y=top; w=cw; h=upper; }
@@ -132,8 +150,12 @@ static void layout(CineDialog *d) {
         SetWindowPos(d->buttons[i],NULL,x,y,max(1,w),max(1,h),SWP_NOZORDER|SWP_NOACTIVATE);
     }
     SetWindowPos(d->close,NULL,d->width-px(d,76),px(d,10),px(d,56),px(d,44),SWP_NOZORDER|SWP_NOACTIVATE);
-    if(d->back)SetWindowPos(d->back,NULL,margin,px(d,63),px(d,104),px(d,42),SWP_NOZORDER|SWP_NOACTIVATE);
-    if(d->options)SetWindowPos(d->options,NULL,d->width-px(d,280),d->height-px(d,79),px(d,256),px(d,38),SWP_NOZORDER|SWP_NOACTIVATE);
+    if(d->back)SetWindowPos(d->back,NULL,margin,px(d,63),max(58,px(d,104)),max(18,px(d,42)),SWP_NOZORDER|SWP_NOACTIVATE);
+    if(d->options) {
+        int width=min(d->width-2*margin,max(132,px(d,256)));
+        SetWindowPos(d->options,NULL,d->width-margin-width,d->height-max(30,px(d,79)),
+            width,max(18,px(d,38)),SWP_NOZORDER|SWP_NOACTIVATE);
+    }
     background(d); InvalidateRect(d->window,NULL,FALSE);
     for(int i=0;i<d->count;i++)InvalidateRect(d->buttons[i],NULL,FALSE);
 }
@@ -155,7 +177,7 @@ static void paint_card(CineDialog *d,DRAWITEMSTRUCT *di) {
             pen=CreatePen(PS_SOLID,max(2,px(d,2)),RGB(255,255,255));SelectObject(di->hDC,pen);
             int cx=r.right/2,cy=r.bottom/2,a=max(6,px(d,9));
             line(di->hDC,cx-a,cy-a,cx+a,cy+a);line(di->hDC,cx+a,cy-a,cx-a,cy+a);
-        } else text(di->hDC,d->body_font,r,di->CtlID==9003?L"Todas las opciones 3D":L"← Volver",RGB(243,250,249),DT_SINGLELINE|DT_CENTER|DT_VCENTER);
+        } else text(di->hDC,d->body_font,r,di->CtlID==9003?d->labels[3]:d->labels[2],RGB(243,250,249),DT_SINGLELINE|DT_CENTER|DT_VCENTER);
         SelectObject(di->hDC,op);SelectObject(di->hDC,ob);DeleteObject(pen);DeleteObject(brush);
         if(di->itemState&ODS_FOCUS){InflateRect(&r,-3,-3);DrawFocusRect(di->hDC,&r);}
         return;
@@ -170,7 +192,9 @@ static void paint_card(CineDialog *d,DRAWITEMSTRUCT *di) {
     HDC bg=CreateCompatibleDC(dc); HGDIOBJ prev=SelectObject(bg,d->background);
     BitBlt(dc,0,0,w,h,bg,p.x,p.y,SRCCOPY); SelectObject(bg,prev); DeleteDC(bg);
     tint(dc,r,RGB(29,36,42),170);
-    int pad=px(d,12); RECT photo={pad,pad,w-pad,px(d,202)};
+    int pad=px(d,12);
+    BOOL compact=d->height<440;
+    RECT photo={pad,pad,w-pad,px(d,compact?168:202)};
     BOOL lower=index>=3;
     if(lower) { photo.right=w*55/100;photo.bottom=h-pad; }
     const CineChoice *c=&d->choices[index];
@@ -180,12 +204,13 @@ static void paint_card(CineDialog *d,DRAWITEMSTRUCT *di) {
         icon(d,dc,(photo.left+photo.right-px(d,78))/2,(photo.top+photo.bottom-px(d,48))/2,2,index);
     }
     int tx=lower?photo.right+px(d,24):px(d,20);
-    int iy=lower?px(d,35):px(d,221);
+    int iy=lower?px(d,35):px(d,compact?175:221);
     icon(d,dc,lower?tx:(w-px(d,78))/2,iy,d->glasses?2:c->image,d->glasses?index:0);
-    RECT title={tx,iy+px(d,58),w-px(d,12),iy+px(d,96)};
-    text(dc,d->title_font,title,c->title,RGB(239,243,245),DT_SINGLELINE|DT_VCENTER|(lower?DT_LEFT:DT_CENTER)|DT_END_ELLIPSIS);
+    int desc_height=c->description && c->description[0]?max(12,px(d,27)):0;
+    RECT title={tx,iy+px(d,58),w-px(d,12),h-pad-desc_height};
+    text(dc,d->title_font,title,c->title,RGB(239,243,245),(lower?DT_LEFT:DT_CENTER)|DT_WORDBREAK|DT_END_ELLIPSIS);
     if(c->description && c->description[0]) {
-        RECT desc={tx,title.bottom+px(d,4),w-px(d,12),h-px(d,8)};
+        RECT desc={tx,title.bottom,w-px(d,12),h-px(d,8)};
         text(dc,d->body_font,desc,c->description,RGB(183,199,208),(lower?DT_LEFT:DT_CENTER)|DT_WORDBREAK);
     }
     HPEN pen=CreatePen(PS_SOLID,max(1,px(d,1)),(di->itemState&(ODS_FOCUS|ODS_SELECTED))?RGB(100,211,184):RGB(73,85,91));
@@ -218,25 +243,26 @@ static LRESULT CALLBACK procedure(HWND window,UINT msg,WPARAM wp,LPARAM lp) {
         else if(id==9002) {d->result=1231;DestroyWindow(window);}
         return 0; }
     case WM_CLOSE:DestroyWindow(window);return 0;
-    case WM_GETMINMAXINFO:((MINMAXINFO*)lp)->ptMinTrackSize=(POINT){640,460};return 0;
+    case WM_GETMINMAXINFO:((MINMAXINFO*)lp)->ptMinTrackSize=(POINT){320,200};return 0;
     case WM_PAINT: {
         PAINTSTRUCT ps;HDC dc=BeginPaint(window,&ps);
         if(d->background) {HDC bg=CreateCompatibleDC(dc);HGDIOBJ old=SelectObject(bg,d->background);
             BitBlt(dc,0,0,d->width,d->height,bg,0,0,SRCCOPY);SelectObject(bg,old);DeleteDC(bg);}
         RECT brand={px(d,25),px(d,19),d->width-px(d,60),px(d,47)};
         text(dc,d->brand_font,brand,L"ENIGMAX  CINEPLAYER",RGB(221,231,236),DT_SINGLELINE);
-        RECT heading={px(d,d->back?150:25),px(d,65),d->width-px(d,25),px(d,111)};
+        RECT heading={d->back?px(d,38)+max(58,px(d,104)):px(d,25),
+            px(d,65),d->width-px(d,25),max(px(d,111),px(d,65)+18)};
         text(dc,d->heading_font,heading,d->heading,RGB(242,245,247),DT_SINGLELINE|DT_END_ELLIPSIS);
-        RECT sub={px(d,25),px(d,117),d->width-px(d,25),px(d,145)};
+        RECT sub={px(d,25),px(d,d->height<440?112:117),d->width-px(d,25),px(d,151)};
         text(dc,d->body_font,sub,d->subtitle,RGB(177,196,206),DT_SINGLELINE|DT_END_ELLIPSIS);
-        if(!d->glasses) {RECT note={px(d,25),d->height-px(d,37),d->width-px(d,25),d->height-px(d,8)};
-            text(dc,d->body_font,note,L"Frame Packing: composición experimental; no activa HDMI 3D.",RGB(145,163,173),DT_SINGLELINE|DT_END_ELLIPSIS);}
+        if(!d->glasses) {RECT note={px(d,25),d->height-max(12,px(d,37)),d->width-px(d,25),d->height-1};
+            text(dc,d->body_font,note,d->labels[4],RGB(145,163,173),DT_SINGLELINE|DT_END_ELLIPSIS);}
         EndPaint(window,&ps);return 0; }
     }
     return DefWindowProcW(window,msg,wp,lp);
 }
 
-int cine_choose(HWND owner,const wchar_t *heading,const wchar_t *subtitle,const CineChoice *choices,int count,int glasses) {
+int cine_choose(HWND owner,const wchar_t *heading,const wchar_t *subtitle,const CineChoice *choices,int count,int glasses,const wchar_t *const *labels) {
     if(!heading || !subtitle || !choices || count!=5)return -1;
     CineDialog d={0}; d.owner=IsWindow(owner)?owner:NULL;d.heading=heading;d.subtitle=subtitle;
     d.choices=choices;d.count=count;d.glasses=glasses;
@@ -254,16 +280,26 @@ int cine_choose(HWND owner,const wchar_t *heading,const wchar_t *subtitle,const 
     UINT dpi=d.owner?GetDpiForWindow(d.owner):96;
     float scale=min(dpi/96.0f,min(aw*0.92f/1200,ah*0.92f/840));
     int width=(int)(1200*scale),height=(int)(840*scale);
-    d.window=CreateWindowExW(WS_EX_CONTROLPARENT,wc.lpszClassName,L"Enigmax CinePlayer — Vídeo 3D",
-        WS_POPUP|WS_THICKFRAME|WS_SYSMENU,mi.rcWork.left+(aw-width)/2,mi.rcWork.top+(ah-height)/2,
+    int x=mi.rcWork.left+(aw-width)/2,y=mi.rcWork.top+(ah-height)/2;
+    RECT owner_rect;
+    if(d.owner && GetWindowRect(d.owner,&owner_rect) &&
+       owner_rect.right>owner_rect.left && owner_rect.bottom>owner_rect.top) {
+        width=owner_rect.right-owner_rect.left;
+        height=owner_rect.bottom-owner_rect.top;
+        x=owner_rect.left;
+        y=owner_rect.top;
+    }
+    d.labels=labels;
+    d.window=CreateWindowExW(WS_EX_CONTROLPARENT,wc.lpszClassName,labels[0],
+        WS_POPUP|WS_THICKFRAME|WS_SYSMENU,x,y,
         width,height,d.owner,NULL,instance,&d);
     if(!d.window){d.result=-4;goto cleanup;}
     int dark=1,round=2;DwmSetWindowAttribute(d.window,20,&dark,sizeof(dark));DwmSetWindowAttribute(d.window,33,&round,sizeof(round));
     for(int i=0;i<count;i++)d.buttons[i]=CreateWindowExW(0,L"BUTTON",choices[i].title,
         WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)(INT_PTR)(200+i),instance,NULL);
-    d.close=CreateWindowExW(0,L"BUTTON",L"Cerrar",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)9001,instance,NULL);
-    if(glasses)d.back=CreateWindowExW(0,L"BUTTON",L"← Volver",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)9002,instance,NULL);
-    if(!glasses)d.options=CreateWindowExW(0,L"BUTTON",L"Todas las opciones 3D",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)9003,instance,NULL);
+    d.close=CreateWindowExW(0,L"BUTTON",labels[1],WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)9001,instance,NULL);
+    if(glasses)d.back=CreateWindowExW(0,L"BUTTON",labels[2],WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)9002,instance,NULL);
+    if(!glasses)d.options=CreateWindowExW(0,L"BUTTON",labels[3],WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,d.window,(HMENU)9003,instance,NULL);
     layout(&d);if(d.owner)EnableWindow(d.owner,FALSE);
     ShowWindow(d.window,SW_SHOW);SetForegroundWindow(d.window);SetFocus(d.buttons[0]);
     MSG msg;while(IsWindow(d.window)) {

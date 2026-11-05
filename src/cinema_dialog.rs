@@ -16,6 +16,7 @@ unsafe extern "C" {
         choices: *const NativeChoice,
         count: i32,
         glasses: i32,
+        labels: *const *const u16,
     ) -> i32;
 }
 pub struct Choice<'a> {
@@ -30,9 +31,11 @@ pub fn show(
     subtitle: &str,
     choices: &[Choice<'_>; 5],
     glasses: bool,
+    native: bool,
 ) -> Result<u32, String> {
-    if crate::popup::stereo(m)
-        || m.user_data("user-data/enigmax-toolbar-popup").as_deref() == Some("yes")
+    if !native
+        && (crate::popup::stereo(m)
+            || m.user_data("user-data/enigmax-toolbar-popup").as_deref() == Some("yes"))
     {
         let mut entries = choices
             .iter()
@@ -63,8 +66,20 @@ pub fn show(
         return crate::popup::show(m, heading, entries);
     }
     fn wide(text: &str) -> Vec<u16> {
-        text.encode_utf16().chain(Some(0)).collect()
+        crate::i18n::tr(text)
+            .encode_utf16()
+            .chain(Some(0))
+            .collect()
     }
+    let labels = [
+        "Enigmax CinePlayer — Vídeo 3D",
+        "Cerrar",
+        "← Volver",
+        "Todas las opciones 3D",
+        "Frame Packing: composición experimental; no activa HDMI 3D.",
+    ]
+    .map(wide);
+    let label_ptrs = labels.each_ref().map(|s| s.as_ptr());
     let headings = (wide(heading), wide(subtitle));
     let texts = choices
         .iter()
@@ -94,12 +109,16 @@ pub fn show(
             buttons.as_ptr(),
             5,
             i32::from(glasses),
+            label_ptrs.as_ptr(),
         )
     };
     let restored = m.command(&["script-message-to", "enigmax_controls", "popup", "no"]);
     restored?;
     if id < 0 {
-        Err(format!("No se pudo abrir el selector de cine ({id})"))
+        Err(format!(
+            "{} ({id})",
+            crate::i18n::tr("No se pudo abrir el selector de cine")
+        ))
     } else {
         Ok(id as u32)
     }

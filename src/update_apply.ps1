@@ -26,14 +26,14 @@ try {
     Add-Type -AssemblyName System.Windows.Forms
     [Windows.Forms.Application]::EnableVisualStyles()
     $form = New-Object Windows.Forms.Form
-    $form.Text = 'Enigmax CinePlayer — Descargando actualización'
+    $form.Text = [string]$data.ui.title
     $form.ClientSize = New-Object Drawing.Size(440,115)
     $form.StartPosition = 'CenterScreen'; $form.FormBorderStyle = 'FixedDialog'
     $form.MaximizeBox = $false; $form.MinimizeBox = $false
     $label = New-Object Windows.Forms.Label
-    $label.SetBounds(15,12,410,24); $label.Text = "Descargando versión $version…"
+    $label.SetBounds(15,12,410,24); $label.Text = "$($data.ui.progress) $version…"
     $bar = New-Object Windows.Forms.ProgressBar; $bar.SetBounds(15,42,410,22)
-    $cancel = New-Object Windows.Forms.Button; $cancel.Text = 'Cancelar'; $cancel.SetBounds(330,77,95,26)
+    $cancel = New-Object Windows.Forms.Button; $cancel.Text = [string]$data.ui.cancel; $cancel.SetBounds(275,77,150,26)
     $cancel.Add_Click({$form.Close()}); $form.Controls.AddRange(@($label,$bar,$cancel)); $form.Show()
     [Windows.Forms.Application]::DoEvents()
     $zip = Join-Path $folder 'package.zip'
@@ -89,10 +89,39 @@ try {
 } catch {
     $message = $_.Exception.Message
     $preserveStage = $message.StartsWith('RECUPERACION PENDIENTE:')
+    $logged = $false
+    if ($data.statusLog) {
+        try {
+            [IO.File]::WriteAllText([string]$data.statusLog,$message,[Text.Encoding]::UTF8)
+            $logged = $true
+        } catch {}
+    }
     try {
         Add-Type -AssemblyName System.Windows.Forms
-        $context = if ($parentClosed) {'No se pudo completar la actualización. Puedes abrir de nuevo el reproductor si la recuperación ha terminado.'} else {'No se ha aplicado la actualización. El reproductor sigue abierto.'}
-        [void][Windows.Forms.MessageBox]::Show("$context`r`n`r`n$message",'Enigmax CinePlayer — Actualización',0,16)
+        if ($form) { $form.Hide() }
+        $context = if ($parentClosed) {$data.ui.errorClosed} else {$data.ui.errorOpen}
+        if (!$context) { throw 'Missing update dialog labels' }
+        if ($logged) { $context += "`r`n`r`n$($data.ui.logHint)" }
+        if ($preserveStage) { $context += "`r`n`r`n$($data.ui.recovery)`r`n$stage" }
+        $notice = New-Object Windows.Forms.Form
+        try {
+            $notice.Text = [string]$data.ui.errorTitle
+            $notice.StartPosition = 'CenterScreen'; $notice.FormBorderStyle = 'FixedDialog'
+            $notice.MaximizeBox = $false; $notice.MinimizeBox = $false
+            $body = New-Object Windows.Forms.Label
+            $body.SetBounds(16,16,456,1); $body.AutoSize = $true
+            $body.MaximumSize = New-Object Drawing.Size(456,0)
+            $body.Text = $context
+            $notice.Controls.Add($body)
+            $ok = New-Object Windows.Forms.Button
+            $ok.Text = [string]$data.ui.ok
+            $ok.DialogResult = [Windows.Forms.DialogResult]::OK
+            $ok.SetBounds(352,($body.Bottom+16),120,29)
+            $notice.Controls.Add($ok)
+            $notice.ClientSize = New-Object Drawing.Size(488,($ok.Bottom+16))
+            $notice.AcceptButton = $notice.CancelButton = $ok
+            [void]$notice.ShowDialog()
+        } finally { $notice.Dispose() }
         $exitCode = 2
     } catch {}
 } finally {

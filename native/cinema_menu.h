@@ -21,6 +21,7 @@ typedef struct {
     HMENU active;
     HBRUSH background;
     int dpi;
+    const wchar_t *back;
 } CineMenuTheme;
 static __thread CineMenuTheme m_theme;
 static int m_px(int n) { return MulDiv(n,m_theme.dpi,96); }
@@ -123,7 +124,7 @@ static LRESULT CALLBACK m_procedure(HWND window,UINT msg,WPARAM wp,LPARAM lp,
 }
 static BOOL m_decorate(HMENU menu,int depth) {
     if(depth>16)return FALSE;
-    if(depth>0 && !InsertMenuW(menu,0,MF_BYPOSITION|MF_STRING,CINE_MENU_BACK,L"‹  Volver"))return FALSE;
+    if(depth>0 && !InsertMenuW(menu,0,MF_BYPOSITION|MF_STRING,CINE_MENU_BACK,m_theme.back))return FALSE;
     MENUINFO info={0};info.cbSize=sizeof(info);info.fMask=MIM_BACKGROUND;info.hbrBack=m_theme.background;
     SetMenuInfo(menu,&info);
     int count=GetMenuItemCount(menu);
@@ -181,9 +182,9 @@ void cine_menu_end(void) {
     if(m_theme.background)DeleteObject(m_theme.background);
     ZeroMemory(&m_theme,sizeof(m_theme));
 }
-void cine_menu_begin(HMENU menu,HWND host,HWND owner) {
+void cine_menu_begin(HMENU menu,HWND host,HWND owner,const wchar_t *back) {
     if(!SetWindowSubclass(host,m_procedure,1,0))return;
-    m_theme.host=host;m_theme.owner=owner;
+    m_theme.host=host;m_theme.owner=owner;m_theme.back=back;
     // No resident polling: this timer exists only for the native modal menu.
     m_theme.watch=SetTimer(host,(UINT_PTR)&m_theme,100,NULL);
     HIGHCONTRASTW hc={sizeof(hc),0,NULL};

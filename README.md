@@ -1,4 +1,8 @@
-# Enigmax CinePlayer 1.0.3 — Windows 11 x64
+# Enigmax CinePlayer 1.0.4 — Windows 11 x64
+
+## Interfaz de la versión 1.0.4
+
+El idioma inicial es inglés. Se puede elegir otro en Configuración → Idioma. El selector gráfico de apertura 3D se ajusta a la ventana del reproductor. Los controles de tamaño y posición de subtítulos, brillo por ojo y Crosstalk admiten deslizadores con previsualización. Los valores se guardan al soltar el control.
 
 Cambios y límites de la versión vigente: **[validación de esta entrega](#validación-de-esta-entrega)**. Paralaje en directo, geometría de subtítulos por ojo y navegación ampliada de menús. No se certifican todas las pantallas o receptores.
 
@@ -210,7 +214,7 @@ La posición de subtítulos se oculta para ASS/SSA, sin explicación adicional e
 Los paneles de aspecto y calibración incluyen «Volver» en la cabecera. Aspecto regresa a Pista de subtítulos; calibración regresa a Avanzado. También se puede volver con Retroceso o Alt+Izquierda. Escape, la cruz y clic fuera cierran el panel. Los ajustes aplicados y guardados se conservan al volver y reabrir; se mantienen las entradas únicas, la ubicación y la versión 1.0.2.
 
 
-## Validación de esta entrega
+## Validación de la versión 1.0.3
 
 Consulta VERIFICACION_1.0.3.md para resultados y límites. Los patrones sintéticos permiten detectar deformación
 en PGS, SRT, ASS convencional y ASS 3D; no certifican todos los subtítulos existentes. Frame Packing sigue siendo
