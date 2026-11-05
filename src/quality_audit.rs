@@ -718,6 +718,14 @@ fn steady_playback_pacing_probe() {
     player::apply(&m, &mut s).unwrap();
     m.set("pause", "no").unwrap();
     advance(&mut m, &mut s, 3.0);
+    let live_subtitles = std::env::var_os("ENIGMAX_PACING_LIVE_SUBS").is_some();
+    let chain = ["current-vo", "vf", "glsl-shaders"];
+    let chain_before = chain.map(|key| m.get(key));
+    let baseline = number(&m, "time-pos");
+    let mut last_pos = baseline;
+    let mut last_advance = Instant::now();
+    let mut longest_plateau = Duration::ZERO;
+    let mut edits = 0;
     let counters = ["frame-drop-count", "decoder-frame-drop-count"];
     let before = counters.map(|p| number(&m, p));
     let cpu = resources().0;
@@ -731,6 +739,25 @@ fn steady_playback_pacing_probe() {
             continue;
         }
         next = Instant::now() + Duration::from_millis(250);
+        let now = Instant::now();
+        let pos = number(&m, "time-pos");
+        longest_plateau = longest_plateau.max(now.duration_since(last_advance));
+        if pos > last_pos {
+            last_advance = now;
+            last_pos = pos;
+        }
+        if live_subtitles {
+            let id = [7100, 7122, 1149, 7105, 7120, 7131][edits % 6];
+            if (1140..=1152).contains(&id) {
+                player::action(&m, &mut s, id).unwrap();
+            } else {
+                crate::playback_features::action(&m, &mut s, id).unwrap();
+            }
+            player::apply(&m, &mut s).unwrap();
+            assert_eq!(chain.map(|key| m.get(key)), chain_before);
+            assert_eq!(m.get("seeking").as_deref(), Some("no"));
+            edits += 1;
+        }
         peak = peak.max(resources().2);
         let props = [
             "time-pos",
@@ -774,6 +801,8 @@ fn steady_playback_pacing_probe() {
         "private_peak_mib":peak as f64/1048576.0,
         "vo_drops":number(&m,counters[0])-before[0],
         "decoder_drops":number(&m,counters[1])-before[1],
+        "edits":edits, "playback_advanced":last_pos-baseline,
+        "longest_advance_gap_ms":longest_plateau.as_secs_f64()*1000.0,
         "renderer":m.get("current-vo"), "hwdec":m.get("hwdec-current"),
         "pipeline":s.pipeline, "samples":rows,
     });
@@ -783,5 +812,14 @@ fn steady_playback_pacing_probe() {
         serde_json::to_vec_pretty(&row).unwrap(),
     )
     .unwrap();
+    if live_subtitles {
+        assert!(edits >= 40);
+        assert!(last_pos - baseline >= 14.0, "Playback did not keep up");
+        assert!(
+            longest_plateau < Duration::from_millis(800),
+            "Playback paused"
+        );
+        assert_eq!(number(&m, counters[1]), before[1], "Decoder dropped frames");
+    }
     println!("Pacing: {} samples; output written", rows.len());
 }

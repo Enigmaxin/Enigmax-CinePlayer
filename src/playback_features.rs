@@ -545,10 +545,11 @@ pub(crate) fn visual_panel(
             entries(m, s)
         });
     if s.prefs != saved.0 || s.features.prefs != saved.1 {
+        if s.prefs.sub_pos != saved.0.sub_pos {
+            m.set("sub-pos", &saved.0.sub_pos.to_string())?;
+        }
         s.prefs = saved.0;
         s.features.prefs = saved.1;
-        s.features.invalidate();
-        s.applied = None;
         s.features.apply(m, s.passthrough)?;
         crate::player::apply(m, s)?;
     }
@@ -689,13 +690,12 @@ pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
             p.sub_scale = 1.0;
             p.sub_color = "#FFFFFF".into();
             s.prefs.sub_pos = 100;
-            s.applied = None;
         }
         _ => return Ok(()),
     }
     let result = s.features.apply(m, s.passthrough).and_then(|()| {
         if id == 7131 {
-            crate::player::apply(m, s)?;
+            m.set("sub-pos", "100")?;
         }
         if s.automatic {
             if id == 7131 {
@@ -711,8 +711,7 @@ pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
         s.features.prefs = old;
         s.prefs.sub_pos = old_position;
         if id == 7131 {
-            s.applied = None;
-            let _ = crate::player::apply(m, s);
+            let _ = m.set("sub-pos", &old_position.to_string());
         }
         s.features.invalidate();
         let _ = s.features.apply(m, s.passthrough);

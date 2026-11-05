@@ -892,7 +892,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     };
     let l = s.effective(m);
     let ass = s.subtitles.active(s.prefs.ass_mode, l);
-    let canvas = s.subtitles.header.as_ref().map(|h| h.canvas);
+    let canvas = ass.and(s.subtitles.header.as_ref()).map(|h| h.canvas);
     s.prefs.validate()?;
     let mut settings = s.prefs.clone();
     // Input order is distinct from the user's relative left/right inversion.
@@ -929,6 +929,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
     } else {
         Quality::Balanced
     };
+    graph_prefs.sub_pos = 100; // Set directly by subtitle appearance controls.
     s.apply_quality_options(m)?;
     // Dynamic mastering/scene luminance is consumed per frame by libplacebo;
     // it must not rebuild the filter/shader graph on every HDR scene change.
@@ -953,7 +954,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         s.hdr_sdr,
         s.generation,
         serde_json::to_string(&color_key).unwrap_or_default(),
-        m.get("sid").unwrap_or_default(),
+        stereo_subs,
         m.get("current-tracks/video/codec-profile")
             .unwrap_or_default(),
         m.get("current-vo").unwrap_or_default()
@@ -1005,7 +1006,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         .clamp(0.01, 100.0)
         .to_string(),
     )?;
-    m.set("glsl-shaders", "")?;
+    let mut shader_path = None;
     let raw_vf = s.raw.map(|i| i.metadata.filter()).unwrap_or_default();
     let mut desired_vf = raw_vf.clone();
     let renderer = if preblend { "gpu" } else { "gpu-next" };
@@ -1174,12 +1175,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
                 &s.dir,
                 stereo::dynamic_shader(stereo::shader(p, l, hdr || gamma == "srgb")?, !preblend),
             )?;
-            m.command(&[
-                "change-list",
-                "glsl-shaders",
-                "set",
-                path.to_str().ok_or("Ruta de shader inválida")?,
-            ])?;
+            shader_path = Some(path);
         }
         m.set("video-aspect-override", &format!("{aspect:.12}"))?;
     } else if l.packed() && matches!(p.output, Output::Left | Output::Right) {
@@ -1189,12 +1185,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
             let path = s
                 .shaders
                 .path(&s.dir, crate::subtitles::eye_shader(l.horizontal(), second))?;
-            m.command(&[
-                "change-list",
-                "glsl-shaders",
-                "set",
-                path.to_str().ok_or("Ruta de shader inválida")?,
-            ])?;
+            shader_path = Some(path);
             m.set("video-aspect-override", &format!("{aspect:.12}"))?;
         }
     } else {
@@ -1213,12 +1204,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
                     !preblend,
                 ),
             )?;
-            m.command(&[
-                "change-list",
-                "glsl-shaders",
-                "set",
-                path.to_str().ok_or("Ruta de shader inválida")?,
-            ])?;
+            shader_path = Some(path);
         }
         m.set(
             "video-aspect-override",
@@ -1235,6 +1221,14 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
                     .unwrap_or_else(|| "no".into())
             },
         )?;
+    }
+    if let Some(path) = shader_path {
+        let path = path.to_str().ok_or("Ruta de shader inválida")?;
+        if m.get("glsl-shaders").as_deref() != Some(path) {
+            m.command(&["change-list", "glsl-shaders", "set", path])?;
+        }
+    } else if m.get("glsl-shaders").is_some_and(|paths| !paths.is_empty()) {
+        m.set("glsl-shaders", "")?;
     }
     if stereo_subs {
         s.pipeline
@@ -1802,10 +1796,10 @@ fn view_dialog(m: &Mpv, s: &State, native: bool) -> Result<u32, String> {
                 image: 0,
             },
             Choice {
-                id: 1221,
-                title: "Reproducir en SBS Anamórfico",
+                id: 1210,
+                title: "Reproducir en 2D",
                 description: "",
-                image: 3,
+                image: 1,
             },
             Choice {
                 id: 1230,
@@ -1814,10 +1808,10 @@ fn view_dialog(m: &Mpv, s: &State, native: bool) -> Result<u32, String> {
                 image: 2,
             },
             Choice {
-                id: 1210,
-                title: "Reproducir en 2D",
-                description: "",
-                image: 1,
+                id: 1221,
+                title: "SBS Anamórfico",
+                description: "Convierte la fuente 3D a SBS anamórfico",
+                image: 3,
             },
             Choice {
                 id: 1222,

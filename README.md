@@ -1,8 +1,8 @@
-# Enigmax CinePlayer 1.0.4 — Windows 11 x64
+# Enigmax CinePlayer 1.0.5 — Windows 11 x64
 
-## Interfaz de la versión 1.0.4
+## Interfaz de la versión 1.0.5
 
-El idioma inicial es inglés. Se puede elegir otro en Configuración → Idioma. El selector gráfico de apertura 3D se ajusta a la ventana del reproductor. Los controles de tamaño y posición de subtítulos, brillo por ojo y Crosstalk admiten deslizadores con previsualización. Los valores se guardan al soltar el control.
+El idioma inicial es inglés. Se puede elegir español, catalán, euskera, gallego, portugués, francés, alemán o italiano en Configuración → Idioma. El selector gráfico de apertura 3D se ajusta a la ventana del reproductor. Los controles de tamaño y posición de subtítulos, brillo por ojo y Crosstalk admiten deslizadores con previsualización. Los valores se guardan al soltar el control.
 
 Cambios y límites de la versión vigente: **[validación de esta entrega](#validación-de-esta-entrega)**. Paralaje en directo, geometría de subtítulos por ojo y navegación ampliada de menús. No se certifican todas las pantallas o receptores.
 
@@ -14,7 +14,7 @@ Cambios y límites de la versión vigente: **[validación de esta entrega](#vali
 - La lectura adaptativa usa datos comprimidos: reserva orientativa de tres segundos, ampliable a ocho ante espera de caché; máximo 128 MiB, o 32 MiB en mínimo consumo. No aumenta la cola de vídeo sin comprimir MVC. No garantiza resolver saturación o averías del disco. Los saltos MVC dentro del par actual y los cortos hacia delante reutilizan el decodificador, sin otra caché de imágenes.
 - **Igualar frecuencia de fotogramas:** desactivada por defecto, actúa en pantalla completa. Prioriza la frecuencia original y después un múltiplo entero exacto: por ejemplo, 25→50 Hz si 25 Hz no está disponible. Verifica la fracción real con CCD y distingue 24 de 23,976 Hz. Conserva resolución y velocidad del vídeo; trabaja en un hilo secundario y restaura el modo anterior. Sin modo compatible o información verificable no fuerza otro. No activa HDMI 3D; un cierre forzado o un fallo del controlador puede impedir la restauración.
 - **Posición de subtítulos:** control dentro de Aspecto de subtítulos, con valor visible, −/+ y Restablecer. Aplica sin cerrar el panel. Se oculta para ASS/SSA para conservar su autoría.
-- **Clic derecho:** menú nativo en cascada junto al puntero en 2D/anaglifo. SBS/OU y Frame Packing mantienen los menús por ojo. Los desplegables de la barra conservan su presentación anterior.
+- **Clic derecho:** menú nativo en cascada junto al puntero en 2D/anaglifo. SBS/OU y Frame Packing mantienen los menús por ojo, alineados en el plano de la pantalla. Los desplegables de la barra conservan su presentación anterior.
 - El cursor integrado se proyecta por ojo en SBS/OU y Frame Packing sobre los controles y menús. Anaglifo y 2D usan el cursor de Windows. La integración física con Virtual Desktop/Quest requiere validación adicional.
 - **Audio → Filtros:** Original, Modo nocturno y Claridad de voz. Los efectos son opcionales y se suspenden con bitstream para conservar el flujo original. Se han retirado los ajustes manuales de sincronización de audio y subtítulos, incluidos sus atajos.
 - El diagnóstico muestra caché, búsqueda, descartes, A/V y formatos de entrada/salida. Los contadores acumulados no demuestran una causa física. No se añaden miniaturas, análisis visual, servicios residentes ni inferencia IA.

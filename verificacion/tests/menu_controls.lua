@@ -113,8 +113,8 @@ local function test()
         else
             assert(properties['cursor-autohide']=='always','Stereo must replace native cursor')
             local v={};for n in payload:gmatch('[^|]+') do v[#v+1]=tonumber(n) end
-            assert(#v==8,'Exactly two eye cursors must be supplied')
-            if case[1]=='sbs' then assert(v[5]-v[1]==sw/2 and v[2]==v[6],'SBS cursor disparity must be zero') end
+            assert(#v==12,'Exactly two eye cursors must be supplied')
+            if case[1]=='sbs' then assert(v[7]-v[1]==sw/2 and v[2]==v[8],'SBS cursor disparity must be zero') end
             assert(v[3]>=6 and v[4]>=6,'Cursor must remain visible')
             clock=clock+0.02;bindings.enigmax_bottom[3][2]()
             assert(properties['user-data/enigmax-cursor']~='','Cursor must update over controls')
@@ -123,6 +123,21 @@ local function test()
         messages['stereo-cursor']('yes')
     end
     messages.configure('mono');assert(properties['user-data/enigmax-cursor']=='' and properties['cursor-autohide']~='always','2D must restore native cursor')
+    -- A final burst event must paint without waiting for the health timer.
+    sw,sh=1920,1080;mx,my=905,1030;clock=clock+1
+    messages.configure('sbs');bindings.enigmax_show[3][2]()
+    local earlier=properties['user-data/enigmax-cursor']
+    mx,my=959,1079;clock=clock+0.003;bindings.enigmax_show[3][2]()
+    assert(single_timer.alive and properties['user-data/enigmax-cursor']==earlier,'Motion burst should be coalesced')
+    clock=clock+0.016;single_timer.tick()
+    local clipped=properties['user-data/enigmax-cursor']
+    assert(clipped:match('^959|1079|%d+|%d+|1|1|1919|1079|'),'The latest hotspot must reach both eye edges')
+    messages['stereo-popup']('qa-popup-client')
+    mx,my=300,300;clock=clock+1;bindings.enigmax_popup[4][2]()
+    mx,my=301,304;clock=clock+0.003;bindings.enigmax_popup[4][2]()
+    clock=clock+0.016;single_timer.tick()
+    assert(sent[#sent][4]=='move' and sent[#sent][5]:match('^1920|1080|301|304|'),'Popup must deliver final coordinates')
+    messages['stereo-popup']('')
     -- Property-style input generation: dimensions, eye edges and invalid coordinates.
     for i=1,180 do
         sw=320+(i*127)%3700;sh=200+(i*83)%2200
@@ -132,8 +147,8 @@ local function test()
             local payload=properties['user-data/enigmax-cursor']
             if payload~='' then
                 local v={};for n in payload:gmatch('[^|]+') do v[#v+1]=tonumber(n) end
-                assert(#v==8,'Malformed cursor payload')
-                for j=1,8,4 do assert(v[j]>=0 and v[j+1]>=0 and v[j]+v[j+2]<=sw+1 and v[j+1]+v[j+3]<=sh+1,'Cursor escaped output') end
+                assert(#v==12,'Malformed cursor payload')
+                for j=1,12,6 do assert(v[j]>=0 and v[j+1]>=0 and v[j]+v[j+4]<=sw and v[j+1]+v[j+5]<=sh,'Cursor escaped output') end
             end
             mx,my=-1,-1;clock=clock+0.02;bindings.enigmax_show[3][2]()
             assert(properties['user-data/enigmax-cursor']=='','Outside pointer must disappear')

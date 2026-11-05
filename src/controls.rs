@@ -399,7 +399,7 @@ impl Controls {
     pub fn cursor(m: &Mpv, body: &str) -> Result<(), String> {
         let values: Option<Vec<f64>> = body.split('|').map(|v| v.parse().ok()).collect();
         let Some(v) = values.filter(|v| {
-            v.len() == 8
+            matches!(v.len(), 8 | 12)
                 && v.iter()
                     .all(|n| n.is_finite() && *n >= 0.0 && *n <= 32768.0)
         }) else {
@@ -409,30 +409,32 @@ impl Controls {
             }
             return Ok(());
         };
-        let rects: Vec<[i32; 4]> = v
-            .as_chunks::<4>()
-            .0
-            .iter()
+        let rects: Vec<[i32; 6]> = v
+            .chunks_exact(v.len() / 2)
             .map(|r| {
+                let w = (r[2] as i32).clamp(6, 48);
+                let h = (r[3] as i32).clamp(6, 48);
                 [
                     r[0] as i32,
                     r[1] as i32,
-                    (r[2] as i32).clamp(6, 48),
-                    (r[3] as i32).clamp(6, 48),
+                    w,
+                    h,
+                    r.get(4).map_or(w, |n| (*n as i32).clamp(1, w)),
+                    r.get(5).map_or(h, |n| (*n as i32).clamp(1, h)),
                 ]
             })
             .collect();
         let x = rects.iter().map(|r| r[0]).min().unwrap();
         let y = rects.iter().map(|r| r[1]).min().unwrap();
-        let w = rects.iter().map(|r| r[0] + r[2]).max().unwrap() - x;
-        let h = rects.iter().map(|r| r[1] + r[3]).max().unwrap() - y;
+        let w = rects.iter().map(|r| r[0] + r[4]).max().unwrap() - x;
+        let h = rects.iter().map(|r| r[1] + r[5]).max().unwrap() - y;
         if w as usize * h as usize > 2 * 1024 * 1024 {
             return Ok(());
         }
         let mut pixels = vec![0u8; (w * h * 4) as usize];
         for r in rects {
-            for cy in 0..r[3] {
-                for cx in 0..r[2] {
+            for cy in 0..r[5] {
+                for cx in 0..r[4] {
                     let u = cx as f64 / r[2] as f64;
                     let v = cy as f64 / r[3] as f64;
                     if u <= v * 0.75 && (v <= 0.7 || u <= 0.22) {

@@ -77,7 +77,7 @@ local function on_state(_,value)
                 x=state.x+state.width-12-(3-button_slot)*(bw+6)+bw/2
             end
             local y=index<0 and state.y+state.header/2 or state.y+state.header+(index-state.offset+0.5)*state.row
-            local depth=math.max(2,math.min(8,state.w/480))
+            local depth=0
             local second=cfg.eye==1
             local sign=second and -1 or 1
             if state.mode=='sbs' then

@@ -1,8 +1,11 @@
 use std::{borrow::Cow, collections::HashMap, io::Write, path::Path, sync::OnceLock};
 
-pub const LANGUAGES: [(&str, &str); 6] = [
+pub const LANGUAGES: [(&str, &str); 9] = [
     ("en", "English"),
     ("es", "Español"),
+    ("ca", "Català"),
+    ("eu", "Euskara"),
+    ("gl", "Galego"),
     ("pt", "Português"),
     ("fr", "Français"),
     ("de", "Deutsch"),
@@ -49,29 +52,41 @@ pub fn save(dir: &Path, index: usize) -> Result<(), String> {
     Ok(())
 }
 
-type Catalog = HashMap<&'static str, [&'static str; 5]>;
+type Catalog = HashMap<&'static str, [&'static str; 9]>;
 fn catalog() -> &'static Catalog {
     static CATALOG: OnceLock<Catalog> = OnceLock::new();
     CATALOG.get_or_init(|| {
+        let regional: HashMap<_, _> = include_str!("locales-iberian.tsv")
+            .lines()
+            .map(|line| {
+                let mut fields = line.split('\t');
+                let key = fields.next().expect("translation key");
+                let row: [_; 3] =
+                    std::array::from_fn(|_| fields.next().expect("regional translation"));
+                assert!(fields.next().is_none(), "extra translation for {key}");
+                (key, row)
+            })
+            .collect();
         include_str!("locales.tsv")
             .lines()
             .map(|line| {
                 let mut fields = line.split('\t');
                 let key = fields.next().expect("translation key");
-                let values = std::array::from_fn(|_| fields.next().expect("missing translation"));
+                let [en, pt, fr, de, it] =
+                    std::array::from_fn(|_| fields.next().expect("translation"));
+                let [ca, eu, gl] = regional[key];
                 assert!(fields.next().is_none(), "extra translation for {key}");
-                (key, values)
+                (key, [en, key, ca, eu, gl, pt, fr, de, it])
             })
             .collect()
     })
 }
 
 pub fn tr(text: &str) -> Cow<'_, str> {
-    let column = match current() {
-        1 => return Cow::Borrowed(text),
-        0 => 0,
-        index => index - 1,
-    };
+    let column = current();
+    if column == 1 {
+        return Cow::Borrowed(text);
+    }
     if let Some(row) = catalog().get(text) {
         return Cow::Borrowed(row[column]);
     }
@@ -84,11 +99,15 @@ pub fn tr(text: &str) -> Cow<'_, str> {
             return Cow::Borrowed(text);
         }
     }
-    if let Some((label, value)) = text.split_once(": ") {
-        if let Some(row) = catalog().get(label) {
-            let punctuation = if current() == 3 { " :" } else { ":" };
-            return Cow::Owned(format!("{}{punctuation} {}", row[column], tr(value)));
-        }
+    if let Some((label, value)) = text.split_once(": ")
+        && let Some(row) = catalog().get(label)
+    {
+        let punctuation = if LANGUAGES[column].0 == "fr" {
+            " :"
+        } else {
+            ":"
+        };
+        return Cow::Owned(format!("{}{punctuation} {}", row[column], tr(value)));
     }
     Cow::Borrowed(text)
 }
@@ -115,6 +134,10 @@ mod tests {
     #[test]
     fn catalogs_have_unique_nonempty_entries_in_every_language() {
         assert_eq!(catalog().len(), include_str!("locales.tsv").lines().count());
+        assert_eq!(
+            catalog().len(),
+            include_str!("locales-iberian.tsv").lines().count()
+        );
         assert!(catalog().values().flatten().all(|v| !v.trim().is_empty()));
         for index in 0..LANGUAGES.len() {
             set(index);
@@ -142,6 +165,19 @@ mod tests {
                 "Ajuste de brillo por ojo",
                 "Original",
             ],
+            [
+                "S’està obrint el vídeo",
+                "Diafonia",
+                "Brillantor per ull",
+                "Original",
+            ],
+            [
+                "Bideoa irekitzen",
+                "Crosstalk",
+                "Begiko distira",
+                "Jatorrizkoa",
+            ],
+            ["Abrindo o vídeo", "Diafonía", "Brillo por ollo", "Orixinal"],
             ["Abrindo vídeo", "Diafonia", "Brilho por olho", "Original"],
             [
                 "Ouverture de la vidéo",

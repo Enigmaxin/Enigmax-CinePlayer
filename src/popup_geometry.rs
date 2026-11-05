@@ -63,27 +63,16 @@ impl Viewport {
             _ => vec![Rect { x: 0, y: 0, w, h }],
         }
     }
-    fn disparity(&self, eye: usize) -> f64 {
-        if matches!(self.projection, Projection::Mono | Projection::Anaglyph) {
-            0.0
-        } else {
-            (self.width as f64 / 480.0).clamp(2.0, 8.0) * if eye == 0 { 1.0 } else { -1.0 }
-        }
-    }
     pub fn point(&self, x: f64, y: f64) -> Option<(f64, f64)> {
         if !x.is_finite() || !y.is_finite() {
             return None;
         }
-        self.eyes()
-            .iter()
-            .enumerate()
-            .find(|(_, r)| r.contains(x, y))
-            .map(|(eye, r)| {
-                (
-                    (x - r.x as f64) * self.width as f64 / r.w as f64 - self.disparity(eye),
-                    (y - r.y as f64) * self.height as f64 / r.h as f64,
-                )
-            })
+        self.eyes().iter().find(|r| r.contains(x, y)).map(|r| {
+            (
+                (x - r.x as f64) * self.width as f64 / r.w as f64,
+                (y - r.y as f64) * self.height as f64 / r.h as f64,
+            )
+        })
     }
     pub fn project(&self, rect: Rect, pixels: &[u8]) -> Vec<Plane> {
         if rect.w <= 0 || rect.h <= 0 || pixels.len() != (rect.w * rect.h) as usize * 4 {
@@ -91,11 +80,8 @@ impl Viewport {
         }
         self.eyes()
             .iter()
-            .enumerate()
-            .map(|(eye, r)| {
-                let x = r.x
-                    + ((rect.x as f64 + self.disparity(eye)) * r.w as f64 / self.width as f64)
-                        .round() as i32;
+            .map(|r| {
+                let x = r.x + (rect.x as f64 * r.w as f64 / self.width as f64).round() as i32;
                 let y = r.y + (rect.y as f64 * r.h as f64 / self.height as f64).round() as i32;
                 let w = (rect.w as f64 * r.w as f64 / self.width as f64)
                     .round()
@@ -159,7 +145,7 @@ mod tests {
         }
     }
     #[test]
-    fn opposite_disparity_places_menus_in_front_without_affecting_the_video() {
+    fn menu_planes_share_the_same_screen_depth() {
         let v = Viewport::new(1920, 1080, Projection::Sbs).unwrap();
         let r = Rect {
             x: 600,
@@ -168,8 +154,8 @@ mod tests {
             h: 500,
         };
         let p = v.project(r, &vec![255; (r.w * r.h * 4) as usize]);
-        assert!(p[0].x > r.x / 2);
-        assert!(p[1].x < 960 + r.x / 2);
+        assert_eq!(p[0].x, r.x / 2);
+        assert_eq!(p[1].x, 960 + r.x / 2);
         assert!(v.point(-1.0, 0.0).is_none());
     }
 }

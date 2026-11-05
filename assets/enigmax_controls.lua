@@ -13,9 +13,15 @@ mp.add_periodic_timer(5,function()
 end)
 local projection = 'mono'
 local cursor_enabled = true
-local function cursor_remove() mp.set_property('user-data/enigmax-cursor','') end
+local last_cursor
+local function cursor_publish(value)
+    if value==last_cursor then return end
+    last_cursor=value
+    mp.set_property('user-data/enigmax-cursor',value)
+end
+local function cursor_remove() cursor_publish('') end
 local cursor_time, cursor_paint = -10, -10
-local native_cursor
+local native_cursor, cursor_timer
 local function cursor_draw(moved)
     local stereo = projection == 'sbs' or projection == 'ou' or projection == 'framepack'
     if not cursor_enabled or not stereo or mp.get_property_bool('idle-active',true) then
@@ -27,7 +33,16 @@ local function cursor_draw(moved)
     local now=mp.get_time()
     if moved then cursor_time=now end
     if now-cursor_time>2.5 then cursor_remove();return end
-    if moved and now-cursor_paint<0.016 then return end
+    if moved and now-cursor_paint<0.016 then
+        if not cursor_timer then
+            cursor_timer=mp.add_timeout(0.016-(now-cursor_paint),function()
+                cursor_timer=nil
+                cursor_draw(false)
+            end)
+        end
+        return
+    end
+    if cursor_timer then cursor_timer:kill();cursor_timer=nil end
     cursor_paint=now
     local w,h=mp.get_osd_size()
     local x,y=mp.get_mouse_pos()
@@ -37,8 +52,9 @@ local function cursor_draw(moved)
     elseif projection=='ou' then views={{0,0,w,math.floor(h/2)},{0,math.floor(h/2),w,h-math.floor(h/2)}}
     else
         local scale=math.min(w/1920,h/2205)
-        local ox,oy=(w-1920*scale)/2,(h-2205*scale)/2
-        views={{ox,oy,1920*scale,1080*scale},{ox,oy+1125*scale,1920*scale,1080*scale}}
+        local ew,eh=math.floor(1920*scale),math.floor(1080*scale)
+        local ox,oy=math.floor((w-ew)/2),math.floor((h-2205*scale)/2)
+        views={{ox,oy,ew,eh},{ox,oy+math.floor(1125*scale),ew,eh}}
     end
     local u,v
     for _,r in ipairs(views) do
@@ -49,12 +65,14 @@ local function cursor_draw(moved)
     local size=math.max(16,math.min(36,h/45))
     for _,r in ipairs(views) do
         local sx,sy=math.max(6,math.floor(size*r[3]/w)),math.max(6,math.floor(size*r[4]/h))
-        data[#data+1]=math.floor(math.min(r[1]+u*r[3],r[1]+r[3]-sx))
-        data[#data+1]=math.floor(math.min(r[2]+v*r[4],r[2]+r[4]-sy))
+        local px,py=math.floor(r[1]+u*r[3]),math.floor(r[2]+v*r[4])
+        data[#data+1]=px;data[#data+1]=py
         data[#data+1]=sx;data[#data+1]=sy
+        data[#data+1]=math.min(sx,r[1]+r[3]-px)
+        data[#data+1]=math.min(sy,r[2]+r[4]-py)
     end
     -- Coalesce mouse moves while the client is occupied by a native menu.
-    mp.set_property('user-data/enigmax-cursor',table.concat(data,'|'))
+    cursor_publish(table.concat(data,'|'))
 end
 mp.register_script_message('stereo-cursor',function(value)cursor_enabled=value=='yes';cursor_draw(false)end)
 local health_timer=mp.add_periodic_timer(2,function()
@@ -241,12 +259,30 @@ local function modal_input(kind)
     if not modal_target then return end
     mp.commandv('script-message-to',modal_target,'popup-input',kind,payload() or '')
 end
-local modal_move=0
+local modal_move, modal_timer=0,nil
+local function send_modal_move()
+    modal_move=mp.get_time()
+    cursor_draw(false)
+    modal_input('move')
+end
+local function queue_modal_move()
+    cursor_time=mp.get_time()
+    local delay=0.016-(cursor_time-modal_move)
+    if delay<=0 then
+        if modal_timer then modal_timer:kill();modal_timer=nil end
+        send_modal_move()
+    elseif not modal_timer then
+        modal_timer=mp.add_timeout(delay,function()
+            modal_timer=nil
+            send_modal_move()
+        end)
+    end
+end
 mp.set_key_bindings({
     {'mbtn_left',function()modal_input('up')end,function()modal_input('down')end},
     {'mbtn_left_dbl','ignore'},
     {'mbtn_right',function()modal_input('close')end},
-    {'mouse_move',function()cursor_draw(true);local now=mp.get_time();if now-modal_move>0.03 then modal_move=now;modal_input('move')end end},
+    {'mouse_move',queue_modal_move},
     {'wheel_up',function()modal_input('wheelup')end},
     {'wheel_down',function()modal_input('wheeldown')end},
     {'ESC',function()modal_input('close')end},

@@ -582,23 +582,7 @@ fn show_sized(
                 c.text(g.rect.w / 2 - 10, g.rect.h - g.font, "⋮");
             }
             let source = c.pixels();
-            let ana = if mode == Projection::Anaglyph {
-                let glasses = m
-                    .user_data("user-data/enigmax-glasses")
-                    .and_then(|s| s.parse::<usize>().ok())
-                    .and_then(|n| cineplayer_core::stereo::Glasses::ALL.get(n).copied())
-                    .unwrap_or_default();
-                Some(cineplayer_core::control_layout::anaglyph_hud(
-                    source, g.rect.w, g.rect.h, glasses,
-                ))
-            } else {
-                None
-            };
-            for (i, plane) in view
-                .project(g.rect, ana.as_deref().unwrap_or(source))
-                .iter()
-                .enumerate()
-            {
+            for (i, plane) in view.project(g.rect, source).iter().enumerate() {
                 m.command_named(
                     "overlay-add",
                     &[

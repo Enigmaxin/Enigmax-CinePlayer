@@ -74,13 +74,9 @@ pub fn refresh(m: &Mpv, s: &mut State) -> bool {
     {
         s.subtitles.detected = header.detect(&m.get("sub-text/ass-full").unwrap_or_default());
     }
-    let changed = old_track != s.subtitles.track
+    old_track != s.subtitles.track
         || old != s.subtitles.requested(s.prefs.ass_mode)
-        || old_canvas != s.subtitles.header.as_ref().map(|h| h.canvas);
-    if changed {
-        s.applied = None;
-    }
-    changed
+        || old_canvas != s.subtitles.header.as_ref().map(|h| h.canvas)
 }
 pub fn eye_shader(horizontal: bool, second: bool) -> String {
     let axis = if horizontal { "x" } else { "y" };

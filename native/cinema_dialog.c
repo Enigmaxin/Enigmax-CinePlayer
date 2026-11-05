@@ -61,8 +61,8 @@ static void tint(HDC dc, RECT r, COLORREF color, BYTE alpha) {
 }
 static void image(CineDialog *d,HDC dc,RECT r,int which) {
     // Source rectangles address only photographs in the embedded design atlas.
-    static const int crops[5][4]={{43,184,466,242},{552,184,431,242},{1035,185,458,241},
-                                 {44,690,390,236},{790,690,388,236}};
+    static const int crops[5][4]={{0,0,703,259},{0,269,703,267},{703,0,380,200},
+                                 {703,202,380,209},{703,412,380,224}};
     if(!d->atlas) return;
     int i=(which>=0 && which<5)?which:1; const int *c=crops[i]; GpGraphics *g=NULL;
     if(GdipCreateFromHDC(dc,&g)==Ok) {
@@ -96,10 +96,13 @@ static void icon(CineDialog *d,HDC dc,int x,int y,int mode,int color) {
             SelectObject(dc,old); DeleteObject(b); }
         line(dc,x+w*2/5,y+h/4,x+w*3/5,y+h/4);
     } else if(mode==3) {
-        rectangle(dc,x+w/4,y,w/4,h); rectangle(dc,x+w*3/5,y,w/4,h);
-        line(dc,x,y+3,x,y+h-3); line(dc,x,y+3,x-px(d,5),y+px(d,8));
-        line(dc,x,y+3,x+px(d,5),y+px(d,8));
-        line(dc,x,y+h-3,x-px(d,5),y+h-px(d,8)); line(dc,x,y+h-3,x+px(d,5),y+h-px(d,8));
+        rectangle(dc,x,y,w,h); line(dc,x+w/2,y,x+w/2,y+h);
+        for(int i=1;i<=3;i+=2) {
+            int cx=x+i*w/4, y1=y+h/5, y2=y+4*h/5, tip=max(2,px(d,5));
+            line(dc,cx,y1,cx,y2);
+            line(dc,cx-tip,y1+tip,cx,y1); line(dc,cx,y1,cx+tip,y1+tip);
+            line(dc,cx-tip,y2-tip,cx,y2); line(dc,cx,y2,cx+tip,y2-tip);
+        }
     } else { rectangle(dc,x,y,w,h*2/5); rectangle(dc,x,y+h*3/5,w,h*2/5); }
     SelectObject(dc,ob); SelectObject(dc,op); DeleteObject(pen);
 }
@@ -132,20 +135,31 @@ static void background(CineDialog *d) {
         if(bmp)DeleteObject(bmp);
     if(small)DeleteDC(small);
     }
-    tint(mem,full,RGB(17,23,29),215);
+    tint(mem,full,RGB(10,24,37),224);
     SelectObject(mem,old); DeleteDC(mem); ReleaseDC(d->window,dc);
 }
 static void layout(CineDialog *d) {
     RECT r; GetClientRect(d->window,&r); d->width=max(1,r.right); d->height=max(1,r.bottom);
-    d->scale=min(d->width/1200.0f,d->height/840.0f);
+    d->scale=min(d->width/1200.0f,d->height/730.0f);
     free_fonts(d); d->heading_font=font(max(18,px(d,34)),600);
     d->title_font=font(max(10,px(d,21)),600); d->body_font=font(max(9,px(d,16)),400);
     d->brand_font=font(max(11,px(d,16)),500);
     int margin=px(d,24),gap=px(d,16),top=px(d,152),cw=(d->width-2*margin-2*gap)/3;
-    int upper=px(d,352),lower=px(d,213),bottom=top+upper+gap;
+    int content=d->height-top-margin-gap;
+    int upper=content*60/100,lower=content-upper,bottom=top+upper+gap;
     for(int i=0;i<d->count;i++) {
         int x,y,w,h;
-        if(i<3) { x=margin+i*(cw+gap); y=top; w=cw; h=upper; }
+        if(!d->glasses) {
+            int left=(d->width-2*margin-gap)*45/100;
+            int rows=i<2?2:3, row=i<2?i:i-2;
+            int total=d->height-top-max(32,px(d,55));
+            int available=total-(rows-1)*gap;
+            int start=available*row/rows, end=available*(row+1)/rows;
+            x=i<2?margin:margin+left+gap;
+            y=top+start+row*gap;
+            w=i<2?left:d->width-margin-x;
+            h=end-start;
+        } else if(i<3) { x=margin+i*(cw+gap); y=top; w=cw; h=upper; }
         else { w=(d->width-2*margin-gap)/2; x=margin+(i-3)*(w+gap); y=bottom; h=lower; }
         SetWindowPos(d->buttons[i],NULL,x,y,max(1,w),max(1,h),SWP_NOZORDER|SWP_NOACTIVATE);
     }
@@ -153,7 +167,7 @@ static void layout(CineDialog *d) {
     if(d->back)SetWindowPos(d->back,NULL,margin,px(d,63),max(58,px(d,104)),max(18,px(d,42)),SWP_NOZORDER|SWP_NOACTIVATE);
     if(d->options) {
         int width=min(d->width-2*margin,max(132,px(d,256)));
-        SetWindowPos(d->options,NULL,d->width-margin-width,d->height-max(30,px(d,79)),
+        SetWindowPos(d->options,NULL,d->width-margin-width,d->height-max(30,px(d,43)),
             width,max(18,px(d,38)),SWP_NOZORDER|SWP_NOACTIVATE);
     }
     background(d); InvalidateRect(d->window,NULL,FALSE);
@@ -191,29 +205,37 @@ static void paint_card(CineDialog *d,DRAWITEMSTRUCT *di) {
     POINT p={wr.left,wr.top}; ScreenToClient(d->window,&p);
     HDC bg=CreateCompatibleDC(dc); HGDIOBJ prev=SelectObject(bg,d->background);
     BitBlt(dc,0,0,w,h,bg,p.x,p.y,SRCCOPY); SelectObject(bg,prev); DeleteDC(bg);
-    tint(dc,r,RGB(29,36,42),170);
+    tint(dc,r,RGB(21,43,60),196);
     int pad=px(d,12);
-    BOOL compact=d->height<440;
-    RECT photo={pad,pad,w-pad,px(d,compact?168:202)};
-    BOOL lower=index>=3;
-    if(lower) { photo.right=w*55/100;photo.bottom=h-pad; }
     const CineChoice *c=&d->choices[index];
-    image(d,dc,photo,d->glasses?1:c->image);
-    if(d->glasses) {
-        tint(dc,photo,RGB(10,15,20),105);
-        icon(d,dc,(photo.left+photo.right-px(d,78))/2,(photo.top+photo.bottom-px(d,48))/2,2,index);
+    if(!d->glasses) {
+        BOOL side=index>=2;
+        int header=max(26,px(d,70));
+        RECT photo=side?(RECT){w*55/100,pad,w-pad,h-pad}:
+                        (RECT){pad,header,w-pad,h-pad};
+        image(d,dc,photo,c->image);
+        int iw=px(d,78),ih=px(d,48);
+        int ix=2*pad,iy=side?(h-ih)/2:(header-ih)/2;
+        icon(d,dc,ix,iy,c->image,0);
+        int text_right=side?photo.left-pad:w-pad;
+        int tx=ix+iw+pad;
+        int desc_height=c->description && c->description[0]?max(20,px(d,42)):0;
+        RECT title={tx,pad,text_right,(side?h:header)-pad-desc_height};
+        text(dc,d->title_font,title,c->title,RGB(243,248,254),DT_WORDBREAK|DT_END_ELLIPSIS);
+        RECT desc={tx,title.bottom,text_right,h-pad};
+        text(dc,d->body_font,desc,c->description,RGB(188,213,230),DT_WORDBREAK);
+    } else {
+        BOOL lower=index>=3;
+        RECT photo={pad,pad,w-pad,h*52/100};
+        if(lower) {photo.right=w*55/100;photo.bottom=h-pad;}
+        image(d,dc,photo,2);
+        tint(dc,photo,RGB(10,15,20),112);
+        int ix=(photo.left+photo.right-px(d,78))/2,iy=(photo.top+photo.bottom-px(d,48))/2;
+        icon(d,dc,ix,iy,2,index);
+        RECT title={lower?photo.right+pad:pad,lower?pad:photo.bottom+pad,w-pad,h-pad};
+        text(dc,d->title_font,title,c->title,RGB(243,248,254),DT_WORDBREAK|DT_CENTER);
     }
-    int tx=lower?photo.right+px(d,24):px(d,20);
-    int iy=lower?px(d,35):px(d,compact?175:221);
-    icon(d,dc,lower?tx:(w-px(d,78))/2,iy,d->glasses?2:c->image,d->glasses?index:0);
-    int desc_height=c->description && c->description[0]?max(12,px(d,27)):0;
-    RECT title={tx,iy+px(d,58),w-px(d,12),h-pad-desc_height};
-    text(dc,d->title_font,title,c->title,RGB(239,243,245),(lower?DT_LEFT:DT_CENTER)|DT_WORDBREAK|DT_END_ELLIPSIS);
-    if(c->description && c->description[0]) {
-        RECT desc={tx,title.bottom,w-px(d,12),h-px(d,8)};
-        text(dc,d->body_font,desc,c->description,RGB(183,199,208),(lower?DT_LEFT:DT_CENTER)|DT_WORDBREAK);
-    }
-    HPEN pen=CreatePen(PS_SOLID,max(1,px(d,1)),(di->itemState&(ODS_FOCUS|ODS_SELECTED))?RGB(100,211,184):RGB(73,85,91));
+    HPEN pen=CreatePen(PS_SOLID,max(1,px(d,1)),(di->itemState&(ODS_FOCUS|ODS_SELECTED))?RGB(159,224,255):RGB(91,133,161));
     HGDIOBJ op=SelectObject(dc,pen),ob=SelectObject(dc,GetStockObject(NULL_BRUSH));
     RoundRect(dc,0,0,w,h,px(d,16),px(d,16)); SelectObject(dc,ob);SelectObject(dc,op);DeleteObject(pen);
     BitBlt(di->hDC,0,0,w,h,dc,0,0,SRCCOPY);SelectObject(dc,old);DeleteObject(bmp);DeleteDC(dc);
@@ -248,15 +270,22 @@ static LRESULT CALLBACK procedure(HWND window,UINT msg,WPARAM wp,LPARAM lp) {
         PAINTSTRUCT ps;HDC dc=BeginPaint(window,&ps);
         if(d->background) {HDC bg=CreateCompatibleDC(dc);HGDIOBJ old=SelectObject(bg,d->background);
             BitBlt(dc,0,0,d->width,d->height,bg,0,0,SRCCOPY);SelectObject(bg,old);DeleteDC(bg);}
-        RECT brand={px(d,25),px(d,19),d->width-px(d,60),px(d,47)};
+        int logo_size=max(16,px(d,38));
+        HICON logo=LoadImageW(GetModuleHandleW(NULL),MAKEINTRESOURCEW(1),IMAGE_ICON,
+                              logo_size,logo_size,LR_SHARED);
+        if(logo)DrawIconEx(dc,px(d,25),px(d,12),logo,logo_size,logo_size,0,NULL,DI_NORMAL);
+        RECT brand={px(d,32)+logo_size,px(d,19),d->width-px(d,84),px(d,52)};
         text(dc,d->brand_font,brand,L"ENIGMAX  CINEPLAYER",RGB(221,231,236),DT_SINGLELINE);
         RECT heading={d->back?px(d,38)+max(58,px(d,104)):px(d,25),
-            px(d,65),d->width-px(d,25),max(px(d,111),px(d,65)+18)};
+            px(d,61),d->width-px(d,25),max(px(d,107),px(d,61)+16)};
         text(dc,d->heading_font,heading,d->heading,RGB(242,245,247),DT_SINGLELINE|DT_END_ELLIPSIS);
-        RECT sub={px(d,25),px(d,d->height<440?112:117),d->width-px(d,25),px(d,151)};
+        RECT sub={px(d,25),max(heading.bottom,px(d,107)),d->width-px(d,25),px(d,149)};
         text(dc,d->body_font,sub,d->subtitle,RGB(177,196,206),DT_SINGLELINE|DT_END_ELLIPSIS);
-        if(!d->glasses) {RECT note={px(d,25),d->height-max(12,px(d,37)),d->width-px(d,25),d->height-1};
-            text(dc,d->body_font,note,d->labels[4],RGB(145,163,173),DT_SINGLELINE|DT_END_ELLIPSIS);}
+        if(!d->glasses) {
+            RECT note={px(d,25),d->height-max(26,px(d,34)),
+                       d->width-px(d,36)-max(132,px(d,256)),d->height-2};
+            text(dc,d->body_font,note,d->labels[4],RGB(164,188,206),DT_WORDBREAK);
+        }
         EndPaint(window,&ps);return 0; }
     }
     return DefWindowProcW(window,msg,wp,lp);
