@@ -238,10 +238,13 @@ impl Canvas {
         }
     }
     pub(crate) fn text_clipped(&self, x: i32, y: i32, w: i32, h: i32, text: &str) {
+        self.literal_text_clipped(x, y, w, h, &crate::i18n::tr(text));
+    }
+    fn literal_text_clipped(&self, x: i32, y: i32, w: i32, h: i32, text: &str) {
         if w <= 0 || h <= 0 || text.is_empty() {
             return;
         }
-        let s = crate::i18n::tr(text).encode_utf16().collect::<Vec<_>>();
+        let s = text.encode_utf16().collect::<Vec<_>>();
         let mut r = [x, y, (x + w).min(self.width), (y + h).min(self.height)];
         let old = self.fit_font(&s, r[2] - r[0]);
         unsafe {
@@ -638,6 +641,7 @@ impl Controls {
             s.display_title.clone()
         };
         if self.title != title {
+            m.set("user-data/enigmax-title", &s.display_title)?;
             self.title = title;
             self.last.clear();
         }
@@ -756,7 +760,7 @@ impl Controls {
         }
         let c = self.canvas.as_mut().ok_or("No hay lienzo de controles")?;
         c.clear(&l);
-        c.text_clipped(
+        c.literal_text_clipped(
             l.shelf.x + 10,
             0,
             l.shelf.w - 20,
@@ -1140,6 +1144,63 @@ fn time(t: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn title_repainting_matches_a_fresh_canvas_and_each_eye_projection() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        for (key, value) in [
+            ("config", "no"),
+            ("vo", "null"),
+            ("ao", "null"),
+            ("idle", "yes"),
+        ] {
+            m.option(key, value).unwrap();
+        }
+        m.init().unwrap();
+        for (width, height) in [(1920, 1080), (3840, 1080), (1919, 1079), (1280, 720)] {
+            let mut controls = Controls::default();
+            for title in [
+                "A VERY LONG PREVIOUS TITLE THAT MUST DISAPPEAR",
+                "NEW TITLE",
+                "",
+                "NEW TITLE",
+            ] {
+                controls.title = title.into();
+                controls.last.clear();
+                let body = format!("{width}|{height}|-1|-1|1|60|50|1|0");
+                controls.draw(&m, &body).unwrap();
+                let actual = controls.canvas.as_mut().unwrap().pixels().to_vec();
+                let mut fresh = Controls {
+                    title: title.into(),
+                    ..Default::default()
+                };
+                fresh.draw(&m, &body).unwrap();
+                let expected = fresh.canvas.as_mut().unwrap().pixels().to_vec();
+                assert_eq!(actual, expected, "Stale title at {width}x{height}: {title}");
+                let layout = Layout::new(width, height).unwrap();
+                for mode in [
+                    Projection::Mono,
+                    Projection::Sbs,
+                    Projection::Ou,
+                    Projection::FramePack,
+                    Projection::Anaglyph,
+                ] {
+                    let planes = control_layout::project(&actual, &layout, mode, Glasses::RedCyan);
+                    assert_eq!(
+                        planes.len(),
+                        if matches!(mode, Projection::Mono | Projection::Anaglyph) {
+                            1
+                        } else {
+                            2
+                        }
+                    );
+                    if width % 2 == 0 && mode == Projection::Sbs {
+                        assert_eq!(planes[0].pixels, planes[1].pixels, "Eye mismatch");
+                    }
+                }
+            }
+        }
+    }
     #[test]
     fn information_and_swap_buttons_work_from_each_output_eye() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));

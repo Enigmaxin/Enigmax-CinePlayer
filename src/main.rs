@@ -55,7 +55,7 @@ fn configure(m: &Mpv, probe: bool, dir: &std::path::Path) -> Result<(), String> 
             concat!(
                 "Enigmax CinePlayer ",
                 env!("CARGO_PKG_VERSION"),
-                "${?media-title: — ${media-title}}"
+                "${?user-data/enigmax-title: — ${user-data/enigmax-title}}"
             ),
         ),
         ("vo", "gpu-next,gpu"),

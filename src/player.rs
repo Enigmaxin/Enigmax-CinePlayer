@@ -2176,33 +2176,34 @@ impl State {
             return Ok(());
         }
         self.applied_quality = None;
-        let p = &self.prefs;
-        m.set(
-            "scale",
-            if p.quality == Quality::High {
-                "ewa_lanczossharp"
-            } else if p.quality == Quality::Low {
-                "bilinear"
-            } else {
-                "spline36"
-            },
-        )?;
-        m.set(
-            "dscale",
-            if p.quality == Quality::High {
-                "mitchell"
-            } else {
-                "bilinear"
-            },
-        )?;
-        m.set(
-            "hdr-compute-peak",
-            if p.quality == Quality::Low {
-                "no"
-            } else {
-                "auto"
-            },
-        )?;
+        let (scale, downscale, chroma, antiring) = match self.prefs.quality {
+            Quality::High if desired.1 == "gpu-next" => {
+                ("ewa_lanczossharp", "mitchell", "ewa_lanczos", "0.6")
+            }
+            Quality::High => ("ewa_lanczossharp", "mitchell", "ewa_lanczossharp", "0"),
+            Quality::Balanced => ("spline36", "bilinear", "spline36", "0.6"),
+            Quality::Compatibility => ("spline36", "bilinear", "spline36", "0"),
+            Quality::Low => ("bilinear", "bilinear", "bilinear", "0"),
+        };
+        // Always restore all scaler options when leaving a quality profile.
+        // Chroma reconstruction is independent from luma resizing, including 1:1 video.
+        for (key, value) in [
+            ("scale", scale),
+            ("dscale", downscale),
+            ("cscale", chroma),
+            ("scale-antiring", antiring),
+            ("cscale-antiring", antiring),
+            (
+                "hdr-compute-peak",
+                if self.prefs.quality == Quality::Low {
+                    "no"
+                } else {
+                    "auto"
+                },
+            ),
+        ] {
+            m.set(key, value)?;
+        }
         self.apply_resources(m)?;
         self.applied_quality = Some(desired);
         Ok(())

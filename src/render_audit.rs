@@ -552,3 +552,149 @@ fn resident_engine_lifetimes_do_not_accumulate_windows_handles() {
         );
     }
 }
+
+#[test]
+#[ignore = "Explicit title diagnostics; requires ENIGMAX_HUD_AUDIT"]
+fn title_overlay_probe() {
+    use cineplayer_core::stereo::{Layout, Output};
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let directory = std::env::var("ENIGMAX_HUD_AUDIT").unwrap();
+    for vo in ["gpu-next", "gpu"] {
+        let temp = tempfile::tempdir().unwrap();
+        let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+        configure(&m, true, root).unwrap();
+        m.option("vo", vo).unwrap();
+        m.option("autofit", "1280x720").unwrap();
+        m.init().unwrap();
+        let mut s = State::new(temp.path(), true);
+        s.prefs.layout = Layout::FullSbs;
+        s.prefs.output = Output::Original;
+        player::load(
+            &m,
+            &mut s,
+            root.join("verificacion/muestras/quality-fullsbs.mkv")
+                .to_str()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        let until = Instant::now() + Duration::from_secs(10);
+        loop {
+            if m.wait(0.02).id == 8 {
+                break;
+            }
+            assert!(Instant::now() < until);
+        }
+        s.pending_load = false;
+        m.set("sid", "no").unwrap();
+        player::apply(&m, &mut s).unwrap();
+        pump(&mut m, Duration::from_millis(300));
+        let mut controls = crate::controls::Controls::default();
+        controls.ready();
+        for (layout, output, label) in [
+            (Layout::FullSbs, Output::Original, "sbs"),
+            (Layout::FullOu, Output::Original, "ou"),
+            (Layout::FullSbs, Output::Anaglyph, "anaglyph"),
+            (Layout::FullSbs, Output::Left, "left"),
+        ] {
+            s.prefs.layout = layout;
+            s.prefs.output = output;
+            player::apply(&m, &mut s).unwrap();
+            pump(&mut m, Duration::from_millis(150));
+            s.display_title = "UN TITULO DE PELICULA 3D".into();
+            controls.sync(&m, &s).unwrap();
+            let w = m.get("osd-width").unwrap();
+            let h = m.get("osd-height").unwrap();
+            controls
+                .draw(&m, &format!("{w}|{h}|-1|-1|1|60|50|1|0"))
+                .unwrap();
+            pump(&mut m, Duration::from_millis(80));
+            m.command(&[
+                "screenshot-to-file",
+                &format!("{directory}/{vo}-{label}.png"),
+                "window",
+            ])
+            .unwrap();
+            println!("{vo}/{label} {w}x{h}");
+        }
+    }
+}
+
+#[test]
+#[ignore = "Requires ENIGMAX_TEST_TITLE_FILE and ENIGMAX_HUD_AUDIT; original is read only"]
+fn duplicate_matroska_title_is_single_in_each_output_eye() {
+    use cineplayer_core::stereo::{Delivery, Layout, Output};
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let source = std::env::var("ENIGMAX_TEST_TITLE_FILE").unwrap();
+    let directory = std::env::var("ENIGMAX_HUD_AUDIT").unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    let original = std::fs::metadata(&source).unwrap();
+    let mut m = Mpv::new(&root.join("libmpv-2.dll")).unwrap();
+    configure(&m, true, root).unwrap();
+    m.init().unwrap();
+    let mut s = State::new(temp.path(), true);
+    s.prefs.layout = Layout::FullSbs;
+    s.prefs.output = Output::Original;
+    player::load(&m, &mut s, &source, None).unwrap();
+    let until = Instant::now() + Duration::from_secs(15);
+    loop {
+        if m.wait(0.02).id == 8 {
+            break;
+        }
+        assert!(Instant::now() < until);
+    }
+    s.pending_load = false;
+    pump(&mut m, Duration::from_millis(100));
+    let metadata = m.get("metadata").unwrap();
+    let tags: serde_json::Value = serde_json::from_str(&metadata).unwrap();
+    let raw = tags
+        .as_object()
+        .unwrap()
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case("title"))
+        .unwrap()
+        .1
+        .as_str()
+        .unwrap();
+    s.display_title = cineplayer_core::media::title(&source, &metadata);
+    assert_ne!(
+        s.display_title, raw,
+        "This fixture must reproduce mpv's duplicate metadata"
+    );
+    assert_eq!(raw, format!("{} / {}", s.display_title, s.display_title));
+    let mut controls = crate::controls::Controls::default();
+    controls.ready();
+    for (output, delivery, label) in [
+        (Output::Original, Delivery::Anamorphic, "anamorphic"),
+        (Output::Original, Delivery::Native, "original"),
+        (Output::Anaglyph, Delivery::Native, "anaglyph"),
+        (Output::Left, Delivery::Native, "2d"),
+    ] {
+        s.prefs.output = output;
+        s.prefs.delivery = delivery;
+        player::apply(&m, &mut s).unwrap();
+        pump(&mut m, Duration::from_millis(200));
+        controls.sync(&m, &s).unwrap();
+        assert_eq!(
+            m.user_data("user-data/enigmax-title").as_deref(),
+            Some(s.display_title.as_str())
+        );
+        let w = m.get("osd-width").unwrap();
+        let h = m.get("osd-height").unwrap();
+        controls
+            .draw(&m, &format!("{w}|{h}|-1|-1|1|60|50|1|0"))
+            .unwrap();
+        pump(&mut m, Duration::from_millis(60));
+        m.command(&[
+            "screenshot-to-file",
+            &format!("{directory}/title-fixed-{label}.png"),
+            "window",
+        ])
+        .unwrap();
+        assert_eq!(m.get("metadata").as_deref(), Some(metadata.as_str()));
+    }
+    let after = std::fs::metadata(&source).unwrap();
+    assert_eq!(original.len(), after.len());
+    assert_eq!(original.modified().unwrap(), after.modified().unwrap());
+    println!("Raw metadata: {raw}; displayed: {}", s.display_title);
+}

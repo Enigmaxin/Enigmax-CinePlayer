@@ -271,6 +271,23 @@ fn all_quality_transitions_keep_playback_tracks_color_and_transport() {
                     _ => "spline36",
                 })
             );
+            let next = m.get("current-vo").as_deref() == Some("gpu-next");
+            assert_eq!(
+                m.get("cscale").as_deref(),
+                Some(match q {
+                    Quality::High if next => "ewa_lanczos",
+                    Quality::High => "ewa_lanczossharp",
+                    Quality::Low => "bilinear",
+                    _ => "spline36",
+                })
+            );
+            let antiring = if q == Quality::Balanced || (q == Quality::High && next) {
+                0.6
+            } else {
+                0.0
+            };
+            assert!((number(&m, "scale-antiring") - antiring).abs() < 0.0001);
+            assert!((number(&m, "cscale-antiring") - antiring).abs() < 0.0001);
             if q == Quality::Low {
                 assert!(number(&m, "demuxer-max-bytes") <= 16.0 * 1024.0 * 1024.0);
                 assert_eq!(m.get("demuxer-max-back-bytes").as_deref(), Some("0"));

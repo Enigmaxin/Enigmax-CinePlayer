@@ -1,6 +1,12 @@
-# Enigmax CinePlayer 1.0.5 — Windows 11 x64
+# Enigmax CinePlayer 1.0.6 — Windows 11 x64
 
-## Interfaz de la versión 1.0.5
+## Cambios de la versión 1.0.6
+
+- El título de un MKV se muestra una sola vez cuando el motor concatena dos campos iguales con « / ». Los nombres distintos separados por barras se conservan. La barra de controles y el título de la ventana utilizan el mismo nombre.
+- Equilibrado añade antirringing moderado al escalado de imagen y color. Máxima calidad utiliza escalado de color independiente y antirringing en gpu-next. Compatibilidad conserva la ruta de renderizado compatible. Mínimo consumo utiliza escalado bilineal sin antirringing.
+- Al cambiar de perfil se restauran todos los parámetros de escalado para evitar ajustes residuales.
+
+## Interfaz
 
 El idioma inicial es inglés. Se puede elegir español, catalán, euskera, gallego, portugués, francés, alemán o italiano en Configuración → Idioma. El selector gráfico de apertura 3D se ajusta a la ventana del reproductor. Los controles de tamaño y posición de subtítulos, brillo por ojo y Crosstalk admiten deslizadores con previsualización. Los valores se guardan al soltar el control.
 
