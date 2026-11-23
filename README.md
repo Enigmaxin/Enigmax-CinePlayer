@@ -1,4 +1,13 @@
-# Enigmax CinePlayer 1.0.6 — Windows 11 x64
+# Enigmax CinePlayer 1.0.7 — Windows 11 x64
+
+## Cambios de la versión 1.0.7
+
+- La barra reserva temporalmente espacio para subtítulos SRT y PGS convencionales mientras está visible, sin guardar el desplazamiento. Al ocultarse se recupera la posición elegida. Los ASS conservan su composición original.
+- Los controles permanecen visibles al situar el puntero sobre ellos o arrastrar un control. Fuera de su zona se ocultan tras unos 450 ms; para mostrarlos de nuevo, acerca el puntero a la barra.
+
+## Validación de esta entrega
+
+Los resultados y límites de la entrega local 1.0.7 se documentan en `VERIFICACION_1.0.7.md`, incluido en las fuentes. El desplazamiento temporal no reconstruye la cadena de vídeo ni se guarda como preferencia. Los subtítulos ASS mantienen sus posiciones; la ocultación rápida de la barra permite volver a verlos.
 
 ## Cambios de la versión 1.0.6
 

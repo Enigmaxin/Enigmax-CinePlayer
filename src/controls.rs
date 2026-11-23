@@ -692,10 +692,14 @@ impl Controls {
             self.fraction = None;
             self.last.clear();
         }
+        if self.rendered {
+            crate::subtitle_clearance::refresh(m)?;
+        }
         self.startup_draw(m, s)
     }
     pub fn hide(&mut self, m: &Mpv) -> Result<(), String> {
         self.rendered = false;
+        crate::subtitle_clearance::controls(m, None)?;
         for id in [61, 62] {
             m.command(&["overlay-remove", &id.to_string()])?;
         }
@@ -707,6 +711,7 @@ impl Controls {
     pub fn draw(&mut self, m: &Mpv, body: &str) -> Result<(), String> {
         let f = Frame::parse(body).ok_or("Estado de controles no válido")?;
         let l = Layout::new(f.w, f.h).ok_or("Tamaño de controles no válido")?;
+        crate::subtitle_clearance::controls(m, Some((&l, self.mode)))?;
         let hover = l.hit(self.mode, f.x, f.y);
         let progress = self
             .fraction

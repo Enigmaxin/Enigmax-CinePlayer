@@ -19,6 +19,7 @@ mod quality_audit;
 mod render_audit;
 #[cfg(test)]
 mod stability_audit;
+mod subtitle_clearance;
 mod subtitles;
 mod sync_probe;
 mod updater;

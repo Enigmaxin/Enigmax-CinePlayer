@@ -66,12 +66,27 @@ local function test()
     local count=#sent
     clock=30;bindings.enigmax_show[4][2]();observers.pause()
     assert(#sent==count,'Mouse leave/property changes must not hide or paint underneath a native popup')
+    mx,my=640,300
     messages.popup('no')
     assert(enabled.enigmax_bottom and enabled.enigmax_show and timer.alive,'Popup close must restore controls')
     count=#sent;clock=31;timer.tick()
     for i=count+1,#sent do assert(sent[i][3]~='controls-hide','Popup close must reset inactivity') end
     clock=34;timer.tick()
     assert(not timer.alive and enabled.enigmax_bottom,'Auto-hide must retain first-click activation')
+    -- A stationary pointer over controls keeps them usable indefinitely.
+    mx,my=640,700;press();clock=40;timer.tick()
+    assert(timer.alive,'Hovering controls must prevent auto-hide')
+    mx,my=640,300;bindings.enigmax_show[3][2]();clock=clock+0.44;timer.tick()
+    assert(timer.alive,'Leaving controls must allow a short grace period')
+    clock=clock+0.12;timer.tick()
+    assert(not timer.alive,'Leaving controls must hide them promptly')
+    local hidden_count=#sent
+    for i=1,10 do mx=640+i;clock=clock+0.1;bindings.enigmax_show[3][2]() end
+    assert(#sent==hidden_count,'Outside movement must not repeatedly flash hidden controls')
+    -- Dragging remains active even after leaving the bar.
+    mx,my=640,700;bindings.enigmax_bottom[1][3]();mx,my=640,300;clock=clock+4;timer.tick()
+    assert(timer.alive,'An active drag must keep controls visible')
+    bindings.enigmax_bottom[1][2]()
     press()
     messages.configure('ou')
     assert(enabled.enigmax_top and enabled.enigmax_bottom,'OU must retain both eye hit regions')
@@ -80,6 +95,12 @@ local function test()
     local top,bottom=mouse_areas.enigmax_top,mouse_areas.enigmax_bottom
     assert(top[1]==327 and top[2]==309 and top[3]==953 and top[4]==352,'Framepack top coordinates')
     assert(bottom[1]==327 and bottom[2]==677 and bottom[3]==953 and bottom[4]==720,'Framepack bottom coordinates')
+    -- Both OU/FramePack eyes retain hover, including their top control strip.
+    mx,my=640,330;clock=clock+4;timer.tick()
+    assert(timer.alive,'FramePack top-eye hover must keep controls visible')
+    messages.configure('ou');mx,my=640,350;clock=clock+4;timer.tick()
+    assert(timer.alive,'OU top-eye hover must keep controls visible')
+    messages.configure('framepack');messages.pin('yes')
     volume=52;observers.volume('volume',volume);clock=clock+0.11;timer.tick()
     local function last_draw()
         for i=#sent,1,-1 do if sent[i][3]=='controls-draw' then return sent[i][4] end end
@@ -90,6 +111,7 @@ local function test()
     assert(last_draw():match('|0$'),'Volume feedback must expire without another key press')
     volume=49;observers.volume('volume',volume);clock=clock+0.11;timer.tick()
     assert(last_draw():match('|%-1$'),'Volume down must carry transient direction')
+    messages.pin('no');press()
     messages['stereo-popup']('qa-popup-client')
     assert(enabled.enigmax_popup and not enabled.enigmax_bottom and not enabled.enigmax_show and not timer.alive,'Stereo popup must own input and suspend bar painting')
     bindings.enigmax_popup[1][3]();bindings.enigmax_popup[1][2]()

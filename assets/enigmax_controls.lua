@@ -87,6 +87,7 @@ local volume_until, volume_feedback = 0, 0
 local last_volume=mp.get_property_number('volume')
 local last_mute=mp.get_property_bool('mute',false)
 local last_activity, last_paint, last_move = 0, 0, 0
+local outside_since, mouse_suppressed
 local previous = ''
 local timer
 local single_click
@@ -129,6 +130,31 @@ local function payload()
     return table.concat({w,h,x,y,number('time-pos'),number('duration'),math.min(100,number('volume')),
         mp.get_property_bool('pause',false) and 1 or 0,mp.get_property_bool('mute',false) and 1 or 0,mp.get_time()<volume_until and volume_feedback or 0}, '|')
 end
+local function panel_areas(w,h)
+    local ph = math.min(h, math.max(88, math.min(160, math.floor(h*0.1+0.5))))
+    if projection == 'framepack' then
+        local scale=math.min(w/1920,h/2205)
+        local width=math.max(1,math.floor(1920*scale+1e-7))
+        local x=math.max(0,math.floor((w-width)/2))
+        local top=math.floor(math.max(0,(h-2205*scale)/2))
+        local bh=math.min(math.max(1,math.floor(ph*width/w+0.5)),math.max(1,math.floor(1080*scale+1e-7)))
+        local first=math.floor(top+1080*scale+1e-7)
+        local second=math.floor(top+2205*scale+1e-7)
+        return {x,second-bh,x+width,second},{x,first-bh,x+width,first}
+    elseif projection == 'ou' then
+        local bh=math.max(1,math.floor(ph/2))
+        return {0,h-bh,w,h},{0,math.floor(h/2)-bh,w,math.floor(h/2)}
+    end
+    return {0,h-ph,w,h}
+end
+local function over_controls()
+    local w,h=mp.get_osd_size()
+    local x,y=mp.get_mouse_pos()
+    if not w or not h or w<=0 or h<=0 or not x or not y then return false end
+    local a,b=panel_areas(w,h)
+    local function inside(r)return r and x>=r[1] and x<r[3] and y>=r[2] and y<r[4] end
+    return inside(a) or inside(b)
+end
 local function areas()
     local w, h = mp.get_osd_size()
     if not w or not h then return end
@@ -147,27 +173,14 @@ local function areas()
     if choosing() or mp.get_property_bool('idle-active',true) then
         mp.disable_key_bindings('enigmax_bottom');mp.disable_key_bindings('enigmax_top');return
     end
-    local ph = math.min(h, math.max(88, math.min(160, math.floor(h*0.1+0.5))))
     if dragging then
         mp.set_mouse_area(0,0,w,h,'enigmax_bottom');mp.disable_key_bindings('enigmax_top')
-    elseif projection == 'framepack' then
-        local scale=math.min(w/1920,h/2205)
-        local width=math.max(1,math.floor(1920*scale+1e-7))
-        local x=math.max(0,math.floor((w-width)/2))
-        local top=math.floor(math.max(0,(h-2205*scale)/2))
-        local bh=math.min(math.max(1,math.floor(ph*width/w+0.5)),math.max(1,math.floor(1080*scale+1e-7)))
-        local first=math.floor(top+1080*scale+1e-7)
-        local second=math.floor(top+2205*scale+1e-7)
-        mp.set_mouse_area(x,second-bh,x+width,second,'enigmax_bottom')
-        mp.set_mouse_area(x,first-bh,x+width,first,'enigmax_top')
-        mp.enable_key_bindings('enigmax_top')
-    elseif projection == 'ou' then
-        local bh = math.max(1,math.floor(ph/2))
-        mp.set_mouse_area(0,h-bh,w,h,'enigmax_bottom')
-        mp.set_mouse_area(0,math.floor(h/2)-bh,w,math.floor(h/2),'enigmax_top')
-        mp.enable_key_bindings('enigmax_top')
     else
-        mp.set_mouse_area(0,h-ph,w,h,'enigmax_bottom');mp.disable_key_bindings('enigmax_top')
+        local bottom,top=panel_areas(w,h)
+        mp.set_mouse_area(bottom[1],bottom[2],bottom[3],bottom[4],'enigmax_bottom')
+        if top then
+            mp.set_mouse_area(top[1],top[2],top[3],top[4],'enigmax_top');mp.enable_key_bindings('enigmax_top')
+        else mp.disable_key_bindings('enigmax_top') end
     end
     mp.enable_key_bindings('enigmax_bottom')
 end
@@ -183,6 +196,7 @@ local function paint(force)
 end
 local function hide()
     visible,dragging=false,false;previous=''
+    outside_since=nil
     if timer then timer:kill() end
     areas();mp.commandv('script-message-to',target,'controls-hide')
 end
@@ -191,6 +205,8 @@ local function show()
     if popup_open then return end
     if choosing() or mp.get_property_bool('idle-active',true) then return end
     last_activity=mp.get_time()
+    mouse_suppressed=false
+    if over_controls() then outside_since=nil else outside_since=outside_since or last_activity end
     if not visible then visible=true;previous='';areas();timer:resume();paint(true) end
 end
 local function input(kind)
@@ -205,7 +221,9 @@ local function input(kind)
     last_activity=mp.get_time();previous=''
 end
 timer=mp.add_periodic_timer(0.1,function()
-    if not pinned and not dragging and mp.get_time()-last_activity>2.5 then hide() else paint(false) end
+    if pinned or dragging or over_controls() then outside_since=nil;paint(false);return end
+    outside_since=outside_since or mp.get_time()
+    if mp.get_time()-outside_since>=0.45 then mouse_suppressed=true;hide() else paint(false) end
 end)
 timer:kill()
 mp.set_key_bindings({
@@ -213,7 +231,7 @@ mp.set_key_bindings({
     {'mbtn_left_dbl',function() cancel_click();mp.commandv('cycle','fullscreen') end},
     {'mouse_move',function()
         cursor_draw(true)
-        show()
+        if not mouse_suppressed or over_controls() or dragging then show() end
         if dragging and mp.get_time()-last_move>0.05 then last_move=mp.get_time();input('move') end
     end},
     {'mouse_leave',function() cursor_time=-10;cursor_remove();if popup_open then return end;if dragging then input('cancel') end;if not pinned then hide() end end},
@@ -222,7 +240,7 @@ mp.set_key_bindings({
 },'enigmax_show','force')
 mp.enable_key_bindings('enigmax_show','allow-vo-dragging+allow-hide-cursor')
 local function control_move()
-    cursor_draw(true);show()
+    cursor_draw(true);if not mouse_suppressed or over_controls() or dragging then show() end
     if dragging and mp.get_time()-last_move>0.05 then last_move=mp.get_time();input('move') end
 end
 for _,name in ipairs({'enigmax_bottom','enigmax_top'}) do
@@ -247,7 +265,7 @@ mp.register_script_message('pin',function(value)
 end)
 mp.register_script_message('popup',function(value)
     popup_open=value=='yes'
-    dragging=false;previous='';last_activity=mp.get_time()
+    dragging=false;previous='';last_activity=mp.get_time();outside_since=nil
     if popup_open then
         cancel_click();timer:kill();areas()
     else
@@ -300,7 +318,7 @@ mp.disable_key_bindings('enigmax_popup')
 mp.register_script_message('stereo-popup',function(client)
     modal_target=client~='' and client or nil
     popup_open=modal_target~=nil
-    dragging=false;cancel_click();previous='';last_activity=mp.get_time()
+    dragging=false;cancel_click();previous='';last_activity=mp.get_time();outside_since=nil
     if modal_target then timer:kill();areas();modal_input('resize')
     else mp.disable_key_bindings('enigmax_popup');areas();if visible then timer:resume();paint(true)end end
 end)
@@ -327,7 +345,7 @@ for _,key in ipairs({'pause','duration'}) do
 end
 mp.observe_property('idle-active','bool',function(_,idle) if idle then health_timer:kill();cursor_draw(false);hide();mp.commandv('script-message-to',target,'idle-draw') else health_timer:resume();mp.commandv('overlay-remove',63);areas() end end)
 mp.observe_property('osd-dimensions','native',function()if choosing()then mp.commandv('script-message-to',target,'startup-draw')end end)
-mp.register_event('start-file',function() volume_until=0;volume_feedback=0;cursor_time=-10;cursor_remove();cancel_click();hide();mp.commandv('overlay-remove',63) end)
+mp.register_event('start-file',function() volume_until=0;volume_feedback=0;cursor_time=-10;cursor_remove();cancel_click();mouse_suppressed=false;hide();mp.commandv('overlay-remove',63) end)
 mp.register_event('file-loaded',function() areas();if pinned then show();paint(true) end end)
 mp.set_key_bindings({
     {'SPACE',function()mp.commandv('script-message-to',target,'startup-choice','continue')end},

@@ -411,11 +411,7 @@ pub fn subtitle_menu(subs: &windows::Menu, _m: &Mpv) -> Result<(), String> {
 }
 pub fn subtitle_position_menu(m: &Mpv) -> Result<windows::Menu, String> {
     let menu = windows::Menu::new()?;
-    let current = m
-        .get("sub-pos")
-        .and_then(|s| s.parse::<f64>().ok())
-        .filter(|n| n.is_finite())
-        .unwrap_or(100.0);
+    let current = crate::subtitle_clearance::position(m);
     for (i, position) in crate::player::SUB_POSITIONS.iter().enumerate() {
         menu.item(
             crate::player::SUB_POSITION_FIRST + i as u32,
@@ -546,7 +542,7 @@ pub(crate) fn visual_panel(
         });
     if s.prefs != saved.0 || s.features.prefs != saved.1 {
         if s.prefs.sub_pos != saved.0.sub_pos {
-            m.set("sub-pos", &saved.0.sub_pos.to_string())?;
+            crate::subtitle_clearance::set_position(m, saved.0.sub_pos as f64)?;
         }
         s.prefs = saved.0;
         s.features.prefs = saved.1;
@@ -581,7 +577,7 @@ fn subtitle_panel_entries(m: &Mpv) -> Result<Vec<crate::popup::Entry>, String> {
             Some(7102),
         ]);
     }
-    let current = number(m, "sub-pos");
+    let current = crate::subtitle_clearance::position(m);
     let supported = subtitle_position_supported(m);
     let mut position = Entry::action(
         7142,
@@ -695,7 +691,7 @@ pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
     }
     let result = s.features.apply(m, s.passthrough).and_then(|()| {
         if id == 7131 {
-            m.set("sub-pos", "100")?;
+            crate::subtitle_clearance::set_position(m, 100.0)?;
         }
         if s.automatic {
             if id == 7131 {
@@ -711,7 +707,7 @@ pub fn action(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
         s.features.prefs = old;
         s.prefs.sub_pos = old_position;
         if id == 7131 {
-            let _ = m.set("sub-pos", &old_position.to_string());
+            let _ = crate::subtitle_clearance::set_position(m, old_position as f64);
         }
         s.features.invalidate();
         let _ = s.features.apply(m, s.passthrough);

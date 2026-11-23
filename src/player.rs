@@ -1065,7 +1065,7 @@ pub fn apply(m: &Mpv, s: &mut State) -> Result<(), String> {
         0.0
     };
     m.set("sub-ass-video-aspect-override", &format!("{sub_par:.12}"))?;
-    m.set("sub-pos", &p.sub_pos.to_string())?;
+    crate::subtitle_clearance::set_position(m, p.sub_pos as f64)?;
     let source_hdr = s
         .raw
         .is_some_and(|i| matches!(i.metadata.transfer, 16 | 18))
@@ -2013,7 +2013,7 @@ fn action_impl(m: &Mpv, s: &mut State, id: u32) -> Result<(), String> {
                 return Ok(());
             }
             let position = SUB_POSITIONS[(id - SUB_POSITION_FIRST) as usize];
-            m.set("sub-pos", &position.to_string())?;
+            crate::subtitle_clearance::set_position(m, position as f64)?;
             s.prefs.sub_pos = position;
             return Ok(());
         }
